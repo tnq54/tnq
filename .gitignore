@@ -46,6 +46,12 @@ tmp/
 temp/
 *.tmp
 
+# Test files
+test_*.mp4
+test_*.mov
+test_*.avi
+test_*.webm
+
 # Video files (examples)
 examples/*.mp4
 examples/*.mov
