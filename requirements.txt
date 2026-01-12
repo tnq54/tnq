@@ -1,0 +1,7 @@
+openai-whisper
+edge-tts
+moviepy>=2.0.0
+deep-translator
+torch
+tqdm
+imageio-ffmpeg
