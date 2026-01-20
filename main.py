@@ -4,7 +4,7 @@ import telebot
 from flask import Flask
 
 # --- CẤU HÌNH ---
-BOT_TOKEN = os.getenv("BOT_TOKEN") # Lấy token từ Environment Variable trên Render
+BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN") # Lấy token từ Environment Variable trên Render
 bot = telebot.TeleBot(BOT_TOKEN)
 app = Flask(__name__)
 
