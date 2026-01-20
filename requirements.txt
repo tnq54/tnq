@@ -2,5 +2,5 @@ fastapi
 uvicorn
 pydantic
 requests
-google-generativeai
+google-genai
 python-telegram-bot
