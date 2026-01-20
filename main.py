@@ -1,7 +1,7 @@
 import os
 import asyncio
 from fastapi import FastAPI
-from genai import Client # Sử dụng SDK v2 mới nhất sếp vừa gửi
+from google import genai # Sử dụng SDK v2 mới nhất sếp vừa gửi
 from telegram import Update
 from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, filters
 
