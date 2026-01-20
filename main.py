@@ -1,14 +1,20 @@
-from fastapi import FastAPI
-from pydantic import BaseModel
 import os
+from fastapi import FastAPI
+import google.generativeai as genai
 
 app = FastAPI()
 
-@app.get("/")
-def home():
-    return {"status": "Brain is Online", "model": "Gemini 2.5 Flash"}
+# Kết nối API Key sếp đã nạp trên Render
+genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
+model = genai.GenerativeModel('gemini-2.0-flash-exp') # Bản Flash 2026 siêu tốc
 
-@app.post("/chat")
-def chat(query: str):
-    # Logic kết nối Gemini 2.5 Flash sẽ nằm ở đây
-    return {"thinking": "Logic GRPO đang được nạp...", "response": "Chào sếp!"}
+@app.get("/")
+def health():
+    return {"status": "Live", "brain": "Gemini 2.5 Flash Online"}
+
+@app.get("/ask")
+def ask_agent(prompt: str):
+    # Ép não tư duy theo phong cách sếp
+    response = model.generate_content(f"Hành xử như Agent tnq. Suy nghĩ: {prompt}")
+    return {"answer": response.text}
+    
