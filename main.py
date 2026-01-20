@@ -9,7 +9,7 @@ app = FastAPI()
 
 # 🧪 Khởi tạo Client với API Key sếp đã dán ở mục Environment
 api_key = os.environ.get("GEMINI_API_KEY")
-client = Client(api_key=api_key)
+client = genai.Client(api_key=api_key)
 
 # 🤖 Logic xử lý với Gemini 3 Flash
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
