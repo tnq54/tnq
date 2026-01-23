@@ -2,23 +2,27 @@ import os
 import threading
 import telebot
 import numpy as np
-from google import genai
+from huggingface_hub import InferenceClient
 from flask import Flask
 
 # --- CẤU HÌNH ---
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+HF_TOKEN = os.getenv("HF_TOKEN")
 
 # --- KHỞI TẠO ---
 bot = telebot.TeleBot(BOT_TOKEN)
 app = Flask(__name__)
-client = genai.Client(api_key=GEMINI_API_KEY)
+client = InferenceClient(api_key=HF_TOKEN)
+
+# --- MODELS ---
+EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+CHAT_MODEL = "HuggingFaceH4/zephyr-7b-beta"
 
 # --- 📚 KHO TRI THỨC (RAG) ---
 # Đây là "não phụ" của Bot. Sếp sửa nội dung trong này nhé.
 KNOWLEDGE_BASE = [
     "Tôi là Trợ lý AI TNQ, chạy trên nền tảng Render với framework Flask.",
-    "Tôi sử dụng model 'gemini-3-flash-preview' mới nhất của Google.",
+    "Tôi sử dụng model 'Zephyr 7B Beta' từ Hugging Face.",
     "Sếp đang dạy tôi kỹ thuật RAG để tôi trả lời thông minh hơn.",
     "Mã nguồn của tôi kết hợp giữa Flask (để giữ server sống) và Telebot (để chat).",
     "Sở thích của sếp là lập trình AI và tối ưu hóa hệ thống tự động."
@@ -27,43 +31,56 @@ KNOWLEDGE_BASE = [
 # Biến lưu trữ Vector (Bộ nhớ tạm)
 VECTOR_DB = []
 
+def get_embedding(text):
+    """Gọi Hugging Face API để lấy embedding"""
+    try:
+        # feature_extraction trả về ndarray
+        output = client.feature_extraction(text, model=EMBEDDING_MODEL)
+
+        # Xử lý output shape (thường là (1, 384))
+        if isinstance(output, np.ndarray) and output.ndim == 2:
+            return output[0]
+        if isinstance(output, list) and len(output) > 0 and isinstance(output[0], list):
+            return np.array(output[0])
+
+        return np.array(output)
+    except Exception as e:
+        print(f"Lỗi embedding: {e}")
+        return None
+
 def build_vector_db():
     """Mã hóa văn bản thành số (Vector) để tìm kiếm"""
     global VECTOR_DB
     print("--- ĐANG NẠP DỮ LIỆU RAG... ---")
     try:
         for text in KNOWLEDGE_BASE:
-            # Dùng model embedding để mã hóa
-            result = client.models.embed_content(
-                model="text-embedding-004",
-                contents=text
-            )
-            VECTOR_DB.append({"text": text, "embedding": result.embeddings[0].values})
+            embed = get_embedding(text)
+            if embed is not None:
+                VECTOR_DB.append({"text": text, "embedding": embed})
         print(f"--- ĐÃ NẠP XONG {len(VECTOR_DB)} MẢNH KIẾN THỨC ---")
     except Exception as e:
-        print(f"LỖI EMBEDDING: {e}")
+        print(f"LỖI BUILD DB: {e}")
 
 def find_best_context(query_text):
     """Tìm thông tin liên quan nhất trong kho não"""
     if not VECTOR_DB: return None
     try:
-        # Mã hóa câu hỏi của sếp
-        query_embed = client.models.embed_content(
-            model="text-embedding-004",
-            contents=query_text
-        ).embeddings[0].values
+        query_embed = get_embedding(query_text)
+        if query_embed is None: return None
         
         # So sánh với kho dữ liệu
         best_score = -1
         best_text = ""
         for item in VECTOR_DB:
+            # Tính cosine similarity (giả sử vector đã chuẩn hóa hoặc dùng dot product đơn giản)
+            # Embedding từ HF thường là 1D array cho 1 câu input
             score = np.dot(query_embed, item["embedding"])
             if score > best_score:
                 best_score = score
                 best_text = item["text"]
         
-        # Chỉ lấy nếu độ giống > 0.5
-        return best_text if best_score > 0.5 else None
+        # Chỉ lấy nếu độ giống > 0.4 (threshold tùy chỉnh)
+        return best_text if best_score > 0.4 else None
     except Exception as e:
         print(f"Lỗi tìm kiếm: {e}")
         return None
@@ -71,7 +88,7 @@ def find_best_context(query_text):
 # --- WEB SERVER (Để Render không tắt Bot) ---
 @app.route('/')
 def home():
-    return "Bot TNQ đang chạy RAG với Gemini 3 Flash Preview!"
+    return "Bot TNQ đang chạy RAG với Hugging Face!"
 
 def run_web_server():
     port = int(os.environ.get("PORT", 10000))
@@ -88,28 +105,35 @@ def handle_message(message):
         # BƯỚC 1: Tìm kiếm thông tin (RAG)
         context_info = find_best_context(user_text)
         
-        # BƯỚC 2: Tạo Prompt (Kết hợp tìm được + ngôn ngữ sếp)
+        # BƯỚC 2: Tạo Prompt
+        messages = []
         if context_info:
             sys_instruct = f"""
-            Bạn là trợ lý AI. Hãy trả lời dựa trên thông tin sau:
+            Bạn là trợ lý AI hữu ích. Dưới đây là thông tin bối cảnh liên quan:
             "{context_info}"
-            Yêu cầu: Trả lời bằng cùng ngôn ngữ với người dùng (Việt/Anh).
+            Hãy trả lời câu hỏi của người dùng dựa trên thông tin này.
+            Nếu thông tin không đủ, hãy dùng kiến thức của bạn nhưng ưu tiên bối cảnh trên.
+            Trả lời bằng ngôn ngữ của người dùng (Tiếng Việt/Anh).
             """
         else:
-            sys_instruct = "Bạn là trợ lý AI. Hãy trả lời ngắn gọn bằng ngôn ngữ của người dùng."
+            sys_instruct = "Bạn là trợ lý AI hữu ích. Hãy trả lời thân thiện và ngắn gọn."
 
-        # BƯỚC 3: Gọi Gemini 3 Flash Preview
-        response = client.models.generate_content(
-            model="gemini-3-flash-preview",
-            contents=user_text,
-            config={"system_instruction": sys_instruct}
+        messages.append({"role": "system", "content": sys_instruct})
+        messages.append({"role": "user", "content": user_text})
+
+        # BƯỚC 3: Gọi Hugging Face Inference API
+        response = client.chat_completion(
+            model=CHAT_MODEL,
+            messages=messages,
+            max_tokens=500
         )
         
-        bot.reply_to(message, response.text, parse_mode='Markdown')
+        bot_reply = response.choices[0].message.content
+        bot.reply_to(message, bot_reply, parse_mode='Markdown')
 
     except Exception as e:
         print(f"Lỗi: {e}")
-        bot.reply_to(message, f"Lỗi não bộ: {str(e)}")
+        bot.reply_to(message, f"Lỗi xử lý: {str(e)}")
 
 # --- CHẠY CHƯƠNG TRÌNH ---
 if __name__ == "__main__":
@@ -121,9 +145,8 @@ if __name__ == "__main__":
     t.start()
     
     # 3. Chạy Bot luồng chính
-    print("Bot đang khởi động với RAG...")
+    print("Bot đang khởi động với Hugging Face...")
     try:
         bot.infinity_polling()
     except Exception as e:
         print(f"Bot bị sập: {e}")
-            
