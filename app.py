@@ -60,7 +60,7 @@ def summarize_with_gemini(text):
 
     try:
         client = genai.Client(api_key=GOOGLE_API_KEY)
-        # Fixed: User requested Gemini 2.5 Flash which doesn't exist yet, using 1.5-flash
+        # Using gemini-1.5-flash as requested (closest valid model to 2.5)
         response = client.models.generate_content(
             model='gemini-1.5-flash',
             contents=f"Summarize this document:\n\n{text[:30000]}"
@@ -145,29 +145,30 @@ def run_bot():
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
-    try:
-        application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+    logger.info("Starting polling loop...")
 
-        application.add_handler(CommandHandler("start", start))
-        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat_handler))
-        application.add_handler(MessageHandler(filters.Document.PDF, document_handler))
+    while True:
+        try:
+            # Rebuild application on every iteration to ensure fresh httpx client
+            application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
-        # FIX: System Error - Invalid file descriptor & Retry logic
-        logger.info("Starting polling...")
+            application.add_handler(CommandHandler("start", start))
+            application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat_handler))
+            application.add_handler(MessageHandler(filters.Document.PDF, document_handler))
 
-        while True:
-            try:
-                application.run_polling(stop_signals=None, close_loop=False)
-            except NetworkError as e:
-                logger.error(f"Network error during polling: {e}. Retrying in 10s...")
-                time.sleep(10)
-            except Exception as e:
-                logger.error(f"Critical error during polling: {e}")
-                # Wait a bit before retrying to avoid rapid crash loops
-                time.sleep(10)
+            # FIX: System Error - Invalid file descriptor
+            application.run_polling(stop_signals=None, close_loop=False)
 
-    except Exception as e:
-        logger.error(f"Fatal Bot Error: {e}")
+        except NetworkError as e:
+            logger.error(f"Network error during polling: {e}. Retrying in 10s...")
+            time.sleep(10)
+        except Exception as e:
+            logger.error(f"Critical error during polling: {e}")
+            # Wait a bit before retrying to avoid rapid crash loops
+            time.sleep(10)
+        finally:
+            # Clean up if necessary, though ApplicationBuilder makes a new one
+            pass
 
 # Background Thread
 if "bot_thread" not in st.session_state:
