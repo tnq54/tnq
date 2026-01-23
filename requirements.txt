@@ -1,5 +1,0 @@
-streamlit
-python-telegram-bot
-google-genai
-pypdf
-huggingface_hub
