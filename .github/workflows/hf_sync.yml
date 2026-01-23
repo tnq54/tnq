@@ -1,0 +1,14 @@
+name: Sync to Hugging Face
+on:
+  push:
+    branches: [main]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with: {fetch-depth: 0}
+      - name: Push to HF
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: git push --force https://quan541996:$HF_TOKEN@huggingface.co/spaces/quan541996/vbot1 main
