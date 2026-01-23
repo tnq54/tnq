@@ -1,11 +1,10 @@
-import time
-# Sleep to prevent network errors on startup
-time.sleep(20)
-
 import streamlit as st
 import os
 import logging
 import io
+import time
+import threading
+import asyncio
 from telegram import Update
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters
 from huggingface_hub import InferenceClient
@@ -36,7 +35,6 @@ try:
         hf_client = None
 
     if GEMINI_API_KEY:
-        # User requested Gemini 2.5 Flash, using 1.5 Flash as standard equivalent
         gemini_client = genai.Client(api_key=GEMINI_API_KEY)
     else:
         logging.warning("GEMINI_API_KEY is missing.")
@@ -114,16 +112,39 @@ async def pdf_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logging.error(f"PDF Error: {e}")
         await update.message.reply_text(f"Error processing PDF: {str(e)}")
 
-if __name__ == '__main__':
+# Bot Thread Logic
+def run_bot_loop():
     if not TELEGRAM_TOKEN:
         print("TELEGRAM_TOKEN not found. Bot cannot start.")
-    else:
-        application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+        return
 
-        application.add_handler(CommandHandler('start', start))
-        application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), chat_handler))
-        application.add_handler(MessageHandler(filters.Document.PDF, pdf_handler))
+    # Sleep to prevent network errors on startup (inside the thread to not block UI)
+    print("Waiting 20s before starting bot polling...")
+    time.sleep(20)
 
-        print("Starting Bot Polling...")
-        # Stop signals must be None to avoid invalid file descriptor error on some platforms
-        application.run_polling(stop_signals=None)
+    # Create a new event loop for this thread
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+    application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+
+    application.add_handler(CommandHandler('start', start))
+    application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), chat_handler))
+    application.add_handler(MessageHandler(filters.Document.PDF, pdf_handler))
+
+    print("Starting Bot Polling (Background Thread)...")
+    # stop_signals=None is critical for running in non-main thread
+    application.run_polling(stop_signals=None)
+
+# Initialize Bot in Background (Singleton)
+@st.cache_resource
+def start_bot():
+    if not TELEGRAM_TOKEN:
+        return None
+
+    thread = threading.Thread(target=run_bot_loop, daemon=True)
+    thread.start()
+    return thread
+
+# Start the bot
+start_bot()
