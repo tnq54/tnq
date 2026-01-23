@@ -121,9 +121,12 @@ if __name__ == "__main__":
     t.start()
     
     # 3. Chạy Bot luồng chính
-    print("Bot đang khởi động với RAG...")
-    try:
-        bot.infinity_polling()
-    except Exception as e:
-        print(f"Bot bị sập: {e}")
+    if os.environ.get("SPACE_ID"):
+        print("Bot đang chạy trên Hugging Face Spaces. Tắt Polling để tránh xung đột với Render.")
+    else:
+        print("Bot đang khởi động với RAG...")
+        try:
+            bot.infinity_polling()
+        except Exception as e:
+            print(f"Bot bị sập: {e}")
             
