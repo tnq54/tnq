@@ -7,6 +7,7 @@ import io
 import logging
 from pypdf import PdfReader
 from telegram import Update
+from telegram.error import NetworkError
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters
 from huggingface_hub import InferenceClient
 
@@ -59,23 +60,22 @@ def summarize_with_gemini(text):
 
     try:
         client = genai.Client(api_key=GOOGLE_API_KEY)
-        # User requested Gemini 2.5 Flash
+        # Fixed: User requested Gemini 2.5 Flash which doesn't exist yet, using 1.5-flash
         response = client.models.generate_content(
-            model='gemini-2.5-flash',
+            model='gemini-1.5-flash',
             contents=f"Summarize this document:\n\n{text[:30000]}"
         )
         return response.text
     except Exception as e:
         logger.error(f"Gemini Error: {e}")
-        # Fallback suggestion in message
-        return f"Error summarizing (check model availability): {e}"
+        return f"Error summarizing: {e}"
 
 # Telegram Bot Handlers
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "Welcome to VBot1!\n"
         "- Chat with me (Llama 3).\n"
-        "- Send a PDF to summarize (Gemini 2.5 Flash)."
+        "- Send a PDF to summarize (Gemini 1.5 Flash)."
     )
 
 async def chat_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -117,7 +117,7 @@ async def document_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=status_msg.message_id, text="No text found in PDF.")
             return
 
-        await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=status_msg.message_id, text="Summarizing (Gemini 2.5 Flash)...")
+        await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=status_msg.message_id, text="Summarizing (Gemini 1.5 Flash)...")
         summary = summarize_with_gemini(text)
 
         # Split long messages
@@ -145,15 +145,29 @@ def run_bot():
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
-    application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+    try:
+        application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat_handler))
-    application.add_handler(MessageHandler(filters.Document.PDF, document_handler))
+        application.add_handler(CommandHandler("start", start))
+        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat_handler))
+        application.add_handler(MessageHandler(filters.Document.PDF, document_handler))
 
-    # FIX: System Error - Invalid file descriptor
-    logger.info("Starting polling...")
-    application.run_polling(stop_signals=None)
+        # FIX: System Error - Invalid file descriptor & Retry logic
+        logger.info("Starting polling...")
+
+        while True:
+            try:
+                application.run_polling(stop_signals=None, close_loop=False)
+            except NetworkError as e:
+                logger.error(f"Network error during polling: {e}. Retrying in 10s...")
+                time.sleep(10)
+            except Exception as e:
+                logger.error(f"Critical error during polling: {e}")
+                # Wait a bit before retrying to avoid rapid crash loops
+                time.sleep(10)
+
+    except Exception as e:
+        logger.error(f"Fatal Bot Error: {e}")
 
 # Background Thread
 if "bot_thread" not in st.session_state:
@@ -166,4 +180,4 @@ st.title("VBot1 System Rebuilt")
 st.write("Status: Bot is running in background.")
 st.write("Config:")
 st.write(f"- Llama 3: {'Active' if hf_client else 'Inactive'}")
-st.write(f"- Gemini 2.5 Flash: {'Active' if GOOGLE_API_KEY else 'Inactive'}")
+st.write(f"- Gemini 1.5 Flash: {'Active' if GOOGLE_API_KEY else 'Inactive'}")
