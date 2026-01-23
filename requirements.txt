@@ -1,4 +1,5 @@
-pyTelegramBotAPI
-Flask
+streamlit
+python-telegram-bot
 google-genai
-numpy
+pypdf
+huggingface_hub
