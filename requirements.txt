@@ -1,0 +1,6 @@
+pyTelegramBotAPI
+Flask
+google-genai
+numpy
+uvicorn
+gunicorn
