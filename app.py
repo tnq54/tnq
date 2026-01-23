@@ -46,6 +46,15 @@ if HF_TOKEN:
 
 # PDF Helper Functions
 def extract_pdf_text(file_bytes):
+    """
+    Extracts and concatenated text from a PDF provided as raw bytes.
+    
+    Parameters:
+        file_bytes (bytes): Raw bytes of a PDF file.
+    
+    Returns:
+        str or None: The concatenated text of all pages if extraction succeeds, `None` if an error occurred during extraction.
+    """
     try:
         reader = PdfReader(io.BytesIO(file_bytes))
         text = ""
@@ -57,6 +66,15 @@ def extract_pdf_text(file_bytes):
         return None
 
 def summarize_with_gemini(text):
+    """
+    Summarizes a document text using Google Gemini 1.5 Flash.
+    
+    Parameters:
+        text (str): Document text to summarize; only the first 30,000 characters are used.
+    
+    Returns:
+        str: The generated summary. If the Gemini API key is missing, returns "Gemini API Key missing."; if the google-genai library is unavailable, returns "google-genai library missing."; on failure returns a string beginning with "Error summarizing: " followed by the error message.
+    """
     if not GOOGLE_API_KEY:
         return "Gemini API Key missing."
     if not genai:
@@ -79,6 +97,13 @@ def summarize_with_gemini(text):
 
 # Bot Handlers
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Sends a greeting and usage instructions to the user.
+    
+    Replies to the incoming message with a brief welcome and two-line instructions:
+    - send text to chat with Llama 3
+    - send a PDF to summarize with Gemini 1.5 Flash
+    """
     await update.message.reply_text(
         "Hello! I am VBot1.\n"
         "- Send text to chat (Llama 3).\n"
@@ -86,6 +111,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def chat_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Handle incoming text messages by sending the user's message to the configured Llama 3 HF client and returning the model's reply to the chat.
+    
+    If the HuggingFace client is not configured, notifies the user. Sends an interim "Thinking" message, invokes the HF chat completion to obtain a reply, and replaces the interim message with the model's response; on error, replaces the interim message with a generic error message and logs the failure.
+    """
     if not hf_client:
         await update.message.reply_text("Llama 3 not configured.")
         return
@@ -108,6 +138,11 @@ async def chat_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=status_msg.message_id, text="Error processing chat.")
 
 async def document_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Handle incoming Telegram document messages: accept only PDFs, download and extract their text, summarize the extracted text with Gemini, and reply with the summary.
+    
+    The handler validates that the uploaded file is a PDF, sends status updates by editing a temporary message (e.g., "Downloading PDF...", "Reading PDF...", "Summarizing with Gemini..."), downloads the file bytes, extracts text using extract_pdf_text, obtains a summary from summarize_with_gemini, and delivers the summary to the chat. If the summary exceeds 4000 characters it is split into multiple messages. On extraction or summarization failure the handler updates the status message or replies with an appropriate error message and logs the exception.
+    """
     document = update.message.document
     if document.mime_type != 'application/pdf':
         await update.message.reply_text("Please send a PDF file.")
@@ -142,6 +177,11 @@ async def document_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # Bot Thread Logic with Retry
 def run_bot_loop():
+    """
+    Start and maintain the Telegram bot polling loop in the current thread, restarting on failures.
+    
+    This function initializes a new asyncio event loop, builds the Telegram Application with configured handlers, and runs long‑running polling to receive updates. If TELEGRAM_TOKEN is not configured, it logs an error and returns without starting. On transient network errors the loop is retried after a short backoff; on other exceptions it retries with a longer backoff. The function blocks and runs indefinitely until the process exits.
+    """
     if not TELEGRAM_TOKEN:
         logger.error("TELEGRAM_TOKEN missing.")
         return
@@ -181,6 +221,14 @@ def run_bot_loop():
 # Start Bot in Background
 @st.cache_resource
 def start_bot_thread():
+    """
+    Start the Telegram bot loop in a background daemon thread.
+    
+    If TELEGRAM_TOKEN is missing, displays an error message in Streamlit and returns None.
+    
+    Returns:
+        threading.Thread | None: The started daemon Thread running the bot loop, or `None` if the bot was not started due to a missing TELEGRAM_TOKEN.
+    """
     if not TELEGRAM_TOKEN:
         st.error("TELEGRAM_TOKEN not found!")
         return None
