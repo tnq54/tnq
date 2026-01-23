@@ -5,6 +5,7 @@ import time
 import threading
 import asyncio
 import io
+import socket
 from pypdf import PdfReader
 from telegram import Update
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters
@@ -146,8 +147,15 @@ def run_bot_loop():
         return
 
     # Add sleep to prevent Errno -5 (No address associated with hostname)
-    logger.info("Bot thread started. Waiting 20s for network warmup...")
-    time.sleep(20)
+    logger.info("Bot thread started. Waiting for network...")
+    for i in range(20):
+        try:
+            with socket.create_connection(("api.telegram.org", 443), timeout=3):
+                pass
+            logger.info("Network detected.")
+            break
+        except Exception:
+            time.sleep(1)
 
     while True:
         try:
