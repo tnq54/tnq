@@ -1,15 +1,12 @@
 import streamlit as st
 import os
 import logging
-import io
 import time
 import threading
 import asyncio
 from telegram import Update
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters
 from huggingface_hub import InferenceClient
-from google import genai
-from pypdf import PdfReader
 
 # Setup logging
 logging.basicConfig(
@@ -19,11 +16,10 @@ logging.basicConfig(
 
 # Streamlit Interface (Minimal)
 st.title("VBot1 System")
-st.write("System is running. Telegram Bot is active.")
+st.write("System is running. Telegram Bot is active (HF Only).")
 
 # Load Environment Variables
 HF_TOKEN = os.environ.get("HF_TOKEN")
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 
 # Initialize AI Clients
@@ -33,20 +29,13 @@ try:
     else:
         logging.warning("HF_TOKEN is missing.")
         hf_client = None
-
-    if GEMINI_API_KEY:
-        gemini_client = genai.Client(api_key=GEMINI_API_KEY)
-    else:
-        logging.warning("GEMINI_API_KEY is missing.")
-        gemini_client = None
 except Exception as e:
     logging.error(f"Error initializing clients: {e}")
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "Hello! I am VBot1 (Rebuilt).\n"
-        "- Chat with me to use Llama 3.\n"
-        "- Send a PDF to get a summary (Gemini Flash)."
+        "- Chat with me to use Llama 3."
     )
 
 async def chat_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -70,48 +59,6 @@ async def chat_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logging.error(f"Llama Error: {e}")
         await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=status_msg.message_id, text="Error processing with Llama 3.")
 
-async def pdf_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not gemini_client:
-        await update.message.reply_text("Gemini is not configured (missing GEMINI_API_KEY).")
-        return
-
-    document = update.message.document
-    if document.mime_type != 'application/pdf':
-        await update.message.reply_text("Please send a valid PDF file.")
-        return
-
-    status_msg = await update.message.reply_text("Downloading and processing PDF...")
-
-    try:
-        file = await context.bot.get_file(document.file_id)
-        file_content = await file.download_as_bytearray()
-
-        # Extract text
-        pdf_file = io.BytesIO(file_content)
-        reader = PdfReader(pdf_file)
-        text = ""
-        for page in reader.pages:
-            text += page.extract_text() or ""
-
-        if not text:
-            await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=status_msg.message_id, text="Could not extract text from this PDF.")
-            return
-
-        await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=status_msg.message_id, text=f"Summarizing {len(text)} characters with Gemini...")
-
-        # Summarize
-        prompt = f"Summarize the following PDF document content:\n\n{text[:30000]}"
-        response = gemini_client.models.generate_content(
-            model="gemini-1.5-flash",
-            contents=prompt
-        )
-
-        await update.message.reply_text(response.text)
-
-    except Exception as e:
-        logging.error(f"PDF Error: {e}")
-        await update.message.reply_text(f"Error processing PDF: {str(e)}")
-
 # Bot Thread Logic
 def run_bot_loop():
     if not TELEGRAM_TOKEN:
@@ -130,7 +77,6 @@ def run_bot_loop():
 
     application.add_handler(CommandHandler('start', start))
     application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), chat_handler))
-    application.add_handler(MessageHandler(filters.Document.PDF, pdf_handler))
 
     print("Starting Bot Polling (Background Thread)...")
     # stop_signals=None is critical for running in non-main thread
