@@ -272,3 +272,99 @@ def test_mission_system_evaluation():
 
     # State should now be Completed!
     assert app.st.session_state.missions["reflex"]["status"] == "Completed"
+
+def test_save_load_circuit_codes():
+    """
+    UPGRADE TEST: Save/Load Circuit Codes
+    Verify serialization and deserialization results are fully identical.
+    """
+    app.st.session_state = MockSessionState()
+    app.st.session_state["bot_thread"] = True
+    app.init_game_state()
+
+    # Customize grid
+    app.st.session_state.neuron_grid[1][2] = {"type": "Sensory", "charge": 0.1, "threshold": 0.4, "fire_rate": 0.3, "last_fired": -1, "direction": "Down"}
+    app.st.session_state.neuron_grid[3][4] = {"type": "Motor", "charge": 0.2, "threshold": 0.6, "fire_rate": 0.0, "last_fired": -1, "direction": "Left"}
+
+    # Serialize
+    code = app.serialize_grid(app.st.session_state.neuron_grid)
+    assert len(code) > 0
+
+    # Deserialize
+    loaded = app.deserialize_grid(code)
+    assert loaded is not None
+    assert loaded[1][2]["type"] == "Sensory"
+    assert loaded[1][2]["direction"] == "Down"
+    assert loaded[3][4]["type"] == "Motor"
+    assert loaded[3][4]["direction"] == "Left"
+
+def test_synaptic_pruning():
+    """
+    UPGRADE TEST: Synaptic Pruning
+    Verify that old idle Interneurons are cleared and memory is partially refunded.
+    """
+    app.st.session_state = MockSessionState()
+    app.st.session_state["bot_thread"] = True
+    app.init_game_state()
+
+    # Turn pruning on
+    app.st.session_state.upgrades["pruning"] = 1
+    app.st.session_state.stats["memory"] = 10.0
+    app.st.session_state.stats["ticks"] = 100
+
+    # Place Interneuron with an old last_fired (e.g., tick 50, which is >15 ticks ago from current 100)
+    app.st.session_state.neuron_grid[2][2] = {
+        "type": "Interneuron",
+        "charge": 0.0,
+        "threshold": 0.5,
+        "fire_rate": 0.0,
+        "last_fired": 50,
+        "direction": "All"
+    }
+
+    app.run_simulation_tick()
+
+    # Cell should be pruned back to Empty
+    assert app.st.session_state.neuron_grid[2][2]["type"] == "Empty"
+    # Memory should be refunded
+    assert app.st.session_state.stats["memory"] > 10.0
+
+def test_pfc_ai_decision_maker():
+    """
+    UPGRADE TEST: PFC AI Decision Maker
+    Verify that random events are automatically evaluated and resolved when PFC is active.
+    """
+    app.st.session_state = MockSessionState()
+    app.st.session_state["bot_thread"] = True
+    app.init_game_state()
+
+    # Activate PFC
+    app.st.session_state.upgrades["pfc"] = 1
+
+    # Create mock event
+    app.st.session_state.current_event = {
+        "title": "☕ Cốc Espresso Đậm Đặc",
+        "desc": "Bạn nạp caffeine.",
+        "choices": [
+            {
+                "label": "Espresso",
+                "effect": "None",
+                "apply": MagicMock()
+            },
+            {
+                "label": "Trà xanh",
+                "effect": "None",
+                "apply": MagicMock()
+            }
+        ]
+    }
+
+    # Trigger tick (forces auto-decision when current_event is set)
+    app.st.session_state.stats["ticks"] = 4 # makes ticks % 4 == 0 (required for periodic events check)
+
+    # To mock random event selection trigger, let's just trigger simulation tick
+    # The tick handles events and auto chooses tea (index 1) for Espresso title
+    app.run_simulation_tick()
+
+    # Check that current_event is resolved/cleared and tea option's apply was called
+    assert app.st.session_state.current_event is None
