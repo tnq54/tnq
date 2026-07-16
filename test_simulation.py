@@ -1,5 +1,5 @@
 import sys
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 # Define MockSessionState class for dictionary & attribute access
 class MockSessionState(dict):
@@ -46,6 +46,10 @@ def test_init_game_state():
     assert app.st.session_state.chemicals["energy"] == 100.0
     assert app.st.session_state.stats["iq"] == 0.0
 
+    # Check updated attributes are initialized
+    assert "doping" in app.st.session_state.cooldowns
+    assert "reflex" in app.st.session_state.missions
+
 def test_evolution_stages():
     assert app.get_evolution_stage(10.0) == "Bò sát (Instinct)"
     assert app.get_evolution_stage(200.0) == "Thú cổ (Emotional)"
@@ -79,14 +83,15 @@ def test_sensory_neuron_buildup():
     # Empty all but one Sensory Neuron at [0][0]
     for r in range(6):
         for c in range(6):
-            app.st.session_state.neuron_grid[r][c] = {"type": "Empty", "charge": 0.0, "threshold": 0.5, "fire_rate": 0.0, "last_fired": -1}
+            app.st.session_state.neuron_grid[r][c] = {"type": "Empty", "charge": 0.0, "threshold": 0.5, "fire_rate": 0.0, "last_fired": -1, "direction": "All"}
 
     app.st.session_state.neuron_grid[0][0] = {
         "type": "Sensory",
         "charge": 0.1,
         "threshold": 0.5,
         "fire_rate": 0.2,
-        "last_fired": -1
+        "last_fired": -1,
+        "direction": "All"
     }
     app.st.session_state.chemicals["dopamine"] = 50.0 # boost = 1.5. Increase = 0.2 * 1.5 = 0.3
 
@@ -95,7 +100,12 @@ def test_sensory_neuron_buildup():
     # 0.1 + 0.3 = 0.4
     assert abs(app.st.session_state.neuron_grid[0][0]["charge"] - 0.4) < 1e-5
 
-def test_signal_propagation_to_neighbor():
+def test_directional_signal_propagation():
+    """
+    UPGRADE TEST: Directional Axon Growth
+    Verify that if a firing neuron's direction is set to 'Right', it transfers charge
+    only to the neighbor to its right, and NOT to the neighbor below it.
+    """
     app.st.session_state = MockSessionState()
     app.st.session_state["bot_thread"] = True
     app.init_game_state()
@@ -103,31 +113,45 @@ def test_signal_propagation_to_neighbor():
     # Clean grid
     for r in range(6):
         for c in range(6):
-            app.st.session_state.neuron_grid[r][c] = {"type": "Empty", "charge": 0.0, "threshold": 0.5, "fire_rate": 0.0, "last_fired": -1}
+            app.st.session_state.neuron_grid[r][c] = {"type": "Empty", "charge": 0.0, "threshold": 0.5, "fire_rate": 0.0, "last_fired": -1, "direction": "All"}
 
-    # Place a Sensory neuron at [0][0] and an Interneuron at [0][1]
+    # Place a firing Sensory neuron at [0][0] with direction set to 'Right'
     app.st.session_state.neuron_grid[0][0] = {
         "type": "Sensory",
-        "charge": 0.6, # fires immediately since charge > threshold (0.4)
+        "charge": 0.6, # threshold 0.4, fires
         "threshold": 0.4,
         "fire_rate": 0.0,
-        "last_fired": -1
+        "last_fired": -1,
+        "direction": "Right" # Only send right!
     }
+    # Interneuron to its right
     app.st.session_state.neuron_grid[0][1] = {
         "type": "Interneuron",
         "charge": 0.1,
         "threshold": 0.5,
         "fire_rate": 0.0,
-        "last_fired": -1
+        "last_fired": -1,
+        "direction": "All"
+    }
+    # Interneuron to its bottom
+    app.st.session_state.neuron_grid[1][0] = {
+        "type": "Interneuron",
+        "charge": 0.1,
+        "threshold": 0.5,
+        "fire_rate": 0.0,
+        "last_fired": -1,
+        "direction": "All"
     }
 
     # With myelin = 0, signal efficiency is 0.35.
-    # Neighbor is only [0][1]. Transferred charge = (0.6 * 0.35) / 1 = 0.21.
-    # Next charge at [0][1] should be 0.1 + 0.21 = 0.31
-    # Next charge at [0][0] should reset to 0.0
+    # Allowed direction is 'Right', so neighbor is only [0][1].
+    # Transferred charge = (0.6 * 0.35) / 1 = 0.21.
+    # [0][1] (right) should get 0.1 + 0.21 = 0.31
+    # [1][0] (bottom) should remain at 0.1
     app.run_simulation_tick()
 
     assert abs(app.st.session_state.neuron_grid[0][1]["charge"] - 0.31) < 1e-5
+    assert app.st.session_state.neuron_grid[1][0]["charge"] == 0.1
     assert app.st.session_state.neuron_grid[0][0]["charge"] == 0.0
 
 def test_motor_neuron_firing_yields():
@@ -138,7 +162,7 @@ def test_motor_neuron_firing_yields():
     # Clean grid
     for r in range(6):
         for c in range(6):
-            app.st.session_state.neuron_grid[r][c] = {"type": "Empty", "charge": 0.0, "threshold": 0.5, "fire_rate": 0.0, "last_fired": -1}
+            app.st.session_state.neuron_grid[r][c] = {"type": "Empty", "charge": 0.0, "threshold": 0.5, "fire_rate": 0.0, "last_fired": -1, "direction": "All"}
 
     # Place a Motor neuron that has full charge
     app.st.session_state.neuron_grid[3][3] = {
@@ -146,7 +170,8 @@ def test_motor_neuron_firing_yields():
         "charge": 0.9, # threshold 0.5, fires
         "threshold": 0.5,
         "fire_rate": 0.0,
-        "last_fired": -1
+        "last_fired": -1,
+        "direction": "All"
     }
 
     app.st.session_state.stats["iq"] = 10.0
@@ -169,7 +194,8 @@ def test_sanity_burnout_recovery():
         "charge": 0.0,
         "threshold": 0.5,
         "fire_rate": 0.0,
-        "last_fired": -1
+        "last_fired": -1,
+        "direction": "All"
     }
 
     # Reduce Sanity to 0.1 to trigger burnout on tick
@@ -203,3 +229,46 @@ def test_apply_event_effects():
     assert app.st.session_state.chemicals["sanity"] == 90.0 # starting sanity was 100.0
     assert app.st.session_state.stats["iq"] == 25.0
     assert app.st.session_state.stats["memory"] == 15.0 # starting memory was 10.0
+
+def test_active_hormone_abilities():
+    """
+    UPGRADE TEST: Hormone Special Abilities
+    Ensure cooldown decrements and status values update correctly during simulation ticks.
+    """
+    app.st.session_state = MockSessionState()
+    app.st.session_state["bot_thread"] = True
+    app.init_game_state()
+
+    # Set a mock cooldown
+    app.st.session_state.cooldowns["doping"] = 5
+
+    # Run simulation tick and verify decrement
+    app.run_simulation_tick()
+    assert app.st.session_state.cooldowns["doping"] == 4
+
+def test_mission_system_evaluation():
+    """
+    UPGRADE TEST: Cognitive Missions
+    Verify that missions can transition from 'In Progress' to 'Completed' when criteria are met.
+    """
+    app.st.session_state = MockSessionState()
+    app.st.session_state["bot_thread"] = True
+    app.init_game_state()
+
+    # Empty grid
+    for r in range(6):
+        for c in range(6):
+            app.st.session_state.neuron_grid[r][c] = {"type": "Empty", "charge": 0.0, "threshold": 0.5, "fire_rate": 0.0, "last_fired": -1, "direction": "All"}
+
+    # Condition: Sensory & Motor present (Reflex Arc)
+    app.st.session_state.neuron_grid[0][0] = {"type": "Sensory", "charge": 0.0, "threshold": 0.5, "fire_rate": 0.0, "last_fired": -1, "direction": "All"}
+    app.st.session_state.neuron_grid[0][1] = {"type": "Motor", "charge": 0.0, "threshold": 0.5, "fire_rate": 0.0, "last_fired": -1, "direction": "All"}
+
+    # Prior state is In Progress
+    assert app.st.session_state.missions["reflex"]["status"] == "In Progress"
+
+    # Run evaluation
+    app.check_mission_statuses()
+
+    # State should now be Completed!
+    assert app.st.session_state.missions["reflex"]["status"] == "Completed"
