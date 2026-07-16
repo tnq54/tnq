@@ -205,7 +205,7 @@ def run_bot():
 
 GRID_SIZE = 6
 
-# UPGRADE: Serialization/Deserialization
+# UPGRADE: Serialization/Deserialization supporting output weights
 def serialize_grid(grid):
     cells = []
     dir_map = {"All": "A", "Up": "U", "Right": "R", "Down": "D", "Left": "L"}
@@ -214,7 +214,8 @@ def serialize_grid(grid):
             cell = grid[r][c]
             t_char = cell["type"][0] # E, S, I, M
             d_char = dir_map.get(cell.get("direction", "All"), "A")
-            cells.append(f"{t_char}{d_char}")
+            weight_val = int(cell.get("weight", 1.0))
+            cells.append(f"{t_char}{d_char}{weight_val}")
     return "-".join(cells)
 
 def deserialize_grid(code_string):
@@ -234,9 +235,15 @@ def deserialize_grid(code_string):
         row = []
         for c in range(GRID_SIZE):
             part = parts[idx]
-            if len(part) != 2:
+            if len(part) < 2:
                 return None
             t_char, d_char = part[0], part[1]
+            weight_val = 1.0
+            if len(part) >= 3:
+                try:
+                    weight_val = float(part[2])
+                except ValueError:
+                    weight_val = 1.0
             t_name = type_map.get(t_char, "Empty")
             d_name = dir_map.get(d_char, "All")
 
@@ -246,7 +253,8 @@ def deserialize_grid(code_string):
                 "threshold": 0.4 if t_name == "Sensory" else (0.6 if t_name == "Motor" else 0.5),
                 "fire_rate": 0.3 if t_name == "Sensory" else 0.0,
                 "last_fired": -1,
-                "direction": d_name
+                "direction": d_name,
+                "weight": weight_val
             })
             idx += 1
         new_grid.append(row)
@@ -267,14 +275,15 @@ def init_game_state():
                     "threshold": 0.5,
                     "fire_rate": 0.25,
                     "last_fired": -1,
-                    "direction": "All"
+                    "direction": "All",
+                    "weight": 1.0 # UPGRADE: Output Synaptic Weight
                 })
             grid.append(row)
 
         # Default starting network structure
-        grid[0][0] = {"type": "Sensory", "charge": 0.0, "threshold": 0.4, "fire_rate": 0.35, "last_fired": -1, "direction": "All"}
-        grid[2][2] = {"type": "Interneuron", "charge": 0.0, "threshold": 0.5, "fire_rate": 0.0, "last_fired": -1, "direction": "All"}
-        grid[5][5] = {"type": "Motor", "charge": 0.0, "threshold": 0.6, "fire_rate": 0.0, "last_fired": -1, "direction": "All"}
+        grid[0][0] = {"type": "Sensory", "charge": 0.0, "threshold": 0.4, "fire_rate": 0.35, "last_fired": -1, "direction": "All", "weight": 1.0}
+        grid[2][2] = {"type": "Interneuron", "charge": 0.0, "threshold": 0.5, "fire_rate": 0.0, "last_fired": -1, "direction": "All", "weight": 1.0}
+        grid[5][5] = {"type": "Motor", "charge": 0.0, "threshold": 0.6, "fire_rate": 0.0, "last_fired": -1, "direction": "All", "weight": 1.0}
 
         st.session_state.neuron_grid = grid
 
@@ -288,7 +297,10 @@ def init_game_state():
             "sanity": 100.0
         }
 
-        # Hormone Active Cooldowns
+        # UPGRADE: Advanced Game Modes (Bình thường / Alzheimer / Động kinh)
+        st.session_state.game_mode = "Normal"
+
+        # Cooldowns
         st.session_state.cooldowns = {
             "doping": 0,
             "ssri": 0,
@@ -323,8 +335,8 @@ def init_game_state():
             "cortex": 1,
             "myelin": 0,
             "plasticity": 0,
-            "pruning": 0, # UPGRADE: Synaptic Pruning level (0 or 1)
-            "pfc": 0      # UPGRADE: Prefrontal Cortex AI decision (0 or 1)
+            "pruning": 0,
+            "pfc": 0
         }
 
         # Logs, playing status, speed, selected cell, events
@@ -493,6 +505,7 @@ def run_simulation_tick():
     grid = st.session_state.neuron_grid
     chems = st.session_state.chemicals
     upgrades = st.session_state.upgrades
+    mode = st.session_state.get("game_mode", "Normal")
 
     # Decrement active hormone abilities cooldowns
     cooldowns = st.session_state.get("cooldowns", {"doping": 0, "ssri": 0, "focus": 0})
@@ -500,7 +513,19 @@ def run_simulation_tick():
         if cooldowns[k] > 0:
             cooldowns[k] -= 1
 
-    # UPGRADE: Synaptic Pruning (Forget idle connections)
+    # UPGRADE: Alzheimer Pathology Tick (Slow threshold degradation)
+    if mode == "Alzheimer" and ticks % 10 == 0:
+        degraded = 0
+        for r in range(GRID_SIZE):
+            for c in range(GRID_SIZE):
+                cell = grid[r][c]
+                if cell["type"] != "Empty" and cell["threshold"] < 0.9:
+                    cell["threshold"] = min(0.9, cell["threshold"] + 0.04)
+                    degraded += 1
+        if degraded > 0:
+            add_log(f"🧠 [Alzheimer] Suy giảm nhận thức khiến {degraded} nơ-ron bị chai lỳ, tăng ngưỡng kích hoạt (+0.04)!")
+
+    # Synaptic Pruning (Forget idle connections)
     if upgrades.get("pruning", 0) == 1:
         pruned_count = 0
         ach_discount = 1.0 - (chems["acetylcholine"] / 200.0)
@@ -512,7 +537,6 @@ def run_simulation_tick():
                 if cell["type"] == "Interneuron":
                     last_fired = cell.get("last_fired", -1)
                     if last_fired != -1 and (ticks - last_fired) > 15:
-                        # Pruning activated! Refund 75% memory
                         refund = int(cost_inter * 0.75)
                         st.session_state.stats["memory"] = min(1000.0, st.session_state.stats["memory"] + refund)
                         grid[r][c] = {
@@ -521,7 +545,8 @@ def run_simulation_tick():
                             "threshold": 0.5,
                             "fire_rate": 0.0,
                             "last_fired": -1,
-                            "direction": "All"
+                            "direction": "All",
+                            "weight": 1.0
                         }
                         pruned_count += 1
         if pruned_count > 0:
@@ -556,7 +581,7 @@ def run_simulation_tick():
                 if cell["charge"] >= cell["threshold"]:
                     sensory_fires += 1
 
-    # 3. Signal Propagation Model with Directional Synapses & Axon Growth
+    # 3. Signal Propagation Model with Output Weights
     next_charges = [[grid[r][c]["charge"] for c in range(GRID_SIZE)] for r in range(GRID_SIZE)]
     signals_fired = 0
     fired_cells = set()
@@ -587,8 +612,15 @@ def run_simulation_tick():
                             neighbors.append((nr, nc))
 
                 if neighbors:
+                    # Base signal efficiency
                     signal_efficiency = 0.35 + (upgrades["myelin"] * 0.05)
-                    transfer_charge = (cell["charge"] * signal_efficiency) / len(neighbors)
+                    # UPGRADE: Epilepsy Pathology increases charge speed
+                    if mode == "Epilepsy":
+                        signal_efficiency *= 1.35
+
+                    # UPGRADE: Synaptic Output Weight scale
+                    cell_weight = cell.get("weight", 1.0)
+                    transfer_charge = (cell["charge"] * signal_efficiency * cell_weight) / len(neighbors)
 
                     for nr, nc in neighbors:
                         next_charges[nr][nc] = min(1.0, next_charges[nr][nc] + transfer_charge)
@@ -628,14 +660,15 @@ def run_simulation_tick():
         st.session_state.stats["memory"] = min(1000.0, st.session_state.stats["memory"] + motor_yield_mem)
         add_log(f"🎯 Hành động Motor kích hoạt! Trùng hợp phát xung thành công (+{motor_yield_iq:.1f} IQ, +{motor_yield_mem:.1f} Trí nhớ)")
 
-    # UPGRADE: Populate Web Audio Trigger
     st.session_state.audio_trigger = {
         "sensory": sensory_fires,
         "motor": motor_fired_count
     }
 
     # 5. Chemistry & Health Delta Calculations
-    fire_stress = signals_fired * 1.5
+    # UPGRADE: Epilepsy doubles active propagation stress
+    fire_stress_mult = 2.0 if mode == "Epilepsy" else 1.0
+    fire_stress = signals_fired * 1.5 * fire_stress_mult
     stress_clearance = 1.5 + (upgrades["cerebellum"] * 1.0)
 
     chems["stress"] = max(0.0, min(100.0, chems["stress"] + fire_stress - stress_clearance))
@@ -670,7 +703,7 @@ def run_simulation_tick():
         for r in range(GRID_SIZE):
             for c in range(GRID_SIZE):
                 if grid[r][c]["type"] == "Interneuron" and random.random() < 0.4:
-                    grid[r][c] = {"type": "Empty", "charge": 0.0, "threshold": 0.5, "fire_rate": 0.0, "last_fired": -1, "direction": "All"}
+                    grid[r][c] = {"type": "Empty", "charge": 0.0, "threshold": 0.5, "fire_rate": 0.0, "last_fired": -1, "direction": "All", "weight": 1.0}
                     degraded += 1
 
         add_log(f"💥 ĐỘT QUY/SUY NHƯỢC KINH NIÊN! Não bộ quá tải và tự thiết lập lại. {degraded} nơ-ron liên kết bị phá hủy.")
@@ -781,6 +814,25 @@ init_game_state()
 with tab1:
     st.subheader("Trình Mô Phỏng Mạng Lưới Nơ-ron và Tiến Hóa Hóa Học Não")
 
+    # UPGRADE: Game pathology modes selector
+    st.markdown("##### ⚙️ Lựa chọn Chế Độ Thử Thách Não Bộ")
+    modes_list = ["Normal", "Alzheimer", "Epilepsy"]
+    modes_names = {
+        "Normal": "🟢 Bình Thường (Sức khỏe ổn định)",
+        "Alzheimer": "👵 Thử Thách Alzheimer (Thoái hóa nơ-ron, chai lỳ điện thế)",
+        "Epilepsy": "⚡ Thử Thách Động Kinh (Gia tăng xung điện cực độ, nhân đôi stress)"
+    }
+    selected_mode = st.selectbox(
+        "Cấu hình bệnh lý học vỏ não:",
+        modes_list,
+        index=modes_list.index(st.session_state.game_mode),
+        format_func=lambda x: modes_names[x]
+    )
+    if selected_mode != st.session_state.game_mode and selected_mode in modes_names:
+        st.session_state.game_mode = selected_mode
+        add_log(f"⚠️ CẤU HÌNH: Chuyển cấu hình vỏ não sang chế độ: {modes_names[selected_mode]}")
+        st.rerun()
+
     # Row 1: Metrics display
     cols = st.columns(6)
     with cols[0]:
@@ -810,6 +862,30 @@ with tab1:
     with chem_cols[3]:
         val = st.session_state.chemicals["stress"]
         st.progress(val / 100.0, text=f"Căng thẳng (Stress Level): {val:.1f}%")
+
+    # UPGRADE: Live EEG Brainwave Telemetry monitoring
+    st.markdown("##### 📊 Sóng não lâm sàng (EEG Brainwave Telemetry)")
+    eeg_cols = st.columns(5)
+
+    # Calculate simulated frequencies based on current chemistry and stress
+    active_count = sum(1 for r in range(GRID_SIZE) for c in range(GRID_SIZE) if st.session_state.neuron_grid[r][c]["type"] != "Empty")
+
+    gamma = min(100.0, max(5.0, (st.session_state.chemicals["acetylcholine"] * 0.6) + (active_count * 2.0)))
+    beta = min(100.0, max(5.0, (st.session_state.chemicals["stress"] * 0.8) + (st.session_state.chemicals["dopamine"] * 0.3)))
+    alpha = min(100.0, max(5.0, (st.session_state.chemicals["serotonin"] * 0.8) - (st.session_state.chemicals["stress"] * 0.3)))
+    theta = min(100.0, max(5.0, (st.session_state.upgrades["hippocampus"] * 8.0) + (50.0 - st.session_state.chemicals["dopamine"] * 0.2)))
+    delta = min(100.0, max(5.0, (100.0 - st.session_state.chemicals["sanity"]) * 0.7 + (100.0 - st.session_state.chemicals["energy"]) * 0.4))
+
+    with eeg_cols[0]:
+        st.progress(gamma / 100.0, text=f"Sóng Gamma (Nhận thức sâu): {gamma:.1f} Hz")
+    with eeg_cols[1]:
+        st.progress(beta / 100.0, text=f"Sóng Beta (Cảnh giác/Lo âu): {beta:.1f} Hz")
+    with eeg_cols[2]:
+        st.progress(alpha / 100.0, text=f"Sóng Alpha (Thư giãn): {alpha:.1f} Hz")
+    with eeg_cols[3]:
+        st.progress(theta / 100.0, text=f"Sóng Theta (Ghi nhớ/Thiền): {theta:.1f} Hz")
+    with eeg_cols[4]:
+        st.progress(delta / 100.0, text=f"Sóng Delta (Hồi phục/Ngủ): {delta:.1f} Hz")
 
     # Hormone active abilities layout
     st.markdown("##### 🧪 Trung tâm nội tiết tố (Active Hormone Abilities)")
@@ -900,6 +976,7 @@ with tab1:
                 }
                 sym = dir_symbols.get(direction, "🌐")
 
+                # Format label
                 label = f"{emoji}{sym}\n({charge:.2f})"
                 is_selected = (r == selected_r and c == selected_c)
                 border_style = "🔴 " if is_selected else ""
@@ -913,7 +990,7 @@ with tab1:
                     st.session_state.selected_cell = (r, c)
                     st.rerun()
 
-        # UPGRADE: Save & Load Circuit Codes Panel
+        # Save & Load Circuit Codes Panel
         st.markdown("---")
         st.markdown("##### 💾 Lưu & Tải Sơ Đồ Mạch Thần Kinh (Circuit Share Codes)")
         st.caption("Sao chép mã chia sẻ mạch nơ-ron hiện tại hoặc nhập mã của người khác để xây dựng nhanh!")
@@ -956,7 +1033,8 @@ with tab1:
                     "threshold": 0.4,
                     "fire_rate": 0.3,
                     "last_fired": -1,
-                    "direction": "All"
+                    "direction": "All",
+                    "weight": 1.0
                 }
                 add_log(f"Cấy ghép Nơ-ron cảm giác (Sensory) tại [{selected_r+1},{selected_c+1}] (-{cost_sensory} MB)")
                 st.rerun()
@@ -971,7 +1049,8 @@ with tab1:
                     "threshold": 0.5,
                     "fire_rate": 0.0,
                     "last_fired": -1,
-                    "direction": "All"
+                    "direction": "All",
+                    "weight": 1.0
                 }
                 add_log(f"Cấy ghép Nơ-ron liên kết (Interneuron) tại [{selected_r+1},{selected_c+1}] (-{cost_inter} MB)")
                 st.rerun()
@@ -986,7 +1065,8 @@ with tab1:
                     "threshold": 0.6,
                     "fire_rate": 0.0,
                     "last_fired": -1,
-                    "direction": "All"
+                    "direction": "All",
+                    "weight": 1.0
                 }
                 add_log(f"Cấy ghép Nơ-ron vận động (Motor) tại [{selected_r+1},{selected_c+1}] (-{cost_motor} MB)")
                 st.rerun()
@@ -1009,37 +1089,59 @@ with tab1:
                     "threshold": 0.5,
                     "fire_rate": 0.0,
                     "last_fired": -1,
-                    "direction": "All"
+                    "direction": "All",
+                    "weight": 1.0
                 }
                 add_log(f"Xóa bỏ nơ-ron tại [{selected_r+1},{selected_c+1}] (Thu hồi +{refund} MB)")
                 st.rerun()
 
         if current_cell["type"] != "Empty":
             st.write("---")
-            st.markdown("**🧭 Định hướng sợi trục (Axon Direction Target):**")
-            st.caption("Khống chế xung điện thế chỉ lan truyền tới mục tiêu theo hướng chỉ định.")
+            # Axon directions configuration layout
+            axon_cols = st.columns(2)
+            with axon_cols[0]:
+                st.markdown("**🧭 Định hướng sợi trục (Axon Target):**")
+                cur_dir = current_cell.get("direction", "All")
+                dirs_list = ["All", "Up", "Right", "Down", "Left"]
+                dir_names = {
+                    "All": "🌐 Bốn phía (All)",
+                    "Up": "⬆️ Phía trên (Up)",
+                    "Right": "➡️ Phía phải (Right)",
+                    "Down": "⬇️ Phía dưới (Down)",
+                    "Left": "⬅️ Phía trái (Left)"
+                }
+                selected_new_dir = st.selectbox(
+                    "Chọn hướng nơ-ron truyền tải:",
+                    dirs_list,
+                    index=dirs_list.index(cur_dir),
+                    format_func=lambda x: dir_names[x],
+                    key=f"dir_select_{selected_r}_{selected_c}"
+                )
+                if selected_new_dir != cur_dir and selected_new_dir in dir_names:
+                    grid[selected_r][selected_c]["direction"] = selected_new_dir
+                    add_log(f"Định hướng lại trục nơ-ron [{selected_r+1},{selected_c+1}] thành {dir_names[selected_new_dir]}")
+                    st.rerun()
 
-            cur_dir = current_cell.get("direction", "All")
-            dirs_list = ["All", "Up", "Right", "Down", "Left"]
-            dir_names = {
-                "All": "🌐 Bốn phía (All Direction)",
-                "Up": "⬆️ Phía trên (Up)",
-                "Right": "➡️ Phía phải (Right)",
-                "Down": "⬇️ Phía dưới (Down)",
-                "Left": "⬅️ Phía trái (Left)"
-            }
-
-            selected_new_dir = st.selectbox(
-                "Chọn hướng trục nơ-ron truyền tải:",
-                dirs_list,
-                index=dirs_list.index(cur_dir),
-                format_func=lambda x: dir_names[x],
-                key=f"dir_select_{selected_r}_{selected_c}"
-            )
-            if selected_new_dir != cur_dir and selected_new_dir in dir_names:
-                grid[selected_r][selected_c]["direction"] = selected_new_dir
-                add_log(f"Định hướng lại trục nơ-ron [{selected_r+1},{selected_c+1}] thành {dir_names[selected_new_dir]}")
-                st.rerun()
+            # UPGRADE: Synaptic Output Weight Slider
+            with axon_cols[1]:
+                st.markdown("**🔋 Khuyếch đại liên kết (Synaptic Weight):**")
+                cur_weight = float(current_cell.get("weight", 1.0))
+                new_weight = st.slider(
+                    "Trọng số nhân điện thế phát xung:",
+                    min_value=1.0,
+                    max_value=3.0,
+                    value=cur_weight,
+                    step=1.0,
+                    key=f"weight_select_{selected_r}_{selected_c}"
+                )
+                if new_weight != cur_weight:
+                    grid[selected_r][selected_c]["weight"] = new_weight
+                    try:
+                        weight_str = f"x{new_weight:.1f}"
+                    except TypeError:
+                        weight_str = f"x{new_weight}"
+                    add_log(f"Thay đổi trọng số nơ-ron [{selected_r+1},{selected_c+1}] thành {weight_str}!")
+                    st.rerun()
 
     with game_cols[1]:
         st.markdown("#### ⚙️ Trung Tâm Điều Hành & Nâng Cấp Lỗ Não")
@@ -1129,7 +1231,7 @@ with tab1:
                 add_log(f"Nâng cấp mức độ Myelin hóa sợi trục lên cấp {upgrades['myelin']}!")
                 st.rerun()
 
-        # UPGRADE: Synaptic Pruning Upgrade Panel
+        # Synaptic Pruning Upgrade Panel
         cost_pruning = 120
         upgrade_cols_6 = st.columns([3, 1])
         with upgrade_cols_6[0]:
@@ -1142,7 +1244,7 @@ with tab1:
                 add_log("✂️ NÂNG CẤP: Kích hoạt Synaptic Pruning tự động cắt tỉa liên kết dư thừa!")
                 st.rerun()
 
-        # UPGRADE: Prefrontal Cortex PFC Decision Maker Panel
+        # Prefrontal Cortex PFC Decision Maker Panel
         cost_pfc = 200
         upgrade_cols_7 = st.columns([3, 1])
         with upgrade_cols_7[0]:
@@ -1210,7 +1312,7 @@ with tab1:
         st.markdown("##### 📝 Nhật Ký Xử Lý Thần Kinh (Neural Log)")
         st.code("\n".join(st.session_state.game_log), language="text")
 
-# UPGRADE: Visual/Audio Feedback Synthesizer Element via Web Audio API
+# Visual/Audio Feedback Synthesizer Element via Web Audio API
 audio_html = ""
 if "audio_trigger" in st.session_state and st.session_state.audio_trigger:
     trig = st.session_state.audio_trigger

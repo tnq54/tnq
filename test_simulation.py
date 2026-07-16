@@ -49,6 +49,7 @@ def test_init_game_state():
     # Check updated attributes are initialized
     assert "doping" in app.st.session_state.cooldowns
     assert "reflex" in app.st.session_state.missions
+    assert app.st.session_state.game_mode == "Normal"
 
 def test_evolution_stages():
     assert app.get_evolution_stage(10.0) == "Bò sát (Instinct)"
@@ -83,7 +84,7 @@ def test_sensory_neuron_buildup():
     # Empty all but one Sensory Neuron at [0][0]
     for r in range(6):
         for c in range(6):
-            app.st.session_state.neuron_grid[r][c] = {"type": "Empty", "charge": 0.0, "threshold": 0.5, "fire_rate": 0.0, "last_fired": -1, "direction": "All"}
+            app.st.session_state.neuron_grid[r][c] = {"type": "Empty", "charge": 0.0, "threshold": 0.5, "fire_rate": 0.0, "last_fired": -1, "direction": "All", "weight": 1.0}
 
     app.st.session_state.neuron_grid[0][0] = {
         "type": "Sensory",
@@ -91,7 +92,8 @@ def test_sensory_neuron_buildup():
         "threshold": 0.5,
         "fire_rate": 0.2,
         "last_fired": -1,
-        "direction": "All"
+        "direction": "All",
+        "weight": 1.0
     }
     app.st.session_state.chemicals["dopamine"] = 50.0 # boost = 1.5. Increase = 0.2 * 1.5 = 0.3
 
@@ -113,7 +115,7 @@ def test_directional_signal_propagation():
     # Clean grid
     for r in range(6):
         for c in range(6):
-            app.st.session_state.neuron_grid[r][c] = {"type": "Empty", "charge": 0.0, "threshold": 0.5, "fire_rate": 0.0, "last_fired": -1, "direction": "All"}
+            app.st.session_state.neuron_grid[r][c] = {"type": "Empty", "charge": 0.0, "threshold": 0.5, "fire_rate": 0.0, "last_fired": -1, "direction": "All", "weight": 1.0}
 
     # Place a firing Sensory neuron at [0][0] with direction set to 'Right'
     app.st.session_state.neuron_grid[0][0] = {
@@ -122,7 +124,8 @@ def test_directional_signal_propagation():
         "threshold": 0.4,
         "fire_rate": 0.0,
         "last_fired": -1,
-        "direction": "Right" # Only send right!
+        "direction": "Right", # Only send right!
+        "weight": 1.0
     }
     # Interneuron to its right
     app.st.session_state.neuron_grid[0][1] = {
@@ -131,7 +134,8 @@ def test_directional_signal_propagation():
         "threshold": 0.5,
         "fire_rate": 0.0,
         "last_fired": -1,
-        "direction": "All"
+        "direction": "All",
+        "weight": 1.0
     }
     # Interneuron to its bottom
     app.st.session_state.neuron_grid[1][0] = {
@@ -140,7 +144,8 @@ def test_directional_signal_propagation():
         "threshold": 0.5,
         "fire_rate": 0.0,
         "last_fired": -1,
-        "direction": "All"
+        "direction": "All",
+        "weight": 1.0
     }
 
     # With myelin = 0, signal efficiency is 0.35.
@@ -162,7 +167,7 @@ def test_motor_neuron_firing_yields():
     # Clean grid
     for r in range(6):
         for c in range(6):
-            app.st.session_state.neuron_grid[r][c] = {"type": "Empty", "charge": 0.0, "threshold": 0.5, "fire_rate": 0.0, "last_fired": -1, "direction": "All"}
+            app.st.session_state.neuron_grid[r][c] = {"type": "Empty", "charge": 0.0, "threshold": 0.5, "fire_rate": 0.0, "last_fired": -1, "direction": "All", "weight": 1.0}
 
     # Place a Motor neuron that has full charge
     app.st.session_state.neuron_grid[3][3] = {
@@ -171,7 +176,8 @@ def test_motor_neuron_firing_yields():
         "threshold": 0.5,
         "fire_rate": 0.0,
         "last_fired": -1,
-        "direction": "All"
+        "direction": "All",
+        "weight": 1.0
     }
 
     app.st.session_state.stats["iq"] = 10.0
@@ -195,7 +201,8 @@ def test_sanity_burnout_recovery():
         "threshold": 0.5,
         "fire_rate": 0.0,
         "last_fired": -1,
-        "direction": "All"
+        "direction": "All",
+        "weight": 1.0
     }
 
     # Reduce Sanity to 0.1 to trigger burnout on tick
@@ -258,11 +265,11 @@ def test_mission_system_evaluation():
     # Empty grid
     for r in range(6):
         for c in range(6):
-            app.st.session_state.neuron_grid[r][c] = {"type": "Empty", "charge": 0.0, "threshold": 0.5, "fire_rate": 0.0, "last_fired": -1, "direction": "All"}
+            app.st.session_state.neuron_grid[r][c] = {"type": "Empty", "charge": 0.0, "threshold": 0.5, "fire_rate": 0.0, "last_fired": -1, "direction": "All", "weight": 1.0}
 
     # Condition: Sensory & Motor present (Reflex Arc)
-    app.st.session_state.neuron_grid[0][0] = {"type": "Sensory", "charge": 0.0, "threshold": 0.5, "fire_rate": 0.0, "last_fired": -1, "direction": "All"}
-    app.st.session_state.neuron_grid[0][1] = {"type": "Motor", "charge": 0.0, "threshold": 0.5, "fire_rate": 0.0, "last_fired": -1, "direction": "All"}
+    app.st.session_state.neuron_grid[0][0] = {"type": "Sensory", "charge": 0.0, "threshold": 0.5, "fire_rate": 0.0, "last_fired": -1, "direction": "All", "weight": 1.0}
+    app.st.session_state.neuron_grid[0][1] = {"type": "Motor", "charge": 0.0, "threshold": 0.5, "fire_rate": 0.0, "last_fired": -1, "direction": "All", "weight": 1.0}
 
     # Prior state is In Progress
     assert app.st.session_state.missions["reflex"]["status"] == "In Progress"
@@ -283,8 +290,8 @@ def test_save_load_circuit_codes():
     app.init_game_state()
 
     # Customize grid
-    app.st.session_state.neuron_grid[1][2] = {"type": "Sensory", "charge": 0.1, "threshold": 0.4, "fire_rate": 0.3, "last_fired": -1, "direction": "Down"}
-    app.st.session_state.neuron_grid[3][4] = {"type": "Motor", "charge": 0.2, "threshold": 0.6, "fire_rate": 0.0, "last_fired": -1, "direction": "Left"}
+    app.st.session_state.neuron_grid[1][2] = {"type": "Sensory", "charge": 0.1, "threshold": 0.4, "fire_rate": 0.3, "last_fired": -1, "direction": "Down", "weight": 1.0}
+    app.st.session_state.neuron_grid[3][4] = {"type": "Motor", "charge": 0.2, "threshold": 0.6, "fire_rate": 0.0, "last_fired": -1, "direction": "Left", "weight": 2.0}
 
     # Serialize
     code = app.serialize_grid(app.st.session_state.neuron_grid)
@@ -297,6 +304,7 @@ def test_save_load_circuit_codes():
     assert loaded[1][2]["direction"] == "Down"
     assert loaded[3][4]["type"] == "Motor"
     assert loaded[3][4]["direction"] == "Left"
+    assert loaded[3][4]["weight"] == 2.0
 
 def test_synaptic_pruning():
     """
@@ -312,14 +320,15 @@ def test_synaptic_pruning():
     app.st.session_state.stats["memory"] = 10.0
     app.st.session_state.stats["ticks"] = 100
 
-    # Place Interneuron with an old last_fired (e.g., tick 50, which is >15 ticks ago from current 100)
+    # Place Interneuron with an old last_fired
     app.st.session_state.neuron_grid[2][2] = {
         "type": "Interneuron",
         "charge": 0.0,
         "threshold": 0.5,
         "fire_rate": 0.0,
         "last_fired": 50,
-        "direction": "All"
+        "direction": "All",
+        "weight": 1.0
     }
 
     app.run_simulation_tick()
@@ -359,12 +368,127 @@ def test_pfc_ai_decision_maker():
         ]
     }
 
-    # Trigger tick (forces auto-decision when current_event is set)
-    app.st.session_state.stats["ticks"] = 4 # makes ticks % 4 == 0 (required for periodic events check)
+    # Trigger tick
+    app.st.session_state.stats["ticks"] = 3
 
-    # To mock random event selection trigger, let's just trigger simulation tick
-    # The tick handles events and auto chooses tea (index 1) for Espresso title
     app.run_simulation_tick()
 
-    # Check that current_event is resolved/cleared and tea option's apply was called
+    # Check that current_event is resolved/cleared
     assert app.st.session_state.current_event is None
+
+def test_synaptic_weight_amplification():
+    """
+    UPGRADE TEST: Synaptic Weight Amplification
+    Verify that Synaptic weight multipliers correctly amplify signal propagation.
+    """
+    app.st.session_state = MockSessionState()
+    app.st.session_state["bot_thread"] = True
+    app.init_game_state()
+
+    # Clean grid
+    for r in range(6):
+        for c in range(6):
+            app.st.session_state.neuron_grid[r][c] = {"type": "Empty", "charge": 0.0, "threshold": 0.5, "fire_rate": 0.0, "last_fired": -1, "direction": "All", "weight": 1.0}
+
+    # Place a Sensory neuron at [0][0] with output weight = 3.0
+    app.st.session_state.neuron_grid[0][0] = {
+        "type": "Sensory",
+        "charge": 0.6,
+        "threshold": 0.4,
+        "fire_rate": 0.0,
+        "last_fired": -1,
+        "direction": "Right",
+        "weight": 3.0 # Weight of 3.0!
+    }
+    # Interneuron neighbor at [0][1]
+    app.st.session_state.neuron_grid[0][1] = {
+        "type": "Interneuron",
+        "charge": 0.1,
+        "threshold": 0.5,
+        "fire_rate": 0.0,
+        "last_fired": -1,
+        "direction": "All",
+        "weight": 1.0
+    }
+
+    # Transferred charge = (0.6 * 0.35 * 3.0) / 1 = 0.63.
+    # [0][1] should get 0.1 + 0.63 = 0.73
+    app.run_simulation_tick()
+
+    assert abs(app.st.session_state.neuron_grid[0][1]["charge"] - 0.73) < 1e-5
+
+def test_alzheimer_pathology_mode():
+    """
+    UPGRADE TEST: Alzheimer Game Mode
+    Verify that thresholds drift higher periodically under Alzheimer mode.
+    """
+    app.st.session_state = MockSessionState()
+    app.st.session_state["bot_thread"] = True
+    app.init_game_state()
+
+    # Set Alzheimer mode
+    app.st.session_state.game_mode = "Alzheimer"
+    app.st.session_state.stats["ticks"] = 9 # next tick will be 10 (multiple of 10)
+
+    # Set starting threshold of a Sensory cell
+    app.st.session_state.neuron_grid[0][0]["threshold"] = 0.4
+
+    app.run_simulation_tick()
+
+    # Under Alzheimer, threshold should increase by 0.04
+    assert app.st.session_state.neuron_grid[0][0]["threshold"] == 0.44
+
+def test_epilepsy_pathology_mode():
+    """
+    UPGRADE TEST: Epilepsy Game Mode
+    Verify that Stress generation is doubled under Epilepsy mode.
+    """
+    app.st.session_state = MockSessionState()
+    app.st.session_state["bot_thread"] = True
+    app.init_game_state()
+
+    # Clean grid
+    for r in range(6):
+        for c in range(6):
+            app.st.session_state.neuron_grid[r][c] = {"type": "Empty", "charge": 0.0, "threshold": 0.5, "fire_rate": 0.0, "last_fired": -1, "direction": "All", "weight": 1.0}
+
+    # Place a firing neuron
+    app.st.session_state.neuron_grid[0][0] = {
+        "type": "Sensory",
+        "charge": 0.6,
+        "threshold": 0.4,
+        "fire_rate": 0.0,
+        "last_fired": -1,
+        "direction": "Right",
+        "weight": 1.0
+    }
+    app.st.session_state.neuron_grid[0][1] = {
+        "type": "Interneuron",
+        "charge": 0.1,
+        "threshold": 0.5,
+        "fire_rate": 0.0,
+        "last_fired": -1,
+        "direction": "All",
+        "weight": 1.0
+    }
+
+    # Normal stress starting
+    app.st.session_state.chemicals["stress"] = 10.0
+    # cerebellum level 1 stress clearance = 2.5
+    # Signals fired = 1. Base stress = 1 * 1.5 = 1.5.
+
+    # Case 1: Normal mode stress delta
+    # stress delta = +1.5 - 2.5 = -1.0. Final stress = 9.0
+    app.st.session_state.game_mode = "Normal"
+    app.run_simulation_tick()
+    assert app.st.session_state.chemicals["stress"] == 9.0
+
+    # Case 2: Epilepsy mode stress delta
+    # Set fire charge back to trigger firing again
+    app.st.session_state.neuron_grid[0][0]["charge"] = 0.6
+    app.st.session_state.chemicals["stress"] = 10.0
+    app.st.session_state.game_mode = "Epilepsy"
+    # Under Epilepsy: signal_efficiency *= 1.35. Signals fired = 1.
+    # stress delta = +(1 * 1.5 * 2.0) - 2.5 = +3.0 - 2.5 = +0.5. Final stress = 10.5
+    app.run_simulation_tick()
+    assert app.st.session_state.chemicals["stress"] == 10.5
