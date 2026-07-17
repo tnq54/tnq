@@ -600,8 +600,6 @@ def test_rtms_therapy_action():
     assert app.st.session_state.neuron_grid[0][0]["threshold"] == 0.4
     assert app.st.session_state.chemicals["sanity"] == 70.0
 
-# ----------------- NEW UPGRADE TEST CASES -----------------
-
 def test_parkinsons_pathology():
     """
     UPGRADE TEST: Parkinson's Pathology Challenge Mode
@@ -650,7 +648,10 @@ def test_active_buffs():
     app.st.session_state.active_buffs = {
         "doping": 5,
         "ssri": 8,
-        "focus": 10
+        "focus": 10,
+        "tyrosine": 0,
+        "tryptophan": 0,
+        "choline": 0
     }
     app.st.session_state.chemicals["dopamine"] = 40.0
     app.st.session_state.chemicals["serotonin"] = 40.0
@@ -740,3 +741,122 @@ def test_drd4_shank3_genes():
     # Neighbor [0][1] should have 0.1 + 0.33 = 0.43
     app.run_simulation_tick()
     assert abs(app.st.session_state.neuron_grid[0][1]["charge"] - 0.43) < 1e-5
+
+# ----------------- BRAND NEW TESTS (DIET, MAOA/CHRNA7, AMYGDALA/THALAMUS) -----------------
+
+def test_diet_precursors():
+    """
+    UPGRADE TEST: Neurotransmitter Synthesis Precursors & Diet System
+    Verify L-Tyrosine, L-Tryptophan, Choline active tick buffs apply correctly.
+    """
+    app.st.session_state = MockSessionState()
+    app.st.session_state["bot_thread"] = True
+    app.init_game_state()
+
+    app.st.session_state.active_buffs = {
+        "doping": 0, "ssri": 0, "focus": 0,
+        "tyrosine": 15,
+        "tryptophan": 15,
+        "choline": 15
+    }
+    app.st.session_state.chemicals["dopamine"] = 40.0
+    app.st.session_state.chemicals["serotonin"] = 40.0
+    app.st.session_state.chemicals["acetylcholine"] = 40.0
+
+    app.run_simulation_tick()
+
+    # Check that precursors apply rate boosts:
+    # Tyrosine: +3.0 Dopamine
+    # Tryptophan: +2.0 Serotonin
+    # Choline: +2.5 Acetylcholine
+    # Then decay/stabilization applies:
+    # Dopamine: 40 + 3 = 43 -> 43 + (50 - 43) * 0.08 = 43.56
+    # Serotonin: 40 + 2 = 42 -> 42 + (50 - 42) * 0.08 = 42.64
+    # Acetylcholine: 40 + 2.5 = 42.5 -> 42.5 + (50 - 42.5) * 0.08 = 43.1
+    assert abs(app.st.session_state.chemicals["dopamine"] - 43.56) < 1e-5
+    assert abs(app.st.session_state.chemicals["serotonin"] - 42.64) < 1e-5
+    assert abs(app.st.session_state.chemicals["acetylcholine"] - 43.1) < 1e-5
+
+    assert app.st.session_state.active_buffs["tyrosine"] == 14
+    assert app.st.session_state.active_buffs["tryptophan"] == 14
+    assert app.st.session_state.active_buffs["choline"] == 14
+
+def test_maoa_chrna7_genes():
+    """
+    UPGRADE TEST: MAOA and CHRNA7 Genetic Mutations
+    MAOA slows dopamine and serotonin decay, but increases signal stress.
+    CHRNA7 boosts acetylcholine delta by 25%, but metabolic energy cost by 15%.
+    """
+    app.st.session_state = MockSessionState()
+    app.st.session_state["bot_thread"] = True
+    app.init_game_state()
+
+    # 1. Test MAOA decay rates
+    app.st.session_state.active_genes = ["MAOA"]
+    app.st.session_state.chemicals["dopamine"] = 80.0
+    app.st.session_state.chemicals["serotonin"] = 80.0
+
+    app.run_simulation_tick()
+    # Normally decay is 0.08. MAOA Dopamine decay rate is 0.08 * 0.7 = 0.056
+    # Dopamine: 80.0 + (50 - 80) * 0.056 = 80.0 - 1.68 = 78.32
+    # MAOA Serotonin decay rate is 0.056:
+    # Serotonin: 80.0 + (50 - 80) * 0.056 = 78.32
+    assert abs(app.st.session_state.chemicals["dopamine"] - 78.32) < 1e-3
+    assert abs(app.st.session_state.chemicals["serotonin"] - 78.32) < 1e-3
+
+    # 2. Test CHRNA7 Acetylcholine delta
+    app.st.session_state = MockSessionState()
+    app.st.session_state["bot_thread"] = True
+    app.init_game_state()
+
+    app.st.session_state.active_genes = ["CHRNA7"]
+    app.st.session_state.chemicals["acetylcholine"] = 40.0
+    app.st.session_state.chemicals["energy"] = 100.0
+
+    app.run_simulation_tick()
+    # Normally ACh delta is (50 - 40) * 0.08 = 0.8
+    # With CHRNA7, ACh delta is 0.8 * 1.25 = 1.0 -> 41.0
+    assert abs(app.st.session_state.chemicals["acetylcholine"] - 41.0) < 1e-5
+
+def test_amygdala_thalamus_upgrades():
+    """
+    UPGRADE TEST: Amygdala & Thalamus Anatomy Upgrades
+    Amygdala reduces stress generation, Thalamus speeds sensory cell charge.
+    """
+    app.st.session_state = MockSessionState()
+    app.st.session_state["bot_thread"] = True
+    app.init_game_state()
+
+    # 1. Test Amygdala level 1 stress reduction (-15% stress)
+    app.st.session_state.upgrades["amygdala"] = 1
+
+    # Clean grid and put 1 firing sensory cell
+    for r in range(6):
+        for c in range(6):
+            app.st.session_state.neuron_grid[r][c] = {"type": "Empty", "charge": 0.0, "threshold": 0.5, "fire_rate": 0.0, "last_fired": -1, "direction": "All", "weight": 1.0}
+    app.st.session_state.neuron_grid[0][0] = {
+        "type": "Sensory",
+        "charge": 0.6,
+        "threshold": 0.4,
+        "fire_rate": 0.0,
+        "last_fired": -1,
+        "direction": "Right",
+        "weight": 1.0
+    }
+    app.st.session_state.neuron_grid[0][1] = {
+        "type": "Interneuron",
+        "charge": 0.1,
+        "threshold": 0.5,
+        "fire_rate": 0.0,
+        "last_fired": -1,
+        "direction": "All",
+        "weight": 1.0
+    }
+
+    app.st.session_state.chemicals["stress"] = 10.0
+    app.run_simulation_tick()
+
+    # Normal stress generation is 1.5. Amygdala level 1 reduces it by 15% -> 1.5 * 0.85 = 1.275
+    # stress clearance = 2.5
+    # Stress delta = 1.275 - 2.5 = -1.225 -> final stress is 10.0 - 1.225 = 8.775
+    assert abs(app.st.session_state.chemicals["stress"] - 8.775) < 1e-5
