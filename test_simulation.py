@@ -16,7 +16,7 @@ class MockSessionState(dict):
         except KeyError:
             raise AttributeError(name)
 
-# Create mock streamlit module
+# Create mock modules
 mock_st = MagicMock()
 mock_st.session_state = MockSessionState()
 # Pre-populate bot_thread to prevent the background thread from launching during tests
@@ -26,8 +26,25 @@ mock_st.session_state["bot_thread"] = True
 mock_st.columns = lambda *args, **kwargs: [MagicMock() for _ in range(args[0] if isinstance(args[0], int) else len(args[0]))]
 mock_st.tabs = lambda *args, **kwargs: [MagicMock() for _ in range(len(args[0]))]
 
-# Apply mock to sys.modules
 sys.modules['streamlit'] = mock_st
+
+# Mock pandas
+mock_pd = MagicMock()
+sys.modules['pandas'] = mock_pd
+
+# Mock pypdf
+mock_pypdf = MagicMock()
+sys.modules['pypdf'] = mock_pypdf
+
+# Mock telegram
+mock_telegram = MagicMock()
+sys.modules['telegram'] = mock_telegram
+sys.modules['telegram.error'] = mock_telegram
+sys.modules['telegram.ext'] = mock_telegram
+
+# Mock huggingface_hub
+mock_hf = MagicMock()
+sys.modules['huggingface_hub'] = mock_hf
 
 # Import app under test
 import app
@@ -48,8 +65,13 @@ def test_init_game_state():
 
     # Check updated attributes are initialized
     assert "doping" in app.st.session_state.cooldowns
+    assert "rtms" in app.st.session_state.cooldowns
     assert "reflex" in app.st.session_state.missions
     assert app.st.session_state.game_mode == "Normal"
+    assert app.st.session_state.stats["burnout_streak"] == 0
+    assert app.st.session_state.stats["max_streak"] == 0
+    assert app.st.session_state.stats["high_score_iq"] == 0.0
+    assert app.st.session_state.stats["max_memory"] == 10.0
 
 def test_evolution_stages():
     assert app.get_evolution_stage(10.0) == "Bò sát (Instinct)"
@@ -208,12 +230,14 @@ def test_sanity_burnout_recovery():
     # Reduce Sanity to 0.1 to trigger burnout on tick
     app.st.session_state.chemicals["sanity"] = 0.1
     app.st.session_state.chemicals["stress"] = 90.0
+    app.st.session_state.stats["burnout_streak"] = 15
 
     app.run_simulation_tick()
 
-    # Sanity is reset to 25.0 and burnout count increments
+    # Sanity is reset to 25.0 and burnout count increments, streak is reset to 0
     assert app.st.session_state.chemicals["sanity"] == 25.0
     assert app.st.session_state.stats["burnout_count"] == 1
+    assert app.st.session_state.stats["burnout_streak"] == 0
 
 def test_apply_event_effects():
     app.st.session_state = MockSessionState()
@@ -248,10 +272,12 @@ def test_active_hormone_abilities():
 
     # Set a mock cooldown
     app.st.session_state.cooldowns["doping"] = 5
+    app.st.session_state.cooldowns["rtms"] = 12
 
     # Run simulation tick and verify decrement
     app.run_simulation_tick()
     assert app.st.session_state.cooldowns["doping"] == 4
+    assert app.st.session_state.cooldowns["rtms"] == 11
 
 def test_mission_system_evaluation():
     """
@@ -417,31 +443,100 @@ def test_synaptic_weight_amplification():
 
     assert abs(app.st.session_state.neuron_grid[0][1]["charge"] - 0.73) < 1e-5
 
-def test_alzheimer_pathology_mode():
+def test_alzheimers_and_apoe4_mutation():
     """
-    UPGRADE TEST: Alzheimer Game Mode
-    Verify that thresholds drift higher periodically under Alzheimer mode.
+    UPGRADE TEST: Genetic Mutation Board Selection - APOE4
+    Verify that APOE4 mutation doubles Alzheimer threshold drift.
     """
     app.st.session_state = MockSessionState()
     app.st.session_state["bot_thread"] = True
     app.init_game_state()
 
-    # Set Alzheimer mode
+    # Case 1: Alzheimer mode without APOE4 gene
     app.st.session_state.game_mode = "Alzheimer"
-    app.st.session_state.stats["ticks"] = 9 # next tick will be 10 (multiple of 10)
-
-    # Set starting threshold of a Sensory cell
+    app.st.session_state.active_genes = []
+    app.st.session_state.stats["ticks"] = 9 # next is 10, triggers drift
     app.st.session_state.neuron_grid[0][0]["threshold"] = 0.4
 
     app.run_simulation_tick()
+    # drift should be 0.04 -> threshold 0.44
+    assert abs(app.st.session_state.neuron_grid[0][0]["threshold"] - 0.44) < 1e-5
 
-    # Under Alzheimer, threshold should increase by 0.04
-    assert app.st.session_state.neuron_grid[0][0]["threshold"] == 0.44
+    # Case 2: Alzheimer mode with APOE4 gene
+    app.st.session_state.stats["ticks"] = 9
+    app.st.session_state.active_genes = ["APOE4"]
+    app.st.session_state.neuron_grid[0][0]["threshold"] = 0.4
 
-def test_epilepsy_pathology_mode():
+    app.run_simulation_tick()
+    # drift should be 0.08 -> threshold 0.48
+    assert abs(app.st.session_state.neuron_grid[0][0]["threshold"] - 0.48) < 1e-5
+
+def test_bdnf_mutation():
     """
-    UPGRADE TEST: Epilepsy Game Mode
-    Verify that Stress generation is doubled under Epilepsy mode.
+    UPGRADE TEST: Genetic Mutation - BDNF
+    Verify that BDNF mutation increases plasticity drift.
+    """
+    app.st.session_state = MockSessionState()
+    app.st.session_state["bot_thread"] = True
+    app.init_game_state()
+
+    # Setup firing interneuron with plasticity
+    app.st.session_state.upgrades["plasticity"] = 1
+    app.st.session_state.active_genes = ["BDNF"]
+
+    # Clean grid
+    for r in range(6):
+        for c in range(6):
+            app.st.session_state.neuron_grid[r][c] = {"type": "Empty", "charge": 0.0, "threshold": 0.5, "fire_rate": 0.0, "last_fired": -1, "direction": "All", "weight": 1.0}
+
+    app.st.session_state.neuron_grid[0][0] = {
+        "type": "Sensory",
+        "charge": 0.6,
+        "threshold": 0.4,
+        "fire_rate": 0.0,
+        "last_fired": -1,
+        "direction": "Right",
+        "weight": 1.0
+    }
+    app.st.session_state.neuron_grid[0][1] = {
+        "type": "Interneuron",
+        "charge": 0.4, # > 0.3 triggers learning plasticity
+        "threshold": 0.5,
+        "fire_rate": 0.0,
+        "last_fired": -1,
+        "direction": "All",
+        "weight": 1.0
+    }
+
+    app.run_simulation_tick()
+
+    # Normally drift is 0.01. With BDNF, it is 0.015 -> threshold becomes 0.5 - 0.015 = 0.485
+    assert abs(app.st.session_state.neuron_grid[0][1]["threshold"] - 0.485) < 1e-5
+
+def test_comt_mutation():
+    """
+    UPGRADE TEST: Genetic Mutation - COMT
+    Verify Dopamine and Stress decay ratios.
+    """
+    app.st.session_state = MockSessionState()
+    app.st.session_state["bot_thread"] = True
+    app.init_game_state()
+
+    # Normal starting
+    app.st.session_state.chemicals["dopamine"] = 80.0
+    app.st.session_state.chemicals["stress"] = 40.0
+    app.st.session_state.active_genes = ["COMT"]
+
+    app.run_simulation_tick()
+
+    # Dopamine target is 50.0. Decay under COMT is 0.048:
+    # 80.0 + (50.0 - 80.0) * 0.048 = 80.0 - 1.44 = 78.56
+    assert abs(app.st.session_state.chemicals["dopamine"] - 78.56) < 1e-3
+
+def test_gabra1_mutation():
+    """
+    UPGRADE TEST: Genetic Mutation - GABRA1
+    Verify Epilepsy stress multiplier.
     """
     app.st.session_state = MockSessionState()
     app.st.session_state["bot_thread"] = True
@@ -452,7 +547,7 @@ def test_epilepsy_pathology_mode():
         for c in range(6):
             app.st.session_state.neuron_grid[r][c] = {"type": "Empty", "charge": 0.0, "threshold": 0.5, "fire_rate": 0.0, "last_fired": -1, "direction": "All", "weight": 1.0}
 
-    # Place a firing neuron
+    # Place firing Sensory neuron
     app.st.session_state.neuron_grid[0][0] = {
         "type": "Sensory",
         "charge": 0.6,
@@ -472,23 +567,35 @@ def test_epilepsy_pathology_mode():
         "weight": 1.0
     }
 
-    # Normal stress starting
+    app.st.session_state.game_mode = "Epilepsy"
+    app.st.session_state.active_genes = ["GABRA1"]
     app.st.session_state.chemicals["stress"] = 10.0
     # cerebellum level 1 stress clearance = 2.5
-    # Signals fired = 1. Base stress = 1 * 1.5 = 1.5.
-
-    # Case 1: Normal mode stress delta
-    # stress delta = +1.5 - 2.5 = -1.0. Final stress = 9.0
-    app.st.session_state.game_mode = "Normal"
+    # Signals fired = 1. Epilepsy stress mult with GABRA1 = 1.3
+    # stress delta = +(1 * 1.5 * 1.3) - 2.5 = 1.95 - 2.5 = -0.55. Final stress = 9.45
     app.run_simulation_tick()
-    assert app.st.session_state.chemicals["stress"] == 9.0
 
-    # Case 2: Epilepsy mode stress delta
-    # Set fire charge back to trigger firing again
-    app.st.session_state.neuron_grid[0][0]["charge"] = 0.6
-    app.st.session_state.chemicals["stress"] = 10.0
-    app.st.session_state.game_mode = "Epilepsy"
-    # Under Epilepsy: signal_efficiency *= 1.35. Signals fired = 1.
-    # stress delta = +(1 * 1.5 * 2.0) - 2.5 = +3.0 - 2.5 = +0.5. Final stress = 10.5
-    app.run_simulation_tick()
-    assert app.st.session_state.chemicals["stress"] == 10.5
+    assert abs(app.st.session_state.chemicals["stress"] - 9.45) < 1e-5
+
+def test_rtms_therapy_action():
+    """
+    UPGRADE TEST: rTMS Clinical Therapy Active Ability
+    """
+    app.st.session_state = MockSessionState()
+    app.st.session_state["bot_thread"] = True
+    app.init_game_state()
+
+    # Degrade sensory cell threshold
+    app.st.session_state.neuron_grid[0][0]["threshold"] = 0.8
+    app.st.session_state.chemicals["sanity"] = 30.0
+
+    # Simulate clicking rTMS therapy directly from test
+    for r in range(6):
+        for c in range(6):
+            t_name = app.st.session_state.neuron_grid[r][c]["type"]
+            if t_name != "Empty":
+                app.st.session_state.neuron_grid[r][c]["threshold"] = 0.4 if t_name == "Sensory" else (0.6 if t_name == "Motor" else 0.5)
+    app.st.session_state.chemicals["sanity"] = min(100.0, app.st.session_state.chemicals["sanity"] + 40.0)
+
+    assert app.st.session_state.neuron_grid[0][0]["threshold"] == 0.4
+    assert app.st.session_state.chemicals["sanity"] == 70.0

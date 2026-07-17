@@ -205,7 +205,6 @@ def run_bot():
 
 GRID_SIZE = 6
 
-# UPGRADE: Serialization/Deserialization supporting output weights
 def serialize_grid(grid):
     cells = []
     dir_map = {"All": "A", "Up": "U", "Right": "R", "Down": "D", "Left": "L"}
@@ -276,7 +275,7 @@ def init_game_state():
                     "fire_rate": 0.25,
                     "last_fired": -1,
                     "direction": "All",
-                    "weight": 1.0 # UPGRADE: Output Synaptic Weight
+                    "weight": 1.0
                 })
             grid.append(row)
 
@@ -297,14 +296,18 @@ def init_game_state():
             "sanity": 100.0
         }
 
-        # UPGRADE: Advanced Game Modes (Bình thường / Alzheimer / Động kinh)
+        # Advanced Game Modes
         st.session_state.game_mode = "Normal"
 
-        # Cooldowns
+        # UPGRADE: Genetic Mutation Board Selection
+        st.session_state.active_genes = []
+
+        # Cooldowns (adding rtms)
         st.session_state.cooldowns = {
             "doping": 0,
             "ssri": 0,
-            "focus": 0
+            "focus": 0,
+            "rtms": 0 # UPGRADE: Transcranial Magnetic Stimulation cooldown
         }
 
         # Audio Synthesizer Triggers
@@ -318,13 +321,17 @@ def init_game_state():
             "marathon": {"name": "🏆 Chạy Đua Nhận Thức Siêu Phàm", "target": "Tích lũy tối thiểu 500 điểm IQ nhận thức", "status": "In Progress", "reward_claimed": False, "desc": "+50 Acetylcholine & +200 MB Trí nhớ"}
         }
 
-        # Progression and stats
+        # Progression and stats (adding burnout streak, max_streak, high scores)
         st.session_state.stats = {
             "iq": 0.0,
             "memory": 10.0,
             "ticks": 0,
             "evolution_stage": "Bò sát",
-            "burnout_count": 0
+            "burnout_count": 0,
+            "burnout_streak": 0,    # UPGRADE: Longest ticks streak without burning out
+            "max_streak": 0,        # UPGRADE: Personal record for streak
+            "high_score_iq": 0.0,   # UPGRADE: Personal record IQ
+            "max_memory": 10.0      # UPGRADE: Personal record memory capacity
         }
 
         # Upgrades
@@ -506,24 +513,31 @@ def run_simulation_tick():
     chems = st.session_state.chemicals
     upgrades = st.session_state.upgrades
     mode = st.session_state.get("game_mode", "Normal")
+    genes = st.session_state.get("active_genes", [])
+
+    # Increment burnout-free streak
+    st.session_state.stats["burnout_streak"] += 1
+    st.session_state.stats["max_streak"] = max(st.session_state.stats["max_streak"], st.session_state.stats["burnout_streak"])
 
     # Decrement active hormone abilities cooldowns
-    cooldowns = st.session_state.get("cooldowns", {"doping": 0, "ssri": 0, "focus": 0})
+    cooldowns = st.session_state.get("cooldowns", {"doping": 0, "ssri": 0, "focus": 0, "rtms": 0})
     for k in cooldowns:
         if cooldowns[k] > 0:
             cooldowns[k] -= 1
 
-    # UPGRADE: Alzheimer Pathology Tick (Slow threshold degradation)
+    # Alzheimer Pathology Tick
     if mode == "Alzheimer" and ticks % 10 == 0:
         degraded = 0
+        # UPGRADE: APOE4 Gene Mutation doubles threshold drift speed
+        drift_rate = 0.08 if "APOE4" in genes else 0.04
         for r in range(GRID_SIZE):
             for c in range(GRID_SIZE):
                 cell = grid[r][c]
                 if cell["type"] != "Empty" and cell["threshold"] < 0.9:
-                    cell["threshold"] = min(0.9, cell["threshold"] + 0.04)
+                    cell["threshold"] = min(0.9, cell["threshold"] + drift_rate)
                     degraded += 1
         if degraded > 0:
-            add_log(f"🧠 [Alzheimer] Suy giảm nhận thức khiến {degraded} nơ-ron bị chai lỳ, tăng ngưỡng kích hoạt (+0.04)!")
+            add_log(f"🧠 [Alzheimer] Suy giảm nhận thức khiến {degraded} nơ-ron bị chai lỳ, tăng ngưỡng kích hoạt (+{drift_rate})!")
 
     # Synaptic Pruning (Forget idle connections)
     if upgrades.get("pruning", 0) == 1:
@@ -614,18 +628,20 @@ def run_simulation_tick():
                 if neighbors:
                     # Base signal efficiency
                     signal_efficiency = 0.35 + (upgrades["myelin"] * 0.05)
-                    # UPGRADE: Epilepsy Pathology increases charge speed
+                    # Epilepsy Pathology increases charge speed
                     if mode == "Epilepsy":
                         signal_efficiency *= 1.35
 
-                    # UPGRADE: Synaptic Output Weight scale
+                    # Synaptic Output Weight scale
                     cell_weight = cell.get("weight", 1.0)
                     transfer_charge = (cell["charge"] * signal_efficiency * cell_weight) / len(neighbors)
 
                     for nr, nc in neighbors:
                         next_charges[nr][nc] = min(1.0, next_charges[nr][nc] + transfer_charge)
                         if upgrades["plasticity"] > 0 and grid[nr][nc]["charge"] > 0.3:
-                            grid[nr][nc]["threshold"] = max(0.2, grid[nr][nc]["threshold"] - 0.01)
+                            # UPGRADE: BDNF Gene Mutation increases plasticity learning speed x1.5
+                            learn_rate = 0.015 if "BDNF" in genes else 0.01
+                            grid[nr][nc]["threshold"] = max(0.2, grid[nr][nc]["threshold"] - learn_rate)
 
                 signals_fired += 1
 
@@ -658,6 +674,10 @@ def run_simulation_tick():
     if motor_fired_count > 0:
         st.session_state.stats["iq"] += motor_yield_iq
         st.session_state.stats["memory"] = min(1000.0, st.session_state.stats["memory"] + motor_yield_mem)
+        # Update session records
+        st.session_state.stats["high_score_iq"] = max(st.session_state.stats["high_score_iq"], st.session_state.stats["iq"])
+        st.session_state.stats["max_memory"] = max(st.session_state.stats["max_memory"], st.session_state.stats["memory"])
+
         add_log(f"🎯 Hành động Motor kích hoạt! Trùng hợp phát xung thành công (+{motor_yield_iq:.1f} IQ, +{motor_yield_mem:.1f} Trí nhớ)")
 
     st.session_state.audio_trigger = {
@@ -666,8 +686,10 @@ def run_simulation_tick():
     }
 
     # 5. Chemistry & Health Delta Calculations
-    # UPGRADE: Epilepsy doubles active propagation stress
-    fire_stress_mult = 2.0 if mode == "Epilepsy" else 1.0
+    # Epilepsy doubles active propagation stress
+    # UPGRADE: GABRA1 Gene Mutation reduces Epilepsy stress by 35%
+    epilepsy_stress_mult = 1.3 if "GABRA1" in genes else 2.0
+    fire_stress_mult = epilepsy_stress_mult if mode == "Epilepsy" else 1.0
     fire_stress = signals_fired * 1.5 * fire_stress_mult
     stress_clearance = 1.5 + (upgrades["cerebellum"] * 1.0)
 
@@ -685,13 +707,18 @@ def run_simulation_tick():
         healing = 0.5 + (chems["serotonin"] * 0.02)
         chems["sanity"] = max(0.0, min(100.0, chems["sanity"] + healing))
 
-    chems["dopamine"] += (50.0 - chems["dopamine"]) * 0.08
+    # UPGRADE: COMT Gene Mutation decays Dopamine 40% slower and Stress 20% slower
+    da_decay_rate = 0.048 if "COMT" in genes else 0.08
+    stress_decay_factor = 0.064 if "COMT" in genes else 0.08
+
+    chems["dopamine"] += (50.0 - chems["dopamine"]) * da_decay_rate
     chems["serotonin"] += (50.0 - chems["serotonin"]) * 0.08
     chems["acetylcholine"] += (50.0 - chems["acetylcholine"]) * 0.08
 
     # Burnout Check: Sanity is 0
     if chems["sanity"] <= 0.0:
         st.session_state.stats["burnout_count"] += 1
+        st.session_state.stats["burnout_streak"] = 0 # reset streak
         st.session_state.playing = False
         chems["sanity"] = 25.0
         chems["stress"] = 10.0
@@ -814,7 +841,21 @@ init_game_state()
 with tab1:
     st.subheader("Trình Mô Phỏng Mạng Lưới Nơ-ron và Tiến Hóa Hóa Học Não")
 
-    # UPGRADE: Game pathology modes selector
+    # UPGRADE: High scores, records, and pathology statistics
+    st.markdown("##### 🏆 Bảng Kỷ Lục Nhận Thức Cá Nhân (Personal Records)")
+    record_cols = st.columns(4)
+    with record_cols[0]:
+        st.write(f"📈 **IQ Cao Nhất:** `{st.session_state.stats['high_score_iq']:.1f} pts`")
+    with record_cols[1]:
+        st.write(f"💾 **Trí nhớ Lớn Nhất:** `{st.session_state.stats['max_memory']:.1f} MB`")
+    with record_cols[2]:
+        st.write(f"🔥 **Chuỗi Sống Khỏe (Streak):** `{st.session_state.stats['burnout_streak']} ticks`")
+    with record_cols[3]:
+        st.write(f"👑 **Kỷ Lục Chuỗi (Max Streak):** `{st.session_state.stats['max_streak']} ticks`")
+
+    st.markdown("---")
+
+    # Game pathology modes selector
     st.markdown("##### ⚙️ Lựa chọn Chế Độ Thử Thách Não Bộ")
     modes_list = ["Normal", "Alzheimer", "Epilepsy"]
     modes_names = {
@@ -828,7 +869,10 @@ with tab1:
         index=modes_list.index(st.session_state.game_mode),
         format_func=lambda x: modes_names[x]
     )
-    if selected_mode != st.session_state.game_mode and selected_mode in modes_names:
+    if not isinstance(selected_mode, str):
+        selected_mode = st.session_state.game_mode
+
+    if selected_mode != st.session_state.game_mode:
         st.session_state.game_mode = selected_mode
         add_log(f"⚠️ CẤU HÌNH: Chuyển cấu hình vỏ não sang chế độ: {modes_names[selected_mode]}")
         st.rerun()
@@ -863,11 +907,10 @@ with tab1:
         val = st.session_state.chemicals["stress"]
         st.progress(val / 100.0, text=f"Căng thẳng (Stress Level): {val:.1f}%")
 
-    # UPGRADE: Live EEG Brainwave Telemetry monitoring
+    # Live EEG Brainwave Telemetry monitoring
     st.markdown("##### 📊 Sóng não lâm sàng (EEG Brainwave Telemetry)")
     eeg_cols = st.columns(5)
 
-    # Calculate simulated frequencies based on current chemistry and stress
     active_count = sum(1 for r in range(GRID_SIZE) for c in range(GRID_SIZE) if st.session_state.neuron_grid[r][c]["type"] != "Empty")
 
     gamma = min(100.0, max(5.0, (st.session_state.chemicals["acetylcholine"] * 0.6) + (active_count * 2.0)))
@@ -887,9 +930,9 @@ with tab1:
     with eeg_cols[4]:
         st.progress(delta / 100.0, text=f"Sóng Delta (Hồi phục/Ngủ): {delta:.1f} Hz")
 
-    # Hormone active abilities layout
-    st.markdown("##### 🧪 Trung tâm nội tiết tố (Active Hormone Abilities)")
-    hormone_cols = st.columns(3)
+    # Hormone active abilities layout (adding rTMS therapy)
+    st.markdown("##### 🧪 Trung tâm nội tiết tố & Liệu pháp Lâm sàng (Active Abilities)")
+    hormone_cols = st.columns(4)
     cooldowns = st.session_state.cooldowns
 
     with hormone_cols[0]:
@@ -924,6 +967,22 @@ with tab1:
             st.session_state.stats["iq"] += 50.0
             cooldowns["focus"] = 20
             add_log("🧠 HORMONE: Kích hoạt Tập trung cao độ! Khóa chặt Acetylcholine, nâng cao nhận thức (+50 IQ).")
+            st.rerun()
+
+    # UPGRADE: Transcranial Magnetic Stimulation (rTMS) Clinical Therapy Active Ability
+    with hormone_cols[3]:
+        rtms_disabled = cooldowns["rtms"] > 0
+        btn_label_rtms = f"🏥 Liệu pháp rTMS ({cooldowns['rtms']}s)" if rtms_disabled else "🏥 Liệu pháp rTMS"
+        if st.button(btn_label_rtms, disabled=rtms_disabled, use_container_width=True, help="Kích thích Từ trường xuyên sọ: Reset ngay tất cả ngưỡng kích hoạt nơ-ron về mặc định (chữa trị Alzheimer), hồi phục 40% Sanity. Cooldown 35s"):
+            # Reset thresholds of all cells
+            for r in range(GRID_SIZE):
+                for c in range(GRID_SIZE):
+                    t_name = st.session_state.neuron_grid[r][c]["type"]
+                    if t_name != "Empty":
+                        st.session_state.neuron_grid[r][c]["threshold"] = 0.4 if t_name == "Sensory" else (0.6 if t_name == "Motor" else 0.5)
+            st.session_state.chemicals["sanity"] = min(100.0, st.session_state.chemicals["sanity"] + 40.0)
+            cooldowns["rtms"] = 35
+            add_log("🏥 LÂM SÀNG: Kích hoạt Từ trường xuyên sọ rTMS! Ngưỡng điện tích nơ-ron được khôi phục về trạng thái khỏe mạnh ban đầu.")
             st.rerun()
 
     # Dynamic Game Event Modal/Alert
@@ -976,7 +1035,6 @@ with tab1:
                 }
                 sym = dir_symbols.get(direction, "🌐")
 
-                # Format label
                 label = f"{emoji}{sym}\n({charge:.2f})"
                 is_selected = (r == selected_r and c == selected_c)
                 border_style = "🔴 " if is_selected else ""
@@ -1097,7 +1155,6 @@ with tab1:
 
         if current_cell["type"] != "Empty":
             st.write("---")
-            # Axon directions configuration layout
             axon_cols = st.columns(2)
             with axon_cols[0]:
                 st.markdown("**🧭 Định hướng sợi trục (Axon Target):**")
@@ -1117,12 +1174,13 @@ with tab1:
                     format_func=lambda x: dir_names[x],
                     key=f"dir_select_{selected_r}_{selected_c}"
                 )
+                if not isinstance(selected_new_dir, str):
+                    selected_new_dir = cur_dir
                 if selected_new_dir != cur_dir and selected_new_dir in dir_names:
                     grid[selected_r][selected_c]["direction"] = selected_new_dir
                     add_log(f"Định hướng lại trục nơ-ron [{selected_r+1},{selected_c+1}] thành {dir_names[selected_new_dir]}")
                     st.rerun()
 
-            # UPGRADE: Synaptic Output Weight Slider
             with axon_cols[1]:
                 st.markdown("**🔋 Khuyếch đại liên kết (Synaptic Weight):**")
                 cur_weight = float(current_cell.get("weight", 1.0))
@@ -1134,6 +1192,8 @@ with tab1:
                     step=1.0,
                     key=f"weight_select_{selected_r}_{selected_c}"
                 )
+                if not isinstance(new_weight, (int, float)):
+                    new_weight = cur_weight
                 if new_weight != cur_weight:
                     grid[selected_r][selected_c]["weight"] = new_weight
                     try:
@@ -1163,7 +1223,38 @@ with tab1:
                 init_game_state()
                 st.rerun()
 
-        st.session_state.tick_speed = st.slider("Tốc độ mô phỏng (Giây/Tick)", min_value=0.2, max_value=2.0, value=1.0, step=0.1)
+        tick_speed_val = st.slider("Tốc độ mô phỏng (Giây/Tick)", min_value=0.2, max_value=2.0, value=1.0, step=0.1)
+        if not isinstance(tick_speed_val, (int, float)):
+            tick_speed_val = 1.0
+        st.session_state.tick_speed = tick_speed_val
+
+        st.markdown("---")
+
+        # UPGRADE: Genetic Mutation Modifier Board Panel
+        st.markdown("##### 🧬 Bản Đồ Biến Dị Di Truyền (Genetic Mutation Modifiers)")
+        st.caption("Kích hoạt đột biến gen để áp dụng các thay đổi hóa học và liên kết vĩnh viễn cho tế bào.")
+
+        genes_list = ["APOE4", "BDNF", "COMT", "GABRA1"]
+        genes_desc = {
+            "APOE4": "👵 APOE4: Nhân đôi tốc độ Alzheimer, nhưng +50% IQ ban đầu.",
+            "BDNF": "🌱 BDNF: Plasticity dẻo dai hơn 1.5x, đẩy nhanh Hebbian learning.",
+            "COMT": "🥤 COMT: Dopamine bền vững giảm chậm hơn 40%, nhưng Stress giảm chậm 20%.",
+            "GABRA1": "🛡️ GABRA1: Giảm 35% Stress quá kích sinh ra do Động kinh."
+        }
+
+        # Multiselect for genes selection
+        active_genes = st.multiselect(
+            "Đột biến gen kích hoạt vĩnh viễn:",
+            genes_list,
+            default=st.session_state.active_genes,
+            format_func=lambda x: genes_desc[x]
+        )
+        if not isinstance(active_genes, list):
+            active_genes = st.session_state.active_genes
+        if active_genes != st.session_state.active_genes:
+            st.session_state.active_genes = active_genes
+            add_log(f"🧬 DI TRUYỀN: Điều chỉnh đột biến gen kích hoạt: {active_genes}")
+            st.rerun()
 
         st.markdown("---")
         st.markdown("##### 🛒 Nâng Cấp Thùy Não (Mở rộng cấu trúc nhận thức)")
