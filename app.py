@@ -286,20 +286,21 @@ def init_game_state():
 
         st.session_state.neuron_grid = grid
 
-        # Chemistry metrics
+        # Chemistry metrics (added melatonin)
         st.session_state.chemicals = {
             "dopamine": 50.0,
             "serotonin": 50.0,
             "acetylcholine": 50.0,
             "energy": 100.0,
             "stress": 10.0,
-            "sanity": 100.0
+            "sanity": 100.0,
+            "melatonin": 10.0
         }
 
         # Advanced Game Modes (Normal, Alzheimer, Epilepsy, Parkinson)
         st.session_state.game_mode = "Normal"
 
-        # UPGRADE: Genetic Mutation Board Selection
+        # UPGRADE: Genetic Mutation Board Selection (supports PGC-1alpha & SLC6A4)
         st.session_state.active_genes = []
 
         # UPGRADE: Continuous Active Buffs tick counter
@@ -312,12 +313,13 @@ def init_game_state():
             "choline": 0
         }
 
-        # Cooldowns
+        # Cooldowns (added opto)
         st.session_state.cooldowns = {
             "doping": 0,
             "ssri": 0,
             "focus": 0,
-            "rtms": 0
+            "rtms": 0,
+            "opto": 0
         }
 
         # Audio Synthesizer Triggers
@@ -331,7 +333,7 @@ def init_game_state():
             "marathon": {"name": "🏆 Chạy Đua Nhận Thức Siêu Phàm", "target": "Tích lũy tối thiểu 500 điểm IQ nhận thức", "status": "In Progress", "reward_claimed": False, "desc": "+50 Acetylcholine & +200 MB Trí nhớ"}
         }
 
-        # Progression and stats
+        # Progression and stats (added day/night circadian cycle state, sleep state, glycogen emergency pool)
         st.session_state.stats = {
             "iq": 0.0,
             "memory": 10.0,
@@ -341,7 +343,10 @@ def init_game_state():
             "burnout_streak": 0,
             "max_streak": 0,
             "high_score_iq": 0.0,
-            "max_memory": 10.0
+            "max_memory": 10.0,
+            "circadian_cycle": "Day",
+            "sleep_state": False,
+            "glycogen_pool": 30.0 # Emergency energy reservoir
         }
 
         # Upgrades
@@ -355,7 +360,8 @@ def init_game_state():
             "pruning": 0,
             "pfc": 0,
             "amygdala": 0,
-            "thalamus": 0
+            "thalamus": 0,
+            "glycogen_shunt": 0 # increases max energy storage to 150
         }
 
         # Logs, playing status, speed, selected cell, events
@@ -531,6 +537,20 @@ def run_simulation_tick():
     st.session_state.stats["burnout_streak"] += 1
     st.session_state.stats["max_streak"] = max(st.session_state.stats["max_streak"], st.session_state.stats["burnout_streak"])
 
+    # UPGRADE: Day/Night Circadian Rhythm (30 Day, 10 Night)
+    cycle_time = ticks % 40
+    if cycle_time < 30:
+        st.session_state.stats["circadian_cycle"] = "Day"
+        chems["melatonin"] = max(0.0, chems["melatonin"] - 1.5)
+    else:
+        st.session_state.stats["circadian_cycle"] = "Night"
+        chems["melatonin"] = min(100.0, chems["melatonin"] + 4.5)
+        # Night melatonin slightly lowers baseline stress
+        chems["stress"] = max(0.0, chems["stress"] - 1.0)
+
+    # UPGRADE: SLC6A4 Transporter Gene increases SSRI active buff duration x1.5, slightly dampens normal clearance
+    slc6a4_mult = 1.5 if "SLC6A4" in genes else 1.0
+
     # UPGRADE: Decrement active neuromodulator buffs tick timers and apply ongoing biochemical bonuses
     buffs = st.session_state.get("active_buffs", {"doping": 0, "ssri": 0, "focus": 0, "tyrosine": 0, "tryptophan": 0, "choline": 0})
     for k in list(buffs.keys()):
@@ -542,7 +562,7 @@ def run_simulation_tick():
                 chems["serotonin"] = min(100.0, chems["serotonin"] + 3.0)
             elif k == "focus":
                 chems["acetylcholine"] = min(100.0, chems["acetylcholine"] + 4.0)
-            # UPGRADE: Dietary Synthesis Precursor Tick Bonuses
+            # Dietary Synthesis Precursor Tick Bonuses
             elif k == "tyrosine":
                 chems["dopamine"] = min(100.0, chems["dopamine"] + 3.0)
             elif k == "tryptophan":
@@ -551,7 +571,7 @@ def run_simulation_tick():
                 chems["acetylcholine"] = min(100.0, chems["acetylcholine"] + 2.5)
 
     # Decrement active hormone abilities cooldowns
-    cooldowns = st.session_state.get("cooldowns", {"doping": 0, "ssri": 0, "focus": 0, "rtms": 0})
+    cooldowns = st.session_state.get("cooldowns", {"doping": 0, "ssri": 0, "focus": 0, "rtms": 0, "opto": 0})
     for k in cooldowns:
         if cooldowns[k] > 0:
             cooldowns[k] -= 1
@@ -622,15 +642,52 @@ def run_simulation_tick():
                 neuron_count += 1
 
     metabolic_cost = 1.0 + (neuron_count * 0.4)
-    # UPGRADE: CHRNA7 genetic mutation increases Energy metabolic consumption by 15%
+    # CHRNA7 genetic mutation increases Energy metabolic consumption by 15%
     if "CHRNA7" in genes:
         metabolic_cost *= 1.15
 
-    chems["energy"] = max(0.0, min(100.0, chems["energy"] + energy_generation - metabolic_cost))
+    max_energy = 100.0
+    # UPGRADE: Astrocytic Glycogen Shunt & PGC-1alpha genetics boost max energy storage capacity
+    if upgrades.get("glycogen_shunt", 0) == 1:
+        max_energy = 150.0
+    if "PGC-1alpha" in genes:
+        max_energy += 40.0
+
+    # Auto-release emergency glycogen pool
+    if chems["energy"] < 15.0 and st.session_state.stats["glycogen_pool"] > 0:
+        chems["energy"] = min(max_energy, chems["energy"] + 30.0)
+        st.session_state.stats["glycogen_pool"] = max(0.0, st.session_state.stats["glycogen_pool"] - 30.0)
+        add_log("🔋 [Glycogen Shunt] Năng lượng dưới 15%! Tự động xuất kho Glycogen khẩn cấp từ tế bào hình sao (+30 Energy).")
+
+    chems["energy"] = max(0.0, min(max_energy, chems["energy"] + energy_generation - metabolic_cost))
 
     if chems["energy"] <= 0.0:
         add_log("⚠️ Cảnh báo: Bộ não cạn kiệt Glucose và Oxy! Không thể truyền tín hiệu.")
         chems["stress"] = max(0.0, min(100.0, chems["stress"] + 5.0))
+        record_history(ticks, chems)
+        return
+
+    # UPGRADE: Sleep Circus Loop Processing
+    if st.session_state.stats.get("sleep_state", False):
+        # Sensory inputs, signal propagation, and motor output are skipped/disabled
+        # Rapid sleep recovery heals biochemistry and flushes waste
+        chems["energy"] = min(max_energy, chems["energy"] + 15.0)
+        chems["sanity"] = min(100.0, chems["sanity"] + 8.0)
+        chems["stress"] = max(0.0, chems["stress"] - 12.0)
+
+        # Reset cell charges to 0.0 during deep sleep
+        for r in range(GRID_SIZE):
+            for c in range(GRID_SIZE):
+                grid[r][c]["charge"] = 0.0
+
+        # Stabilize dopamine and serotonin extremely quickly back towards 50%
+        chems["dopamine"] += (50.0 - chems["dopamine"]) * 0.35
+        chems["serotonin"] += (50.0 - chems["serotonin"]) * 0.35
+
+        if cycle_time == 0: # Day shifted, wake up automatically!
+            st.session_state.stats["sleep_state"] = False
+            add_log("🌞 [Circadian] Mặt trời lên! Bộ não tự động tỉnh giấc, khôi phục hệ thống kích thích.")
+
         record_history(ticks, chems)
         return
 
@@ -641,7 +698,7 @@ def run_simulation_tick():
             cell = grid[r][c]
             if cell["type"] == "Sensory":
                 boost = 1.0 + (chems["dopamine"] / 100.0)
-                # UPGRADE: Thalamus boosts sensory cell charge speed by +20% per level
+                # Thalamus boosts sensory cell charge speed by +20% per level
                 thalamus_level = upgrades.get("thalamus", 0)
                 boost *= (1.0 + thalamus_level * 0.2)
 
@@ -680,7 +737,7 @@ def run_simulation_tick():
                             neighbors.append((nr, nc))
 
                 if neighbors:
-                    # UPGRADE: SHANK3 (Synaptic Scaffolding) boosts Myelin transmission efficiency by +15%
+                    # SHANK3 (Synaptic Scaffolding) boosts Myelin transmission efficiency by +15%
                     shank3_bonus = 0.15 if "SHANK3" in genes else 0.0
                     signal_efficiency = 0.35 + (upgrades["myelin"] * 0.05) + shank3_bonus
 
@@ -695,7 +752,7 @@ def run_simulation_tick():
                     for nr, nc in neighbors:
                         next_charges[nr][nc] = min(1.0, next_charges[nr][nc] + transfer_charge)
                         if upgrades["plasticity"] > 0 and grid[nr][nc]["charge"] > 0.3:
-                            # UPGRADE: BDNF Gene Mutation increases plasticity learning speed x1.5
+                            # BDNF Gene Mutation increases plasticity learning speed x1.5
                             learn_rate = 0.015 if "BDNF" in genes else 0.01
                             grid[nr][nc]["threshold"] = max(0.2, grid[nr][nc]["threshold"] - learn_rate)
 
@@ -723,7 +780,7 @@ def run_simulation_tick():
                 mem_multiplier = 1.0 + (upgrades["hippocampus"] * 0.4)
                 motor_yield_mem += 2.0 * mem_multiplier
 
-                # UPGRADE: DRD4 Mutation doubles dopamine reward from Motor fires
+                # DRD4 Mutation doubles dopamine reward from Motor fires
                 doping_multiplier = 2.0 if "DRD4" in genes else 1.0
                 chems["dopamine"] = min(100.0, chems["dopamine"] + (8.0 * doping_multiplier))
                 chems["acetylcholine"] = max(0.0, chems["acetylcholine"] - 4.0)
@@ -745,22 +802,25 @@ def run_simulation_tick():
 
     # 5. Chemistry & Health Delta Calculations
     # Epilepsy doubles active propagation stress
-    # UPGRADE: GABRA1 Gene Mutation reduces Epilepsy stress by 35%
+    # GABRA1 Gene Mutation reduces Epilepsy stress by 35%
     epilepsy_stress_mult = 1.3 if "GABRA1" in genes else 2.0
     fire_stress_mult = epilepsy_stress_mult if mode == "Epilepsy" else 1.0
     fire_stress = signals_fired * 1.5 * fire_stress_mult
 
-    # UPGRADE: MAOA genetic mutation increases stress generation on firing by +40%
+    # MAOA genetic mutation increases stress generation on firing by +40%
     if "MAOA" in genes:
         fire_stress *= 1.4
 
     stress_clearance = 1.5 + (upgrades["cerebellum"] * 1.0)
+    # SLC6A4 gene slightly dampens normal stress clearance by 30%
+    if "SLC6A4" in genes:
+        stress_clearance *= 0.7
 
     # Active SSRI Buff reduces stress generation by 50%
     if buffs.get("ssri", 0) > 0:
         fire_stress *= 0.5
 
-    # UPGRADE: Amygdala anatomy reduces active stress generation by -15% per level
+    # Amygdala anatomy reduces active stress generation by -15% per level
     amygdala_level = upgrades.get("amygdala", 0)
     fire_stress *= max(0.1, 1.0 - amygdala_level * 0.15)
 
@@ -769,7 +829,7 @@ def run_simulation_tick():
     serotonin_dampening = chems["serotonin"] * 0.1
     effective_stress = max(0.0, chems["stress"] - serotonin_dampening)
 
-    # UPGRADE: DRD4 mutation causes low dopamine (<30.0) to double stress damage on sanity
+    # DRD4 mutation causes low dopamine (<30.0) to double stress damage on sanity
     drd4_sanity_mult = 2.0 if ("DRD4" in genes and chems["dopamine"] < 30.0) else 1.0
 
     if effective_stress > 60.0:
@@ -781,8 +841,8 @@ def run_simulation_tick():
         healing = 0.5 + (chems["serotonin"] * 0.02)
         chems["sanity"] = max(0.0, min(100.0, chems["sanity"] + healing))
 
-    # UPGRADE: COMT Gene Mutation decays Dopamine 40% slower and Stress 20% slower
-    # UPGRADE: MAOA Gene Mutation decays Dopamine and Serotonin 30% slower
+    # COMT Gene Mutation decays Dopamine 40% slower and Stress 20% slower
+    # MAOA Gene Mutation decays Dopamine and Serotonin 30% slower
     da_decay_rate = 0.048 if "COMT" in genes else 0.08
     if "MAOA" in genes:
         da_decay_rate *= 0.7
@@ -793,7 +853,7 @@ def run_simulation_tick():
     chems["dopamine"] += (50.0 - chems["dopamine"]) * da_decay_rate
     chems["serotonin"] += (50.0 - chems["serotonin"]) * se_decay_rate
 
-    # UPGRADE: CHRNA7 boosts Acetylcholine generation / baseline stabilization by +25%
+    # CHRNA7 boosts Acetylcholine generation / baseline stabilization by +25%
     ach_decay_rate = 0.08
     ach_delta = (50.0 - chems["acetylcholine"]) * ach_decay_rate
     if "CHRNA7" in genes:
@@ -945,15 +1005,19 @@ with tab1:
 
     # Personal records display
     st.markdown("##### 🏆 Bảng Kỷ Lục Nhận Thức Cá Nhân (Personal Records)")
-    record_cols = st.columns(4)
+    record_cols = st.columns(5)
     with record_cols[0]:
         st.write(f"📈 **IQ Cao Nhất:** `{st.session_state.stats['high_score_iq']:.1f} pts`")
     with record_cols[1]:
         st.write(f"💾 **Trí nhớ Lớn Nhất:** `{st.session_state.stats['max_memory']:.1f} MB`")
     with record_cols[2]:
-        st.write(f"🔥 **Chuỗi Sống Khỏe (Streak):** `{st.session_state.stats['burnout_streak']} ticks`")
+        st.write(f"🔥 **Chuỗi Sống Khỏe:** `{st.session_state.stats['burnout_streak']} ticks`")
     with record_cols[3]:
-        st.write(f"👑 **Kỷ Lục Chuỗi (Max Streak):** `{st.session_state.stats['max_streak']} ticks`")
+        st.write(f"👑 **Kỷ Lục Chuỗi:** `{st.session_state.stats['max_streak']} ticks`")
+    with record_cols[4]:
+        # UPGRADE: Visual State indicator of Day/Night Circadian Cycle
+        cycle_emoji = "🌞 Ngày (Day)" if st.session_state.stats["circadian_cycle"] == "Day" else "🌙 Đêm (Night)"
+        st.write(f"⏰ **Chu kỳ sinh học:** `{cycle_emoji}`")
 
     st.markdown("---")
 
@@ -980,7 +1044,7 @@ with tab1:
         add_log(f"⚠️ CẤU HÌNH: Chuyển cấu hình vỏ não sang chế độ: {modes_names[selected_mode]}")
         st.rerun()
 
-    # UPGRADE: Continuous Active Buff badges indicators (now supports synthesis precursors L-Tyrosine, L-Tryptophan, Choline)
+    # UPGRADE: Continuous Active Buff badges indicators
     st.markdown("##### 🧪 Trạng thái hoạt hóa hóa học (Active Neuromodulator Buffs)")
     active_buffs = st.session_state.get("active_buffs", {"doping": 0, "ssri": 0, "focus": 0, "tyrosine": 0, "tryptophan": 0, "choline": 0})
     buffs_html = []
@@ -991,7 +1055,7 @@ with tab1:
     if active_buffs.get("focus", 0) > 0:
         buffs_html.append(f"<span class='buff-badge badge-focus'>🧠 Deep Focus ({active_buffs['focus']} ticks)</span>")
     if active_buffs.get("tyrosine", 0) > 0:
-        buffs_html.append(f"<span class='buff-badge badge-tyrosine'>🍳 L-Tyrosine Synthesis ({active_buffs['tyrosine']} ticks)</span>")
+        buffs_html.append(f"<span class='buff-badge badge-tyrosine'>🥩 L-Tyrosine Synthesis ({active_buffs['tyrosine']} ticks)</span>")
     if active_buffs.get("tryptophan", 0) > 0:
         buffs_html.append(f"<span class='buff-badge badge-tryptophan'>🍌 L-Tryptophan Synthesis ({active_buffs['tryptophan']} ticks)</span>")
     if active_buffs.get("choline", 0) > 0:
@@ -1013,12 +1077,18 @@ with tab1:
     with cols[3]:
         st.metric("Tỉnh táo (Sanity)", f"{st.session_state.chemicals['sanity']:.1f}%")
     with cols[4]:
-        st.metric("Mức năng lượng (Fuel)", f"{st.session_state.chemicals['energy']:.1f}%")
+        # Displays max capacity according to upgrades & genes
+        max_cap = 100.0
+        if st.session_state.upgrades.get("glycogen_shunt", 0) == 1:
+            max_cap = 150.0
+        if "PGC-1alpha" in st.session_state.active_genes:
+            max_cap += 40.0
+        st.metric("Mức năng lượng (Fuel)", f"{st.session_state.chemicals['energy']:.1f}% / {max_cap:.0f}%")
     with cols[5]:
-        st.metric("Số lần quá tải (Burnout)", st.session_state.stats["burnout_count"])
+        st.metric("Kho Glycogen tế bào hình sao", f"{st.session_state.stats.get('glycogen_pool', 0.0):.1f} units")
 
-    # Progress bars for detailed chemistry
-    chem_cols = st.columns(4)
+    # Progress bars for detailed chemistry (added Melatonin)
+    chem_cols = st.columns(5)
     with chem_cols[0]:
         val = st.session_state.chemicals["dopamine"]
         st.progress(val / 100.0, text=f"Dopamine (Động lực, Thưởng): {val:.1f}%")
@@ -1031,6 +1101,9 @@ with tab1:
     with chem_cols[3]:
         val = st.session_state.chemicals["stress"]
         st.progress(val / 100.0, text=f"Căng thẳng (Stress Level): {val:.1f}%")
+    with chem_cols[4]:
+        val = st.session_state.chemicals.get("melatonin", 10.0)
+        st.progress(val / 100.0, text=f"Melatonin (Gây ngủ): {val:.1f}%")
 
     # Live EEG Brainwave Telemetry monitoring
     st.markdown("##### 📊 Sóng não lâm sàng (EEG Brainwave Telemetry)")
@@ -1055,9 +1128,9 @@ with tab1:
     with eeg_cols[4]:
         st.progress(delta / 100.0, text=f"Sóng Delta (Hồi phục/Ngủ): {delta:.1f} Hz")
 
-    # Hormone active abilities layout
+    # Hormone active abilities layout (added sleep & Optogenetics)
     st.markdown("##### 🧪 Trung tâm nội tiết tố & Liệu pháp Lâm sàng (Active Abilities)")
-    hormone_cols = st.columns(4)
+    hormone_cols = st.columns(6)
     cooldowns = st.session_state.cooldowns
 
     with hormone_cols[0]:
@@ -1077,18 +1150,22 @@ with tab1:
 
     with hormone_cols[1]:
         ssri_disabled = cooldowns["ssri"] > 0
-        btn_label_ssri = f"💊 Tái hấp thu Serotonin (SSRI) ({cooldowns['ssri']}s)" if ssri_disabled else "💊 Tái hấp thu Serotonin (SSRI)"
+        btn_label_ssri = f"💊 Serotonin (SSRI) ({cooldowns['ssri']}s)" if ssri_disabled else "💊 Serotonin (SSRI)"
         if st.button(btn_label_ssri, disabled=ssri_disabled, use_container_width=True, help="Hạ 50% Stress, hồi phục 30 Tỉnh táo lập tức. Cooldown 25s. Kích hoạt buff liên tục 12 ticks giảm 50% sinh stress."):
             st.session_state.chemicals["stress"] = max(0.0, st.session_state.chemicals["stress"] - 50.0)
             st.session_state.chemicals["sanity"] = min(100.0, st.session_state.chemicals["sanity"] + 30.0)
-            st.session_state.active_buffs["ssri"] = 12
+
+            # SLC6A4 gene increases SSRI duration x1.5 -> 18 ticks
+            slc6a4_mult_val = 1.5 if "SLC6A4" in st.session_state.get("active_genes", []) else 1.0
+            ssri_dur = int(12 * slc6a4_mult_val)
+            st.session_state.active_buffs["ssri"] = ssri_dur
             cooldowns["ssri"] = 25
-            add_log("💊 HORMONE: Kích hoạt liệu pháp Serotonin! Xoa dịu vỏ não, triệt tiêu căng thẳng. Serotonin buff liên tục kích hoạt.")
+            add_log(f"💊 HORMONE: Kích hoạt liệu pháp Serotonin! Xoa dịu vỏ não, triệt tiêu căng thẳng. Serotonin buff liên tục {ssri_dur} ticks kích hoạt.")
             st.rerun()
 
     with hormone_cols[2]:
         focus_disabled = cooldowns["focus"] > 0
-        btn_label_focus = f"🧠 Tập trung cao độ ({cooldowns['focus']}s)" if focus_disabled else "🧠 Tập trung cao độ"
+        btn_label_focus = f"🧠 Tập trung ({cooldowns['focus']}s)" if focus_disabled else "🧠 Tập trung"
         if st.button(btn_label_focus, disabled=focus_disabled, use_container_width=True, help="Tăng Acetylcholine (+50) và nạp thêm +50 IQ. Cooldown 20s. Kích hoạt buff liên tục 10 ticks."):
             st.session_state.chemicals["acetylcholine"] = min(100.0, st.session_state.chemicals["acetylcholine"] + 50.0)
             st.session_state.stats["iq"] += 50.0
@@ -1113,7 +1190,36 @@ with tab1:
             add_log("🏥 LÂM SÀNG: Kích hoạt Từ trường xuyên sọ rTMS! Ngưỡng điện tích nơ-ron được khôi phục về trạng thái khỏe mạnh ban đầu.")
             st.rerun()
 
-    # UPGRADE: Neurotransmitter Synthesis Precursors & Diet System Layout
+    # UPGRADE: Sleep State recovery action
+    with hormone_cols[4]:
+        is_sleeping = st.session_state.stats.get("sleep_state", False)
+        btn_label_sleep = "🌞 Thức Dậy" if is_sleeping else "😴 Đi Ngủ (Sleep)"
+        if st.button(btn_label_sleep, use_container_width=True, help="Cho bộ não ngủ sâu phục hồi: Sensory và Motor tạm ngừng, sạc nhanh Năng lượng (+15), Tỉnh táo (+8) và thải Stress (-12) cực tốc."):
+            st.session_state.stats["sleep_state"] = not is_sleeping
+            if not is_sleeping:
+                add_log("😴 [Circadian] Bộ não bắt đầu chìm vào giấc ngủ phục hồi sâu. Các sóng liên kết tạm dừng hoạt động.")
+            else:
+                add_log("🌞 [Circadian] Bộ não thức dậy sớm theo yêu cầu của bạn!")
+            st.rerun()
+
+    # UPGRADE: Optogenetic Light Stimulation Active Ability
+    with hormone_cols[5]:
+        opto_disabled = cooldowns["opto"] > 0
+        btn_label_opto = f"🔦 Optogenetic ({cooldowns['opto']}s)" if opto_disabled else "🔦 Optogenetic"
+        if st.button(btn_label_opto, disabled=opto_disabled, use_container_width=True, help="Kích thích Quang Di truyền: Bắn luồng sáng Laser cực mạnh, sạc lập tức +0.5 điện thế cho tất cả nơ-ron nằm cùng hàng & cột với nơ-ron được chọn. Cooldown 18s."):
+            sel_r, sel_c = st.session_state.selected_cell
+            charged_count = 0
+            t_grid = st.session_state.neuron_grid
+            for r in range(GRID_SIZE):
+                for c in range(GRID_SIZE):
+                    if (r == sel_r or c == sel_c) and t_grid[r][c]["type"] != "Empty":
+                        t_grid[r][c]["charge"] = min(1.0, t_grid[r][c]["charge"] + 0.5)
+                        charged_count += 1
+            cooldowns["opto"] = 18
+            add_log(f"🔦 QUANG DI TRUYỀN: Kích hoạt xung Laser nhắm vào hàng {sel_r+1} & cột {sel_c+1}! Đã sạc +0.5 điện thế cho {charged_count} tế bào.")
+            st.rerun()
+
+    # Neurotransmitter Synthesis Precursors & Diet System Layout
     st.markdown("##### 🧬 Dinh Dưỡng Học & Tiền Chất Thần Kinh (Precursor Dietary Intake)")
     st.caption("Tổng hợp trực tiếp các chất dẫn truyền thông qua bồi bổ dinh dưỡng. Phí tiêu thụ: 15 MB Bộ nhớ.")
 
@@ -1385,7 +1491,7 @@ with tab1:
             tick_speed_val = 1.0
         st.session_state.tick_speed = tick_speed_val
 
-        # UPGRADE: Render Anatomical Brain Lobe Status with Amygdala and Thalamus upgrades!
+        # UPGRADE: Render Anatomical Brain Lobe Status with Glycogen upgrade!
         st.markdown("---")
         st.markdown("##### 🗺️ Bản Đồ Giải Phẫu Thùy Não (Anatomical Lobe Status)")
         st.caption("Trạng thái nâng cấp các cấu trúc giải phẫu sinh học quan trọng.")
@@ -1393,6 +1499,7 @@ with tab1:
         upgrades = st.session_state.upgrades
         pfc_status = "Đã tích hợp 🟢" if upgrades.get("pfc", 0) == 1 else "Chưa mở khóa ⚪"
         pruning_status = "Đã kích hoạt 🟢" if upgrades.get("pruning", 0) == 1 else "Chưa mở khóa ⚪"
+        gly_status = "Đã tích hợp (Max Fuel 150) 🟢" if upgrades.get("glycogen_shunt", 0) == 1 else "Chưa mở khóa ⚪"
 
         brain_art = f"""
         [ Frontal Cortex: Lv.{upgrades['cortex']} ] ---------.
@@ -1409,6 +1516,8 @@ with tab1:
                    |
         [ Amygdala (Hạch Hạnh Nhân): Lv.{upgrades.get('amygdala', 0)} ] (Hạ stress)
                    |
+        [ Astrocytic Glycogen Shunt: {gly_status} ] (Kho trữ năng lượng)
+                   |
         [ Cerebellum: Lv.{upgrades['cerebellum']} ] (Tiểu não hạ stress)
                    |
         [ Brainstem: Lv.{upgrades['brainstem']} ] (Hành não cấp năng lượng)
@@ -1417,11 +1526,11 @@ with tab1:
 
         st.markdown("---")
 
-        # UPGRADE: Genetic Mutation Modifier Board Panel (Now supports MAOA & CHRNA7!)
+        # UPGRADE: Genetic Mutation Modifier Board Panel (Now supports PGC-1alpha & SLC6A4!)
         st.markdown("##### 🧬 Bản Đồ Biến Dị Di Truyền (Genetic Mutation Modifiers)")
         st.caption("Kích hoạt đột biến gen để áp dụng các thay đổi hóa học và liên kết vĩnh viễn cho tế bào.")
 
-        genes_list = ["APOE4", "BDNF", "COMT", "GABRA1", "DRD4", "SHANK3", "MAOA", "CHRNA7"]
+        genes_list = ["APOE4", "BDNF", "COMT", "GABRA1", "DRD4", "SHANK3", "MAOA", "CHRNA7", "PGC-1alpha", "SLC6A4"]
         genes_desc = {
             "APOE4": "👵 APOE4: Nhân đôi tốc độ Alzheimer, nhưng +50% IQ ban đầu.",
             "BDNF": "🌱 BDNF: Plasticity dẻo dai hơn 1.5x, đẩy nhanh Hebbian learning.",
@@ -1430,7 +1539,9 @@ with tab1:
             "DRD4": "🎰 DRD4: Nhân đôi Dopamine khi Motor phát xung, nhưng thiếu hụt Dopamine nhân đôi stress hại sanity.",
             "SHANK3": "🧱 SHANK3: Thần kinh giáp tự, tăng +15% hiệu suất truyền tải tín hiệu nơ-ron.",
             "MAOA": "🧘 MAOA: Dopamine và Serotonin phân hủy chậm hơn 30%, nhưng phát xung sinh stress +40%.",
-            "CHRNA7": "⚡ CHRNA7: Acetylcholine gia tăng +25% hiệu quả, nhưng tiêu hao năng lượng cơ thể tăng 15%."
+            "CHRNA7": "⚡ CHRNA7: Acetylcholine gia tăng +25% hiệu quả, nhưng tiêu hao năng lượng cơ thể tăng 15%.",
+            "PGC-1alpha": "🔋 PGC-1alpha: Đột biến nguyên sinh tế bào, gia tăng +40 Max Fuel của não bộ.",
+            "SLC6A4": "🧬 SLC6A4: Đột biến vận chuyển Serotonin, tăng thời gian duy trì SSRI thêm 1.5 lần."
         }
 
         # Multiselect for genes selection
@@ -1511,7 +1622,7 @@ with tab1:
                 add_log(f"Nâng cấp mức độ Myelin hóa sợi trục lên cấp {upgrades['myelin']}!")
                 st.rerun()
 
-        # UPGRADE: Amygdala Anatomy Upgrade Item
+        # Amygdala Anatomy Upgrade Item
         cost_amygdala = int(45 * (1.6 ** upgrades.get("amygdala", 0)))
         upgrade_cols_amygdala = st.columns([3, 1])
         with upgrade_cols_amygdala[0]:
@@ -1523,7 +1634,7 @@ with tab1:
                 add_log(f"Nâng cấp Hạch hạnh nhân Amygdala lên cấp {upgrades['amygdala']}!")
                 st.rerun()
 
-        # UPGRADE: Thalamus Anatomy Upgrade Item
+        # Thalamus Anatomy Upgrade Item
         cost_thalamus = int(45 * (1.6 ** upgrades.get("thalamus", 0)))
         upgrade_cols_thalamus = st.columns([3, 1])
         with upgrade_cols_thalamus[0]:
@@ -1533,6 +1644,19 @@ with tab1:
                 st.session_state.stats["iq"] -= cost_thalamus
                 upgrades["thalamus"] = upgrades.get("thalamus", 0) + 1
                 add_log(f"Nâng cấp Đồi thị Thalamus lên cấp {upgrades['thalamus']}!")
+                st.rerun()
+
+        # UPGRADE: Astrocytic Glycogen Shunt Upgrade Item
+        cost_shunt = 150
+        upgrade_cols_shunt = st.columns([3, 1])
+        with upgrade_cols_shunt[0]:
+            st.write(f"**Kho Astrocytic Glycogen [Lv.{upgrades.get('glycogen_shunt', 0)}/1]**\nTế bào hình sao liên kết mạch máu: Tăng sức chứa Năng lượng cực đại lên 150% (bình thường 100%).")
+        with upgrade_cols_shunt[1]:
+            shunt_disabled = upgrades.get("glycogen_shunt", 0) >= 1 or st.session_state.stats["iq"] < cost_shunt
+            if st.button(f"Mua ({cost_shunt} IQ)", key="up_shunt", disabled=shunt_disabled, use_container_width=True):
+                st.session_state.stats["iq"] -= cost_shunt
+                upgrades["glycogen_shunt"] = 1
+                add_log("🔋 NÂNG CẤP: Kích hoạt Astrocytic Glycogen Shunt nâng tối đa Năng lượng bộ não lên 150!")
                 st.rerun()
 
         # Synaptic Pruning Upgrade Panel

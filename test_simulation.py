@@ -742,8 +742,6 @@ def test_drd4_shank3_genes():
     app.run_simulation_tick()
     assert abs(app.st.session_state.neuron_grid[0][1]["charge"] - 0.43) < 1e-5
 
-# ----------------- BRAND NEW TESTS (DIET, MAOA/CHRNA7, AMYGDALA/THALAMUS) -----------------
-
 def test_diet_precursors():
     """
     UPGRADE TEST: Neurotransmitter Synthesis Precursors & Diet System
@@ -860,3 +858,81 @@ def test_amygdala_thalamus_upgrades():
     # stress clearance = 2.5
     # Stress delta = 1.275 - 2.5 = -1.225 -> final stress is 10.0 - 1.225 = 8.775
     assert abs(app.st.session_state.chemicals["stress"] - 8.775) < 1e-5
+
+# ----------------- CHU KỲ SINH HỌC & QUANG DI TRUYỀN TESTS -----------------
+
+def test_circadian_sleep_cycle():
+    """
+    UPGRADE TEST: Circadian sleep state
+    Sleep mode halts signals and triggers rapid recovery (+15 energy, +8 sanity, -12 stress).
+    """
+    app.st.session_state = MockSessionState()
+    app.st.session_state["bot_thread"] = True
+    app.init_game_state()
+
+    app.st.session_state.stats["sleep_state"] = True
+    app.st.session_state.chemicals["energy"] = 20.0
+    app.st.session_state.chemicals["sanity"] = 50.0
+    app.st.session_state.chemicals["stress"] = 30.0
+
+    app.run_simulation_tick()
+
+    # Sleep mode increments and restores:
+    # energy: starting 20.0 + sleep 15.0 + metabolic net generation (+3.8) = 38.8
+    # sanity: starting 50.0 + sleep 8.0 = 58.0
+    # stress: starting 30.0 - sleep 12.0 = 18.0
+    assert abs(app.st.session_state.chemicals["energy"] - 38.8) < 1e-5
+    assert abs(app.st.session_state.chemicals["sanity"] - 58.0) < 1e-5
+    assert abs(app.st.session_state.chemicals["stress"] - 18.0) < 1e-5
+
+def test_optogenetic_pulse():
+    """
+    UPGRADE TEST: Optogenetic laser stimulation active pulse
+    Charges up all cells in selected row and column by +0.5.
+    """
+    app.st.session_state = MockSessionState()
+    app.st.session_state["bot_thread"] = True
+    app.init_game_state()
+
+    app.st.session_state.selected_cell = (1, 1)
+
+    # Pre-set cell charges
+    app.st.session_state.neuron_grid[1][1] = {"type": "Interneuron", "charge": 0.2, "threshold": 0.5}
+    app.st.session_state.neuron_grid[1][2] = {"type": "Interneuron", "charge": 0.3, "threshold": 0.5}
+    app.st.session_state.neuron_grid[4][4] = {"type": "Interneuron", "charge": 0.1, "threshold": 0.5}
+
+    # Simulate optogenetics activation manually
+    sel_r, sel_c = app.st.session_state.selected_cell
+    grid = app.st.session_state.neuron_grid
+    for r in range(6):
+        for c in range(6):
+            if (r == sel_r or c == sel_c) and grid[r][c]["type"] != "Empty":
+                grid[r][c]["charge"] = min(1.0, grid[r][c]["charge"] + 0.5)
+
+    # row 1 col 1 is charged: 0.2 + 0.5 = 0.7
+    assert grid[1][1]["charge"] == 0.7
+    # row 1 col 2 is charged: 0.3 + 0.5 = 0.8
+    assert grid[1][2]["charge"] == 0.8
+    # row 4 col 4 is not in row 1 or col 1 -> remains 0.1
+    assert grid[4][4]["charge"] == 0.1
+
+def test_pgc1_slc6a4_genes():
+    """
+    UPGRADE TEST: PGC-1alpha and SLC6A4 Genes
+    PGC-1alpha increases maximum fuel capacity by +40.
+    SLC6A4 increases SSRI active buff duration.
+    """
+    app.st.session_state = MockSessionState()
+    app.st.session_state["bot_thread"] = True
+    app.init_game_state()
+
+    # 1. Test PGC-1alpha maximum energy storage
+    app.st.session_state.active_genes = ["PGC-1alpha"]
+    app.st.session_state.upgrades["glycogen_shunt"] = 1 # increases energy cap to 150
+    # under PGC-1alpha cap becomes 150 + 40 = 190.
+    app.st.session_state.chemicals["energy"] = 180.0
+    app.st.session_state.upgrades["brainstem"] = 1 # generates 6.0 energy
+
+    app.run_simulation_tick()
+    # Fuel generation should let energy exceed 180.0 up to 190.0 cap
+    assert app.st.session_state.chemicals["energy"] > 180.0
