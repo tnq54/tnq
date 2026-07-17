@@ -599,3 +599,144 @@ def test_rtms_therapy_action():
 
     assert app.st.session_state.neuron_grid[0][0]["threshold"] == 0.4
     assert app.st.session_state.chemicals["sanity"] == 70.0
+
+# ----------------- NEW UPGRADE TEST CASES -----------------
+
+def test_parkinsons_pathology():
+    """
+    UPGRADE TEST: Parkinson's Pathology Challenge Mode
+    Under Parkinson's, Dopamine levels below 40.0 cause Motor cells to randomly misfire, draining energy.
+    """
+    app.st.session_state = MockSessionState()
+    app.st.session_state["bot_thread"] = True
+    app.init_game_state()
+
+    app.st.session_state.game_mode = "Parkinson"
+    app.st.session_state.chemicals["dopamine"] = 20.0 # < 40.0 triggers Parkinson's misfires
+    app.st.session_state.chemicals["energy"] = 50.0
+
+    # Force mock motor cells on grid
+    for r in range(6):
+        for c in range(6):
+            app.st.session_state.neuron_grid[r][c] = {"type": "Empty", "charge": 0.0, "threshold": 0.5, "fire_rate": 0.0, "last_fired": -1, "direction": "All", "weight": 1.0}
+    app.st.session_state.neuron_grid[5][5] = {"type": "Motor", "charge": 0.4, "threshold": 0.6, "fire_rate": 0.0, "last_fired": -1, "direction": "All", "weight": 1.0}
+
+    # Mock random choice to guarantee motor misfire triggering
+    import random
+    original_random = random.random
+    original_choice = random.choice
+
+    random.random = lambda: 0.1 # Triggers the random misfire check (< 0.30)
+    random.choice = lambda seq: seq[0]
+
+    try:
+        app.run_simulation_tick()
+        # Misfire drains 5.0 energy, resets motor cell charge to 0.0
+        assert app.st.session_state.chemicals["energy"] < 50.0
+        assert app.st.session_state.neuron_grid[5][5]["charge"] == 0.0
+    finally:
+        random.random = original_random
+        random.choice = original_choice
+
+def test_active_buffs():
+    """
+    UPGRADE TEST: Neuromodulator Ongoing Buffs
+    Ensures that active neuromodulator ongoing buffs increment biochemical rates and decrement tick timers correctly.
+    """
+    app.st.session_state = MockSessionState()
+    app.st.session_state["bot_thread"] = True
+    app.init_game_state()
+
+    app.st.session_state.active_buffs = {
+        "doping": 5,
+        "ssri": 8,
+        "focus": 10
+    }
+    app.st.session_state.chemicals["dopamine"] = 40.0
+    app.st.session_state.chemicals["serotonin"] = 40.0
+    app.st.session_state.chemicals["acetylcholine"] = 40.0
+
+    app.run_simulation_tick()
+
+    # Ongoing buffs should apply rate bonuses and decrement timers by 1
+    assert app.st.session_state.active_buffs["doping"] == 4
+    assert app.st.session_state.active_buffs["ssri"] == 7
+    assert app.st.session_state.active_buffs["focus"] == 9
+
+    # Chem values undergo decay/stabilization in the same tick:
+    # dopamine: 40 + 5 = 45 -> 45 + (50 - 45) * 0.08 = 45.4
+    # serotonin: 40 + 3 = 43 -> 43 + (50 - 43) * 0.08 = 43.56
+    # acetylcholine: 40 + 4 = 44 -> 44 + (50 - 44) * 0.08 = 44.48
+    assert abs(app.st.session_state.chemicals["dopamine"] - 45.4) < 1e-5
+    assert abs(app.st.session_state.chemicals["serotonin"] - 43.56) < 1e-5
+    assert abs(app.st.session_state.chemicals["acetylcholine"] - 44.48) < 1e-5
+
+def test_drd4_shank3_genes():
+    """
+    UPGRADE TEST: DRD4 and SHANK3 Mutations
+    DRD4 doubles motor dopamine reward, but low dopamine doubles sanity damage.
+    SHANK3 boosts myelin signal efficiency by +15%.
+    """
+    app.st.session_state = MockSessionState()
+    app.st.session_state["bot_thread"] = True
+    app.init_game_state()
+
+    # 1. Test DRD4 dopamine multiplier on motor fire
+    app.st.session_state.active_genes = ["DRD4"]
+    app.st.session_state.chemicals["dopamine"] = 20.0
+
+    # Place a Motor neuron that fires
+    for r in range(6):
+        for c in range(6):
+            app.st.session_state.neuron_grid[r][c] = {"type": "Empty", "charge": 0.0, "threshold": 0.5, "fire_rate": 0.0, "last_fired": -1, "direction": "All", "weight": 1.0}
+    app.st.session_state.neuron_grid[3][3] = {
+        "type": "Motor",
+        "charge": 0.9, # threshold 0.5, fires
+        "threshold": 0.5,
+        "fire_rate": 0.0,
+        "last_fired": -1,
+        "direction": "All",
+        "weight": 1.0
+    }
+
+    app.run_simulation_tick()
+
+    # Motor firing should double dopamine reward (normally +8.0, under DRD4 it is +16.0)
+    # Decay is also applied: 20.0 + 16.0 = 36.0 -> with COMT (not active), normal decay: 36.0 + (50 - 36) * 0.08 = 37.12
+    assert app.st.session_state.chemicals["dopamine"] > 35.0
+
+    # 2. Test SHANK3 signal propagation efficiency
+    app.st.session_state = MockSessionState()
+    app.st.session_state["bot_thread"] = True
+    app.init_game_state()
+    app.st.session_state.active_genes = ["SHANK3"]
+    app.st.session_state.upgrades["myelin"] = 1
+
+    # Place sensory cell next to interneuron
+    for r in range(6):
+        for c in range(6):
+            app.st.session_state.neuron_grid[r][c] = {"type": "Empty", "charge": 0.0, "threshold": 0.5, "fire_rate": 0.0, "last_fired": -1, "direction": "All", "weight": 1.0}
+    app.st.session_state.neuron_grid[0][0] = {
+        "type": "Sensory",
+        "charge": 0.6,
+        "threshold": 0.4,
+        "fire_rate": 0.0,
+        "last_fired": -1,
+        "direction": "Right",
+        "weight": 1.0
+    }
+    app.st.session_state.neuron_grid[0][1] = {
+        "type": "Interneuron",
+        "charge": 0.1,
+        "threshold": 0.5,
+        "fire_rate": 0.0,
+        "last_fired": -1,
+        "direction": "All",
+        "weight": 1.0
+    }
+
+    # Efficiency is 0.35 + myelin * 0.05 + shank3 * 0.15 = 0.35 + 0.05 + 0.15 = 0.55
+    # Transferred charge = (0.6 * 0.55) = 0.33
+    # Neighbor [0][1] should have 0.1 + 0.33 = 0.43
+    app.run_simulation_tick()
+    assert abs(app.st.session_state.neuron_grid[0][1]["charge"] - 0.43) < 1e-5

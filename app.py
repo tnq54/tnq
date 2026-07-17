@@ -296,18 +296,25 @@ def init_game_state():
             "sanity": 100.0
         }
 
-        # Advanced Game Modes
+        # Advanced Game Modes (Normal, Alzheimer, Epilepsy, Parkinson)
         st.session_state.game_mode = "Normal"
 
         # UPGRADE: Genetic Mutation Board Selection
         st.session_state.active_genes = []
 
-        # Cooldowns (adding rtms)
+        # UPGRADE: Continuous Active Buffs tick counter
+        st.session_state.active_buffs = {
+            "doping": 0,
+            "ssri": 0,
+            "focus": 0
+        }
+
+        # Cooldowns
         st.session_state.cooldowns = {
             "doping": 0,
             "ssri": 0,
             "focus": 0,
-            "rtms": 0 # UPGRADE: Transcranial Magnetic Stimulation cooldown
+            "rtms": 0
         }
 
         # Audio Synthesizer Triggers
@@ -321,17 +328,17 @@ def init_game_state():
             "marathon": {"name": "🏆 Chạy Đua Nhận Thức Siêu Phàm", "target": "Tích lũy tối thiểu 500 điểm IQ nhận thức", "status": "In Progress", "reward_claimed": False, "desc": "+50 Acetylcholine & +200 MB Trí nhớ"}
         }
 
-        # Progression and stats (adding burnout streak, max_streak, high scores)
+        # Progression and stats
         st.session_state.stats = {
             "iq": 0.0,
             "memory": 10.0,
             "ticks": 0,
             "evolution_stage": "Bò sát",
             "burnout_count": 0,
-            "burnout_streak": 0,    # UPGRADE: Longest ticks streak without burning out
-            "max_streak": 0,        # UPGRADE: Personal record for streak
-            "high_score_iq": 0.0,   # UPGRADE: Personal record IQ
-            "max_memory": 10.0      # UPGRADE: Personal record memory capacity
+            "burnout_streak": 0,
+            "max_streak": 0,
+            "high_score_iq": 0.0,
+            "max_memory": 10.0
         }
 
         # Upgrades
@@ -519,6 +526,18 @@ def run_simulation_tick():
     st.session_state.stats["burnout_streak"] += 1
     st.session_state.stats["max_streak"] = max(st.session_state.stats["max_streak"], st.session_state.stats["burnout_streak"])
 
+    # UPGRADE: Decrement active neuromodulator buffs tick timers and apply ongoing biochemical bonuses
+    buffs = st.session_state.get("active_buffs", {"doping": 0, "ssri": 0, "focus": 0})
+    for k in list(buffs.keys()):
+        if buffs[k] > 0:
+            buffs[k] -= 1
+            if k == "doping":
+                chems["dopamine"] = min(100.0, chems["dopamine"] + 5.0)
+            elif k == "ssri":
+                chems["serotonin"] = min(100.0, chems["serotonin"] + 3.0)
+            elif k == "focus":
+                chems["acetylcholine"] = min(100.0, chems["acetylcholine"] + 4.0)
+
     # Decrement active hormone abilities cooldowns
     cooldowns = st.session_state.get("cooldowns", {"doping": 0, "ssri": 0, "focus": 0, "rtms": 0})
     for k in cooldowns:
@@ -538,6 +557,21 @@ def run_simulation_tick():
                     degraded += 1
         if degraded > 0:
             add_log(f"🧠 [Alzheimer] Suy giảm nhận thức khiến {degraded} nơ-ron bị chai lỳ, tăng ngưỡng kích hoạt (+{drift_rate})!")
+
+    # UPGRADE: Parkinson's Pathology Tick
+    # Low Dopamine causes random Motor cells to misfire (tremors), draining energy but yielding 0 IQ/Memory.
+    if mode == "Parkinson" and chems["dopamine"] < 40.0:
+        if random.random() < 0.30:
+            motor_cells = []
+            for r in range(GRID_SIZE):
+                for c in range(GRID_SIZE):
+                    if grid[r][c]["type"] == "Motor":
+                        motor_cells.append((r, c))
+            if motor_cells:
+                tr_r, tr_c = random.choice(motor_cells)
+                grid[tr_r][tr_c]["charge"] = 0.0
+                chems["energy"] = max(0.0, chems["energy"] - 5.0)
+                add_log(f"🤝 [Parkinson] Mức Dopamine quá thấp (<40%) kích hoạt cơn run giật (tremor) tại Motor [{tr_r+1},{tr_c+1}], làm rò rỉ điện tích mà không sinh ra IQ/Memory! (-5 Energy)")
 
     # Synaptic Pruning (Forget idle connections)
     if upgrades.get("pruning", 0) == 1:
@@ -626,8 +660,10 @@ def run_simulation_tick():
                             neighbors.append((nr, nc))
 
                 if neighbors:
-                    # Base signal efficiency
-                    signal_efficiency = 0.35 + (upgrades["myelin"] * 0.05)
+                    # UPGRADE: SHANK3 (Synaptic Scaffolding) boosts Myelin transmission efficiency by +15%
+                    shank3_bonus = 0.15 if "SHANK3" in genes else 0.0
+                    signal_efficiency = 0.35 + (upgrades["myelin"] * 0.05) + shank3_bonus
+
                     # Epilepsy Pathology increases charge speed
                     if mode == "Epilepsy":
                         signal_efficiency *= 1.35
@@ -667,7 +703,9 @@ def run_simulation_tick():
                 mem_multiplier = 1.0 + (upgrades["hippocampus"] * 0.4)
                 motor_yield_mem += 2.0 * mem_multiplier
 
-                chems["dopamine"] = min(100.0, chems["dopamine"] + 8.0)
+                # UPGRADE: DRD4 Mutation doubles dopamine reward from Motor fires
+                doping_multiplier = 2.0 if "DRD4" in genes else 1.0
+                chems["dopamine"] = min(100.0, chems["dopamine"] + (8.0 * doping_multiplier))
                 chems["acetylcholine"] = max(0.0, chems["acetylcholine"] - 4.0)
 
     # Apply motor accomplishments
@@ -693,13 +731,20 @@ def run_simulation_tick():
     fire_stress = signals_fired * 1.5 * fire_stress_mult
     stress_clearance = 1.5 + (upgrades["cerebellum"] * 1.0)
 
+    # Active SSRI Buff reduces stress generation by 50%
+    if buffs.get("ssri", 0) > 0:
+        fire_stress *= 0.5
+
     chems["stress"] = max(0.0, min(100.0, chems["stress"] + fire_stress - stress_clearance))
 
     serotonin_dampening = chems["serotonin"] * 0.1
     effective_stress = max(0.0, chems["stress"] - serotonin_dampening)
 
+    # UPGRADE: DRD4 mutation causes low dopamine (<30.0) to double stress damage on sanity
+    drd4_sanity_mult = 2.0 if ("DRD4" in genes and chems["dopamine"] < 30.0) else 1.0
+
     if effective_stress > 60.0:
-        sanity_damage = (effective_stress - 60.0) * 0.35
+        sanity_damage = (effective_stress - 60.0) * 0.35 * drd4_sanity_mult
         chems["sanity"] = max(0.0, min(100.0, chems["sanity"] - sanity_damage))
         if sanity_damage > 1.0:
             add_log(f"⚡ Căng thẳng cực độ gây tổn hại myelin và nơ-ron! (-{sanity_damage:.1f} Tỉnh táo)")
@@ -725,6 +770,9 @@ def run_simulation_tick():
         chems["energy"] = 50.0
         chems["dopamine"] = 20.0
         chems["serotonin"] = 30.0
+
+        # Reset ongoing buffs on burnout
+        st.session_state.active_buffs = {"doping": 0, "ssri": 0, "focus": 0}
 
         degraded = 0
         for r in range(GRID_SIZE):
@@ -826,6 +874,17 @@ st.markdown("""
     .cell-Interneuron { background-color: #0f2c59; border: 2px solid #58a6ff; color: #58a6ff; }
     .cell-Motor { background-color: #1b3a1b; border: 2px solid #3fb950; color: #3fb950; }
     .cell-firing { box-shadow: 0 0 15px #ff7b72; border: 2px solid #ff7b72 !important; background-color: #491d1d !important; }
+    .buff-badge {
+        display: inline-block;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 0.85em;
+        font-weight: bold;
+        margin-right: 5px;
+    }
+    .badge-doping { background-color: #ffaa00; color: black; }
+    .badge-ssri { background-color: #00aaff; color: white; }
+    .badge-focus { background-color: #8800ff; color: white; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -841,7 +900,7 @@ init_game_state()
 with tab1:
     st.subheader("Trình Mô Phỏng Mạng Lưới Nơ-ron và Tiến Hóa Hóa Học Não")
 
-    # UPGRADE: High scores, records, and pathology statistics
+    # Personal records display
     st.markdown("##### 🏆 Bảng Kỷ Lục Nhận Thức Cá Nhân (Personal Records)")
     record_cols = st.columns(4)
     with record_cols[0]:
@@ -855,13 +914,14 @@ with tab1:
 
     st.markdown("---")
 
-    # Game pathology modes selector
+    # Game pathology modes selector (Normal, Alzheimer, Epilepsy, Parkinson)
     st.markdown("##### ⚙️ Lựa chọn Chế Độ Thử Thách Não Bộ")
-    modes_list = ["Normal", "Alzheimer", "Epilepsy"]
+    modes_list = ["Normal", "Alzheimer", "Epilepsy", "Parkinson"]
     modes_names = {
         "Normal": "🟢 Bình Thường (Sức khỏe ổn định)",
         "Alzheimer": "👵 Thử Thách Alzheimer (Thoái hóa nơ-ron, chai lỳ điện thế)",
-        "Epilepsy": "⚡ Thử Thách Động Kinh (Gia tăng xung điện cực độ, nhân đôi stress)"
+        "Epilepsy": "⚡ Thử Thách Động Kinh (Gia tăng xung điện cực độ, nhân đôi stress)",
+        "Parkinson": "🤝 Thử Thách Parkinson (Run giật nơ-ron vận động khi thiếu hụt Dopamine)"
     }
     selected_mode = st.selectbox(
         "Cấu hình bệnh lý học vỏ não:",
@@ -876,6 +936,22 @@ with tab1:
         st.session_state.game_mode = selected_mode
         add_log(f"⚠️ CẤU HÌNH: Chuyển cấu hình vỏ não sang chế độ: {modes_names[selected_mode]}")
         st.rerun()
+
+    # UPGRADE: Continuous Active Buff badges indicators
+    st.markdown("##### 🧪 Trạng thái hoạt hóa hóa học (Active Neuromodulator Buffs)")
+    active_buffs = st.session_state.get("active_buffs", {"doping": 0, "ssri": 0, "focus": 0})
+    buffs_html = []
+    if active_buffs.get("doping", 0) > 0:
+        buffs_html.append(f"<span class='buff-badge badge-doping'>⚡ Hyper-Dopamine ({active_buffs['doping']} ticks)</span>")
+    if active_buffs.get("ssri", 0) > 0:
+        buffs_html.append(f"<span class='buff-badge badge-ssri'>💊 SSRI Serenity ({active_buffs['ssri']} ticks)</span>")
+    if active_buffs.get("focus", 0) > 0:
+        buffs_html.append(f"<span class='buff-badge badge-focus'>🧠 Deep Focus ({active_buffs['focus']} ticks)</span>")
+
+    if buffs_html:
+        st.markdown(" ".join(buffs_html), unsafe_allow_html=True)
+    else:
+        st.info("Không có hoạt chất bổ trợ nào đang hoạt động liên tục.")
 
     # Row 1: Metrics display
     cols = st.columns(6)
@@ -930,7 +1006,7 @@ with tab1:
     with eeg_cols[4]:
         st.progress(delta / 100.0, text=f"Sóng Delta (Hồi phục/Ngủ): {delta:.1f} Hz")
 
-    # Hormone active abilities layout (adding rTMS therapy)
+    # Hormone active abilities layout
     st.markdown("##### 🧪 Trung tâm nội tiết tố & Liệu pháp Lâm sàng (Active Abilities)")
     hormone_cols = st.columns(4)
     cooldowns = st.session_state.cooldowns
@@ -938,38 +1014,41 @@ with tab1:
     with hormone_cols[0]:
         doping_disabled = cooldowns["doping"] > 0
         btn_label_doping = f"⚡ Doping Dopamine ({cooldowns['doping']}s)" if doping_disabled else "⚡ Doping Dopamine"
-        if st.button(btn_label_doping, disabled=doping_disabled, use_container_width=True, help="Tự động sạc đầy tất cả Sensory cells, +30 Dopamine, +25 Stress. Cooldown 15s"):
+        if st.button(btn_label_doping, disabled=doping_disabled, use_container_width=True, help="Tự động sạc đầy tất cả Sensory cells, +30 Dopamine, +25 Stress. Cooldown 15s. Kích hoạt buff liên tục 8 ticks."):
             for r in range(GRID_SIZE):
                 for c in range(GRID_SIZE):
                     if st.session_state.neuron_grid[r][c]["type"] == "Sensory":
                         st.session_state.neuron_grid[r][c]["charge"] = 1.0
             st.session_state.chemicals["dopamine"] = min(100.0, st.session_state.chemicals["dopamine"] + 30.0)
             st.session_state.chemicals["stress"] = min(100.0, st.session_state.chemicals["stress"] + 25.0)
+            st.session_state.active_buffs["doping"] = 8
             cooldowns["doping"] = 15
-            add_log("⚡ HORMONE: Kích hoạt Doping Dopamine! Đồng loạt Sensory cells bùng nổ xung điện.")
+            add_log("⚡ HORMONE: Kích hoạt Doping Dopamine! Đồng loạt Sensory cells bùng nổ xung điện. Buff dopamine liên tục kích hoạt.")
             st.rerun()
 
     with hormone_cols[1]:
         ssri_disabled = cooldowns["ssri"] > 0
         btn_label_ssri = f"💊 Tái hấp thu Serotonin (SSRI) ({cooldowns['ssri']}s)" if ssri_disabled else "💊 Tái hấp thu Serotonin (SSRI)"
-        if st.button(btn_label_ssri, disabled=ssri_disabled, use_container_width=True, help="Hạ 50% Stress, hồi phục 30 Tỉnh táo lập tức. Cooldown 25s"):
+        if st.button(btn_label_ssri, disabled=ssri_disabled, use_container_width=True, help="Hạ 50% Stress, hồi phục 30 Tỉnh táo lập tức. Cooldown 25s. Kích hoạt buff liên tục 12 ticks giảm 50% sinh stress."):
             st.session_state.chemicals["stress"] = max(0.0, st.session_state.chemicals["stress"] - 50.0)
             st.session_state.chemicals["sanity"] = min(100.0, st.session_state.chemicals["sanity"] + 30.0)
+            st.session_state.active_buffs["ssri"] = 12
             cooldowns["ssri"] = 25
-            add_log("💊 HORMONE: Kích hoạt liệu pháp Serotonin! Xoa dịu vỏ não, triệt tiêu căng thẳng.")
+            add_log("💊 HORMONE: Kích hoạt liệu pháp Serotonin! Xoa dịu vỏ não, triệt tiêu căng thẳng. Serotonin buff liên tục kích hoạt.")
             st.rerun()
 
     with hormone_cols[2]:
         focus_disabled = cooldowns["focus"] > 0
         btn_label_focus = f"🧠 Tập trung cao độ ({cooldowns['focus']}s)" if focus_disabled else "🧠 Tập trung cao độ"
-        if st.button(btn_label_focus, disabled=focus_disabled, use_container_width=True, help="Tăng Acetylcholine (+50) và nạp thêm +50 IQ. Cooldown 20s"):
+        if st.button(btn_label_focus, disabled=focus_disabled, use_container_width=True, help="Tăng Acetylcholine (+50) và nạp thêm +50 IQ. Cooldown 20s. Kích hoạt buff liên tục 10 ticks."):
             st.session_state.chemicals["acetylcholine"] = min(100.0, st.session_state.chemicals["acetylcholine"] + 50.0)
             st.session_state.stats["iq"] += 50.0
+            st.session_state.active_buffs["focus"] = 10
             cooldowns["focus"] = 20
-            add_log("🧠 HORMONE: Kích hoạt Tập trung cao độ! Khóa chặt Acetylcholine, nâng cao nhận thức (+50 IQ).")
+            add_log("🧠 HORMONE: Kích hoạt Tập trung cao độ! Khóa chặt Acetylcholine, nâng cao nhận thức (+50 IQ). Focus buff liên tục kích hoạt.")
             st.rerun()
 
-    # UPGRADE: Transcranial Magnetic Stimulation (rTMS) Clinical Therapy Active Ability
+    # Transcranial Magnetic Stimulation (rTMS) Clinical Therapy Active Ability
     with hormone_cols[3]:
         rtms_disabled = cooldowns["rtms"] > 0
         btn_label_rtms = f"🏥 Liệu pháp rTMS ({cooldowns['rtms']}s)" if rtms_disabled else "🏥 Liệu pháp rTMS"
@@ -1228,18 +1307,46 @@ with tab1:
             tick_speed_val = 1.0
         st.session_state.tick_speed = tick_speed_val
 
+        # UPGRADE: Render Anatomical Brain Lobe Status (ASCII Visualizer Art)
+        st.markdown("---")
+        st.markdown("##### 🗺️ Bản Đồ Giải Phẫu Thùy Não (Anatomical Lobe Status)")
+        st.caption("Trạng thái nâng cấp các cấu trúc giải phẫu sinh học quan trọng.")
+
+        upgrades = st.session_state.upgrades
+        pfc_status = "Đã tích hợp 🟢" if upgrades.get("pfc", 0) == 1 else "Chưa mở khóa ⚪"
+        pruning_status = "Đã kích hoạt 🟢" if upgrades.get("pruning", 0) == 1 else "Chưa mở khóa ⚪"
+
+        brain_art = f"""
+        [ Frontal Cortex: Lv.{upgrades['cortex']} ] ---------.
+                   |                         |
+         [ Prefrontal PFC: {pfc_status} ]    |--- ( Cortex )
+                   |                         |
+        [ Myelin Sheath: Lv.{upgrades['myelin']} ] <--------'
+                   |
+        [ Hippocampus: Lv.{upgrades['hippocampus']} ] (Ghi nhớ)
+                   |
+         [ Synaptic Pruning: {pruning_status} ]
+                   |
+        [ Cerebellum: Lv.{upgrades['cerebellum']} ] (Tiểu não hạ stress)
+                   |
+        [ Brainstem: Lv.{upgrades['brainstem']} ] (Hành não cấp năng lượng)
+        """
+        st.code(brain_art, language="text")
+
         st.markdown("---")
 
-        # UPGRADE: Genetic Mutation Modifier Board Panel
+        # UPGRADE: Genetic Mutation Modifier Board Panel (Now supports DRD4 and SHANK3!)
         st.markdown("##### 🧬 Bản Đồ Biến Dị Di Truyền (Genetic Mutation Modifiers)")
         st.caption("Kích hoạt đột biến gen để áp dụng các thay đổi hóa học và liên kết vĩnh viễn cho tế bào.")
 
-        genes_list = ["APOE4", "BDNF", "COMT", "GABRA1"]
+        genes_list = ["APOE4", "BDNF", "COMT", "GABRA1", "DRD4", "SHANK3"]
         genes_desc = {
             "APOE4": "👵 APOE4: Nhân đôi tốc độ Alzheimer, nhưng +50% IQ ban đầu.",
             "BDNF": "🌱 BDNF: Plasticity dẻo dai hơn 1.5x, đẩy nhanh Hebbian learning.",
             "COMT": "🥤 COMT: Dopamine bền vững giảm chậm hơn 40%, nhưng Stress giảm chậm 20%.",
-            "GABRA1": "🛡️ GABRA1: Giảm 35% Stress quá kích sinh ra do Động kinh."
+            "GABRA1": "🛡️ GABRA1: Giảm 35% Stress quá kích sinh ra do Động kinh.",
+            "DRD4": "🎰 DRD4: Nhân đôi Dopamine khi Motor phát xung, nhưng thiếu hụt Dopamine nhân đôi stress hại sanity.",
+            "SHANK3": "🧱 SHANK3: Thần kinh giáp tự, tăng +15% hiệu suất truyền tải tín hiệu nơ-ron."
         }
 
         # Multiselect for genes selection
@@ -1259,8 +1366,6 @@ with tab1:
         st.markdown("---")
         st.markdown("##### 🛒 Nâng Cấp Thùy Não (Mở rộng cấu trúc nhận thức)")
         st.caption("Sử dụng điểm IQ tích lũy từ các hành động Motor thành công để tiến hóa các vùng não.")
-
-        upgrades = st.session_state.upgrades
 
         # Upgrade Item 1: Brainstem
         cost_stem = int(25 * (1.5 ** upgrades["brainstem"]))

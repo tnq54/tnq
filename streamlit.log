@@ -12,3 +12,6 @@ Collecting usage statistics. To deactivate, set browser.gatherUsageStats to fals
 2026-07-17 04:53:11,516 - __main__ - INFO - Initializing Telegram Bot Runner thread...
 2026-07-17 04:53:11,522 - __main__ - INFO - Network check passed successfully!
 2026-07-17 04:53:11,522 - __main__ - ERROR - TELEGRAM_TOKEN is missing. Bot cannot be started.
+2026-07-17 05:04:20,239 - __main__ - INFO - Initializing Telegram Bot Runner thread...
+2026-07-17 05:04:20,267 - __main__ - INFO - Network check passed successfully!
+2026-07-17 05:04:20,267 - __main__ - ERROR - TELEGRAM_TOKEN is missing. Bot cannot be started.
