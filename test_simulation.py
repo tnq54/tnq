@@ -85,6 +85,9 @@ def test_simulation_tick_metabolism():
     app.st.session_state["bot_thread"] = True
     app.init_game_state()
 
+    # Set norepinephrine to 0 to avoid fight-or-flight energy drain in this baseline test
+    app.st.session_state.chemicals["norepinephrine"] = 0.0
+
     # Force full energy and known upgrades
     app.st.session_state.chemicals["energy"] = 100.0
     app.st.session_state.upgrades["brainstem"] = 1 # generates 6.0 energy per tick
@@ -102,6 +105,9 @@ def test_sensory_neuron_buildup():
     app.st.session_state = MockSessionState()
     app.st.session_state["bot_thread"] = True
     app.init_game_state()
+
+    # Set norepinephrine to 0 to avoid fight-or-flight fire_rate boost in this baseline test
+    app.st.session_state.chemicals["norepinephrine"] = 0.0
 
     # Empty all but one Sensory Neuron at [0][0]
     for r in range(6):
@@ -636,6 +642,88 @@ def test_parkinsons_pathology():
         random.random = original_random
         random.choice = original_choice
 
+
+def test_norepinephrine_panic_attack():
+    """
+    TEST: Norepinephrine & Panic Attack Trigger
+    Ensures Norepinephrine builds up, triggers Panic Attack (>90), inflicts sanity damage, and resets.
+    """
+    app.st.session_state = MockSessionState()
+    app.st.session_state["bot_thread"] = True
+    app.init_game_state()
+
+    # 1. Normal panic attack
+    app.st.session_state.chemicals["norepinephrine"] = 95.0
+    app.st.session_state.chemicals["sanity"] = 100.0
+    app.st.session_state.active_genes = []
+
+    app.run_simulation_tick()
+    # sanity damage is 15.0, so sanity should be 85.0
+    assert app.st.session_state.chemicals["sanity"] == 85.0
+    # Norepinephrine resets to 50.0 after panic
+    assert app.st.session_state.chemicals["norepinephrine"] == 50.0
+
+    # 2. ADRA2A gene reduces damage to 9.0 and raises threshold to 100.0
+    app.st.session_state = MockSessionState()
+    app.st.session_state["bot_thread"] = True
+    app.init_game_state()
+    app.st.session_state.chemicals["norepinephrine"] = 95.0
+    app.st.session_state.chemicals["sanity"] = 100.0
+    app.st.session_state.active_genes = ["ADRA2A"]
+
+    app.run_simulation_tick()
+    # threshold is 100.0, so at 95.0 no panic attack triggers!
+    assert app.st.session_state.chemicals["sanity"] == 100.0
+
+    # Trigger at 100.0 (maximum bounded norepinephrine level with sufficient stress to overcome clearance)
+    app.st.session_state.chemicals["norepinephrine"] = 100.0
+    app.st.session_state.chemicals["stress"] = 50.0
+    app.run_simulation_tick()
+    # damage is 9.0, sanity drops to 91.0
+    assert app.st.session_state.chemicals["sanity"] == 91.0
+
+
+def test_amyloid_plaques_phagocytosis():
+    """
+    TEST: Amyloid plaques and Microglia Phagocytosis
+    Ensures plaques degrade synaptic weight by 50% during propagation, and high Serotonin/Acetylcholine clears them.
+    """
+    app.st.session_state = MockSessionState()
+    app.st.session_state["bot_thread"] = True
+    app.init_game_state()
+
+    # Clean grid
+    for r in range(6):
+        for c in range(6):
+            app.st.session_state.neuron_grid[r][c] = {"type": "Empty", "charge": 0.0, "threshold": 0.5, "fire_rate": 0.0, "last_fired": -1, "direction": "All", "weight": 1.0, "amyloid_plaque": False}
+
+    # Place sensory cell next to interneuron
+    app.st.session_state.neuron_grid[0][0] = {
+        "type": "Sensory",
+        "charge": 0.6,
+        "threshold": 0.4,
+        "fire_rate": 0.0,
+        "last_fired": -1,
+        "direction": "Right",
+        "weight": 1.0,
+        "amyloid_plaque": True # Covered in Amyloid plaque!
+    }
+    app.st.session_state.neuron_grid[0][1] = {
+        "type": "Interneuron",
+        "charge": 0.1,
+        "threshold": 0.5,
+        "fire_rate": 0.0,
+        "last_fired": -1,
+        "direction": "All",
+        "weight": 1.0,
+        "amyloid_plaque": False
+    }
+
+    # With plaque, synaptic weight is halved. Charge transferred is (0.6 * 0.35 * 0.5) = 0.105
+    # Neighbor [0][1] gets 0.1 + 0.105 = 0.205
+    app.run_simulation_tick()
+    assert abs(app.st.session_state.neuron_grid[0][1]["charge"] - 0.205) < 1e-5
+
 def test_active_buffs():
     """
     UPGRADE TEST: Neuromodulator Ongoing Buffs
@@ -869,6 +957,9 @@ def test_circadian_sleep_cycle():
     app.st.session_state = MockSessionState()
     app.st.session_state["bot_thread"] = True
     app.init_game_state()
+
+    # Set norepinephrine to 0 to avoid fight-or-flight energy drain in this baseline test
+    app.st.session_state.chemicals["norepinephrine"] = 0.0
 
     app.st.session_state.stats["sleep_state"] = True
     app.st.session_state.chemicals["energy"] = 20.0

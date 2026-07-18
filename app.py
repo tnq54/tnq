@@ -286,7 +286,7 @@ def init_game_state():
 
         st.session_state.neuron_grid = grid
 
-        # Chemistry metrics (added melatonin, neuro_inflammation)
+        # Chemistry metrics (added melatonin, neuro_inflammation, norepinephrine)
         st.session_state.chemicals = {
             "dopamine": 50.0,
             "serotonin": 50.0,
@@ -295,7 +295,8 @@ def init_game_state():
             "stress": 10.0,
             "sanity": 100.0,
             "melatonin": 10.0,
-            "neuro_inflammation": 10.0
+            "neuro_inflammation": 10.0,
+            "norepinephrine": 10.0
         }
 
         # Advanced Game Modes (Normal, Alzheimer, Epilepsy, Parkinson, ADHD)
@@ -321,7 +322,8 @@ def init_game_state():
             "focus": 0,
             "rtms": 0,
             "opto": 0,
-            "cortisol": 0 # clinical anti-inflammatory wash cooldown
+            "cortisol": 0, # clinical anti-inflammatory wash cooldown
+            "propranolol": 0 # clinical beta-blocker cooldown
         }
 
         # Audio Synthesizer Triggers
@@ -378,7 +380,8 @@ def init_game_state():
             "sanity": [100.0],
             "energy": [100.0],
             "dopamine": [50.0],
-            "stress": [10.0]
+            "stress": [10.0],
+            "norepinephrine": [10.0]
         }
 
 def get_evolution_stage(iq):
@@ -603,6 +606,34 @@ def run_simulation_tick():
         if degraded > 0:
             add_log(f"🧠 [Alzheimer] Suy giảm nhận thức khiến {degraded} nơ-ron bị chai lỳ, tăng ngưỡng kích hoạt (+{drift_rate})!")
 
+    # UPGRADE: Amyloid-Beta Plaque Accumulation in Alzheimer's Mode
+    if mode == "Alzheimer" and random.random() < 0.25:
+        # 25% chance per tick of placing a plaque on a random non-empty cell that doesn't have one yet
+        non_plaque_cells = []
+        for r in range(GRID_SIZE):
+            for c in range(GRID_SIZE):
+                cell = grid[r][c]
+                if cell["type"] != "Empty" and not cell.get("amyloid_plaque", False):
+                    non_plaque_cells.append((r, c))
+        if non_plaque_cells:
+            pr, pc = random.choice(non_plaque_cells)
+            grid[pr][pc]["amyloid_plaque"] = True
+            add_log(f"🧬 [Amyloid-Beta] Mảng bám Amyloid tích tụ trên nơ-ron [{pr+1},{pc+1}], giảm 50% hiệu suất truyền dẫn!")
+
+    # UPGRADE: Microglia Phagocytosis (Plaque clearing)
+    if chems["serotonin"] > 60.0 and chems["acetylcholine"] > 60.0:
+        clear_chance = 0.40 if "TREM2" in genes else 0.20
+        if random.random() < clear_chance:
+            plaque_cells = []
+            for r in range(GRID_SIZE):
+                for c in range(GRID_SIZE):
+                    if grid[r][c].get("amyloid_plaque", False):
+                        plaque_cells.append((r, c))
+            if plaque_cells:
+                cr, cc = random.choice(plaque_cells)
+                grid[cr][cc]["amyloid_plaque"] = False
+                add_log(f"🧹 [Thực bào Microglia] Tế bào thần green đệm dọn sạch mảng bám Amyloid tại [{cr+1},{cc+1}]!")
+
     # UPGRADE: Chronic Neuro-Inflammation threshold drift (Cytokine Storm)
     # Inflammation above 80% causes slow, chronic neural threshold drift
     if chems.get("neuro_inflammation", 0.0) > 80.0 and ticks % 8 == 0:
@@ -696,6 +727,10 @@ def run_simulation_tick():
     if "CHRNA7" in genes:
         metabolic_cost *= 1.15
 
+    # Norepinephrine drains energy faster (Fight-or-Flight cost)
+    norepi_val = chems.get("norepinephrine", 10.0)
+    metabolic_cost += (norepi_val / 100.0) * 3.0
+
     max_energy = 100.0
     # Astrocytic Glycogen Shunt & PGC-1alpha genetics boost max energy storage capacity
     if upgrades.get("glycogen_shunt", 0) == 1:
@@ -737,6 +772,9 @@ def run_simulation_tick():
         # Sleep flushes neuro-inflammation quickly
         chems["neuro_inflammation"] = max(5.0, chems["neuro_inflammation"] - 6.0)
 
+        # Sleep flushes norepinephrine quickly
+        chems["norepinephrine"] = max(5.0, chems.get("norepinephrine", 10.0) - 8.0)
+
         if cycle_time == 0: # Day shifted, wake up automatically!
             st.session_state.stats["sleep_state"] = False
             add_log("🌞 [Circadian] Mặt trời lên! Bộ não tự động tỉnh giấc, khôi phục hệ thống kích thích.")
@@ -756,6 +794,10 @@ def run_simulation_tick():
                 # Thalamus boosts sensory cell charge speed by +20% per level
                 thalamus_level = upgrades.get("thalamus", 0)
                 boost *= (1.0 + thalamus_level * 0.2)
+
+                # Fight-or-flight Norepinephrine boost: up to +40% fire rate boost
+                norepi_boost = 1.0 + (chems.get("norepinephrine", 10.0) / 100.0) * 0.4
+                boost *= norepi_boost
 
                 cell["charge"] += cell["fire_rate"] * boost
                 if cell["charge"] >= cell["threshold"]:
@@ -802,6 +844,9 @@ def run_simulation_tick():
 
                     # Synaptic Output Weight scale
                     cell_weight = cell.get("weight", 1.0)
+                    # Amyloid-Beta plaques reduce effective Synaptic weight by 50%
+                    if cell.get("amyloid_plaque", False):
+                        cell_weight *= 0.5
                     transfer_charge = (cell["charge"] * signal_efficiency * cell_weight) / len(neighbors)
 
                     for nr, nc in neighbors:
@@ -916,6 +961,33 @@ def run_simulation_tick():
         cyto_decay = (chems["neuro_inflammation"] - 80.0) * 0.4
         chems["sanity"] = max(0.0, chems["sanity"] - cyto_decay)
 
+    # UPGRADE: Norepinephrine Fight-or-Flight & Panic Attack Delta Engine
+    # Norepinephrine rises with signals fired and high stress
+    norepi_gain = (signals_fired * 0.5) + (chems["stress"] * 0.1)
+    # Natural clearance of 1.5% per tick
+    chems["norepinephrine"] = max(0.0, min(100.0, chems.get("norepinephrine", 10.0) + norepi_gain - 1.5))
+
+    # Panic Attack Trigger Check (threshold is 90% normally, or 100% if ADRA2A gene is active)
+    panic_threshold = 100.0 if "ADRA2A" in genes else 90.0
+    if chems.get("norepinephrine", 10.0) >= panic_threshold:
+        damage = 9.0 if "ADRA2A" in genes else 15.0
+        chems["sanity"] = max(0.0, chems["sanity"] - damage)
+
+        # Paralyze 3 random cells: find non-empty neurons and set their charge to 0
+        non_empty = []
+        for r in range(GRID_SIZE):
+            for c in range(GRID_SIZE):
+                if grid[r][c]["type"] != "Empty":
+                    non_empty.append((r, c))
+        if non_empty:
+            paralyzed_cells = random.sample(non_empty, min(3, len(non_empty)))
+            for pr, pc in paralyzed_cells:
+                grid[pr][pc]["charge"] = 0.0
+
+        add_log(f"🚨 [HOẢNG LOẠN] Norepinephrine ({chems['norepinephrine']:.1f}%) vượt ngưỡng {panic_threshold}%! Gây mất -{damage:.1f} Sanity và đóng băng 3 nơ-ron.")
+        # Post-panic crash
+        chems["norepinephrine"] = 50.0
+
     # COMT Gene Mutation decays Dopamine 40% slower and Stress 20% slower
     # MAOA Gene Mutation decays Dopamine and Serotonin 30% slower
     da_decay_rate = 0.048 if "COMT" in genes else 0.08
@@ -950,6 +1022,7 @@ def run_simulation_tick():
         chems["dopamine"] = 20.0
         chems["serotonin"] = 30.0
         chems["neuro_inflammation"] = 30.0 # moderate post-burnout inflammation
+        chems["norepinephrine"] = 20.0 # moderate post-burnout norepinephrine
 
         # Reset ongoing buffs on burnout
         st.session_state.active_buffs = {"doping": 0, "ssri": 0, "focus": 0, "tyrosine": 0, "tryptophan": 0, "choline": 0}
@@ -1007,6 +1080,7 @@ def record_history(ticks, chems):
     hist["energy"].append(chems["energy"])
     hist["dopamine"].append(chems["dopamine"])
     hist["stress"].append(chems["stress"])
+    hist["norepinephrine"].append(chems.get("norepinephrine", 10.0))
 
     if len(hist["tick"]) > 40:
         for key in hist:
@@ -1167,8 +1241,8 @@ with tab1:
     with cols[5]:
         st.metric("Kho Glycogen tế bào hình sao", f"{st.session_state.stats.get('glycogen_pool', 0.0):.1f} units")
 
-    # Progress bars for detailed chemistry (added Melatonin and Inflammation)
-    chem_cols = st.columns(6)
+    # Progress bars for detailed chemistry (added Melatonin, Inflammation, Norepinephrine)
+    chem_cols = st.columns(7)
     with chem_cols[0]:
         val = st.session_state.chemicals["dopamine"]
         st.progress(val / 100.0, text=f"Dopamine (Động lực): {val:.1f}%")
@@ -1188,6 +1262,9 @@ with tab1:
         val = st.session_state.chemicals.get("neuro_inflammation", 10.0)
         micro_state = "🔥 Reactive (Bão)" if val > 80.0 else ("⚠️ Reactive" if val >= 50.0 else "Normal")
         st.progress(val / 100.0, text=f"Viêm thần kinh: {val:.1f}% ({micro_state})")
+    with chem_cols[6]:
+        val = st.session_state.chemicals.get("norepinephrine", 10.0)
+        st.progress(val / 100.0, text=f"Norepinephrine (Fight-or-Flight): {val:.1f}%")
 
     # Live EEG Brainwave Telemetry monitoring
     st.markdown("##### 📊 Sóng não lâm sàng (EEG Brainwave Telemetry)")
@@ -1214,7 +1291,7 @@ with tab1:
 
     # Hormone active abilities layout
     st.markdown("##### 🧪 Trung tâm nội tiết tố & Liệu pháp Lâm sàng (Active Abilities)")
-    hormone_cols = st.columns(6)
+    hormone_cols = st.columns(7)
     cooldowns = st.session_state.cooldowns
 
     with hormone_cols[0]:
@@ -1297,6 +1374,16 @@ with tab1:
             add_log("🧪 LÂM SÀNG: Kích hoạt liệu pháp Cortisol Wash! Rửa giải toàn bộ cytokine kháng viêm, dập tắt việm nơ-ron cấp tính.")
             st.rerun()
 
+    # UPGRADE: Clinical Beta-Blocker Propranolol Active Ability
+    with hormone_cols[6]:
+        propranolol_disabled = cooldowns.get("propranolol", 0) > 0
+        btn_label_propranolol = f"🩺 Propranolol ({cooldowns.get('propranolol', 0)}s)" if cooldowns.get("propranolol", 0) > 0 else "🩺 Propranolol"
+        if st.button(btn_label_propranolol, disabled=propranolol_disabled, use_container_width=True, help="Liệu pháp chặn Beta Propranolol: Reset lập tức nồng độ Norepinephrine hoảng loạn về mức 10.0% và làm dịu nhịp sinh học vỏ não. Cooldown 20s."):
+            st.session_state.chemicals["norepinephrine"] = 10.0
+            cooldowns["propranolol"] = 20
+            add_log("🩺 LÂM SÀNG: Sử dụng Propranolol Beta-Blocker! Chặn đứng Norepinephrine kích thích, dập tắt hoàn toàn các triệu chứng hoảng loạn cấp tính.")
+            st.rerun()
+
     # Neurotransmitter Synthesis Precursors & Diet System Layout
     st.markdown("##### 🧬 Dinh Dưỡng Học & Tiền Chất Thần Kinh (Precursor Dietary Intake)")
     st.caption("Tổng hợp trực tiếp các chất dẫn truyền thông qua bồi bổ dinh dưỡng. Phí tiêu thụ: 15 MB Bộ nhớ.")
@@ -1376,7 +1463,8 @@ with tab1:
                 }
                 sym = dir_symbols.get(direction, "🌐")
 
-                label = f"{emoji}{sym}\n({charge:.2f})"
+                plaque_marker = "🧬" if (cell.get("amyloid_plaque", False) and ctype != "Empty") else ""
+                label = f"{emoji}{sym}{plaque_marker}\n({charge:.2f})"
                 is_selected = (r == selected_r and c == selected_c)
                 border_style = "🔴 " if is_selected else ""
 
@@ -1433,7 +1521,8 @@ with tab1:
                     "fire_rate": 0.3,
                     "last_fired": -1,
                     "direction": "All",
-                    "weight": 1.0
+                    "weight": 1.0,
+                    "amyloid_plaque": False
                 }
                 add_log(f"Cấy ghép Nơ-ron cảm giác (Sensory) tại [{selected_r+1},{selected_c+1}] (-{cost_sensory} MB)")
                 st.rerun()
@@ -1449,7 +1538,8 @@ with tab1:
                     "fire_rate": 0.0,
                     "last_fired": -1,
                     "direction": "All",
-                    "weight": 1.0
+                    "weight": 1.0,
+                    "amyloid_plaque": False
                 }
                 add_log(f"Cấy ghép Nơ-ron liên kết (Interneuron) tại [{selected_r+1},{selected_c+1}] (-{cost_inter} MB)")
                 st.rerun()
@@ -1465,7 +1555,8 @@ with tab1:
                     "fire_rate": 0.0,
                     "last_fired": -1,
                     "direction": "All",
-                    "weight": 1.0
+                    "weight": 1.0,
+                    "amyloid_plaque": False
                 }
                 add_log(f"Cấy ghép Nơ-ron vận động (Motor) tại [{selected_r+1},{selected_c+1}] (-{cost_motor} MB)")
                 st.rerun()
@@ -1489,7 +1580,8 @@ with tab1:
                     "fire_rate": 0.0,
                     "last_fired": -1,
                     "direction": "All",
-                    "weight": 1.0
+                    "weight": 1.0,
+                    "amyloid_plaque": False
                 }
                 add_log(f"Xóa bỏ nơ-ron tại [{selected_r+1},{selected_c+1}] (Thu hồi +{refund} MB)")
                 st.rerun()
@@ -1580,6 +1672,10 @@ with tab1:
         gly_status = "Đã tích hợp (Max Fuel 150) 🟢" if upgrades.get("glycogen_shunt", 0) == 1 else "Chưa mở khóa ⚪"
         dentate_status = f"Đã tích hợp (Tế bào gốc) [Lv.{upgrades.get('dentate_gyrus', 0)}] 🟢" if upgrades.get("dentate_gyrus", 0) >= 1 else "Chưa mở khóa ⚪"
 
+        plaques_count = sum(1 for r in range(GRID_SIZE) for c in range(GRID_SIZE) if st.session_state.neuron_grid[r][c].get("amyloid_plaque", False))
+        adra2a_active = "Có 🟢" if "ADRA2A" in st.session_state.active_genes else "Không ⚪"
+        trem2_active = "Có 🟢" if "TREM2" in st.session_state.active_genes else "Không ⚪"
+
         brain_art = f"""
         [ Frontal Cortex: Lv.{upgrades['cortex']} ] ---------.
                    |                         |
@@ -1602,16 +1698,21 @@ with tab1:
         [ Cerebellum: Lv.{upgrades['cerebellum']} ] (Tiểu não hạ stress)
                    |
         [ Brainstem: Lv.{upgrades['brainstem']} ] (Hành não cấp năng lượng)
+
+        -------------------------------------------------------------
+        🔬 Chỉ số Alzheimer: Tích lũy {plaques_count} mảng bám Amyloid-Beta
+        🧬 Đột biến ADRA2A (Bình ổn hoảng loạn): {adra2a_active}
+        🧬 Đột biến TREM2 (Tăng dọn dẹp mảng bám): {trem2_active}
         """
         st.code(brain_art, language="text")
 
         st.markdown("---")
 
-        # UPGRADE: Genetic Mutation Modifier Board Panel (Now supports DRD2 and COMT-Met!)
+        # UPGRADE: Genetic Mutation Modifier Board Panel (Now supports DRD2, COMT-Met, ADRA2A, TREM2!)
         st.markdown("##### 🧬 Bản Đồ Biến Dị Di Truyền (Genetic Mutation Modifiers)")
         st.caption("Kích hoạt đột biến gen để áp dụng các thay đổi hóa học và liên kết vĩnh viễn cho tế bào.")
 
-        genes_list = ["APOE4", "BDNF", "COMT", "GABRA1", "DRD4", "SHANK3", "MAOA", "CHRNA7", "PGC-1alpha", "SLC6A4", "DRD2", "COMT-Met"]
+        genes_list = ["APOE4", "BDNF", "COMT", "GABRA1", "DRD4", "SHANK3", "MAOA", "CHRNA7", "PGC-1alpha", "SLC6A4", "DRD2", "COMT-Met", "ADRA2A", "TREM2"]
         genes_desc = {
             "APOE4": "👵 APOE4: Nhân đôi tốc độ Alzheimer, nhưng +50% IQ ban đầu.",
             "BDNF": "🌱 BDNF: Plasticity dẻo dai hơn 1.5x, đẩy nhanh Hebbian learning.",
@@ -1624,7 +1725,9 @@ with tab1:
             "PGC-1alpha": "🔋 PGC-1alpha: Đột biến nguyên sinh tế bào, gia tăng +40 Max Fuel của não bộ.",
             "SLC6A4": "🧬 SLC6A4: Đột biến vận chuyển Serotonin, tăng thời gian duy trì SSRI thêm 1.5 lần.",
             "DRD2": "🕹️ DRD2: Tăng cường thụ thể Dopamine, tăng +50% hiệu ứng động lực Sensory, nhưng stress cao hại gấp rưỡi sanity.",
-            "COMT-Met": "🧠 COMT-Met: Đột biến thùy trán siêu trí tuệ, +30% IQ nhận thức từ Motor, nhưng stress giảm chậm đi 30%."
+            "COMT-Met": "🧠 COMT-Met: Đột biến thùy trán siêu trí tuệ, +30% IQ nhận thức từ Motor, nhưng stress giảm chậm đi 30%.",
+            "ADRA2A": "🧘 ADRA2A: Bình ổn hoảng loạn, giảm 40% sát thương lên Sanity của Panic Attack và nâng ngưỡng hoảng loạn lên 100%.",
+            "TREM2": "🧹 TREM2: Kích hoạt hệ thực bào siêu vi, nhân đôi tốc độ/tỷ lệ thực bào dọn dẹp mảng bám Amyloid-Beta (lên 40% mỗi tick)."
         }
 
         # Multiselect for genes selection
