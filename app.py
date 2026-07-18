@@ -286,7 +286,7 @@ def init_game_state():
 
         st.session_state.neuron_grid = grid
 
-        # Chemistry metrics (added melatonin)
+        # Chemistry metrics (added melatonin, neuro_inflammation)
         st.session_state.chemicals = {
             "dopamine": 50.0,
             "serotonin": 50.0,
@@ -294,13 +294,14 @@ def init_game_state():
             "energy": 100.0,
             "stress": 10.0,
             "sanity": 100.0,
-            "melatonin": 10.0
+            "melatonin": 10.0,
+            "neuro_inflammation": 10.0
         }
 
-        # Advanced Game Modes (Normal, Alzheimer, Epilepsy, Parkinson)
+        # Advanced Game Modes (Normal, Alzheimer, Epilepsy, Parkinson, ADHD)
         st.session_state.game_mode = "Normal"
 
-        # UPGRADE: Genetic Mutation Board Selection (supports PGC-1alpha & SLC6A4)
+        # UPGRADE: Genetic Mutation Board Selection (supports PGC-1alpha & SLC6A4, DRD2, COMT-Met)
         st.session_state.active_genes = []
 
         # UPGRADE: Continuous Active Buffs tick counter
@@ -313,13 +314,14 @@ def init_game_state():
             "choline": 0
         }
 
-        # Cooldowns (added opto)
+        # Cooldowns
         st.session_state.cooldowns = {
             "doping": 0,
             "ssri": 0,
             "focus": 0,
             "rtms": 0,
-            "opto": 0
+            "opto": 0,
+            "cortisol": 0 # clinical anti-inflammatory wash cooldown
         }
 
         # Audio Synthesizer Triggers
@@ -333,7 +335,7 @@ def init_game_state():
             "marathon": {"name": "🏆 Chạy Đua Nhận Thức Siêu Phàm", "target": "Tích lũy tối thiểu 500 điểm IQ nhận thức", "status": "In Progress", "reward_claimed": False, "desc": "+50 Acetylcholine & +200 MB Trí nhớ"}
         }
 
-        # Progression and stats (added day/night circadian cycle state, sleep state, glycogen emergency pool)
+        # Progression and stats
         st.session_state.stats = {
             "iq": 0.0,
             "memory": 10.0,
@@ -346,7 +348,7 @@ def init_game_state():
             "max_memory": 10.0,
             "circadian_cycle": "Day",
             "sleep_state": False,
-            "glycogen_pool": 30.0 # Emergency energy reservoir
+            "glycogen_pool": 30.0
         }
 
         # Upgrades
@@ -361,7 +363,8 @@ def init_game_state():
             "pfc": 0,
             "amygdala": 0,
             "thalamus": 0,
-            "glycogen_shunt": 0 # increases max energy storage to 150
+            "glycogen_shunt": 0,
+            "dentate_gyrus": 0 # Dentate Gyrus Lv.0
         }
 
         # Logs, playing status, speed, selected cell, events
@@ -537,7 +540,17 @@ def run_simulation_tick():
     st.session_state.stats["burnout_streak"] += 1
     st.session_state.stats["max_streak"] = max(st.session_state.stats["max_streak"], st.session_state.stats["burnout_streak"])
 
-    # UPGRADE: Day/Night Circadian Rhythm (30 Day, 10 Night)
+    # UPGRADE: Neurodevelopmental ADHD Pathology Mode
+    # ADHD wildly fluctuates Dopamine baseline levels randomly and accelerates Acetylcholine decay
+    if mode == "ADHD":
+        da_fluctuate = random.uniform(-15.0, 15.0)
+        chems["dopamine"] = max(0.0, min(100.0, chems["dopamine"] + da_fluctuate))
+        if da_fluctuate > 10.0:
+            add_log(f"🧠 [ADHD] Dao động Dopamine bất thường đột ngột (+{da_fluctuate:.1f}%) gây tăng động tăng tập trung ngắn hạn!")
+        elif da_fluctuate < -10.0:
+            add_log(f"🧠 [ADHD] Dopamine sụt giảm đột ngột ({da_fluctuate:.1f}%) làm mất khả năng tập trung sâu!")
+
+    # Day/Night Circadian Rhythm (30 Day, 10 Night)
     cycle_time = ticks % 40
     if cycle_time < 30:
         st.session_state.stats["circadian_cycle"] = "Day"
@@ -548,10 +561,10 @@ def run_simulation_tick():
         # Night melatonin slightly lowers baseline stress
         chems["stress"] = max(0.0, chems["stress"] - 1.0)
 
-    # UPGRADE: SLC6A4 Transporter Gene increases SSRI active buff duration x1.5, slightly dampens normal clearance
+    # SLC6A4 gene increases SSRI active buff duration x1.5
     slc6a4_mult = 1.5 if "SLC6A4" in genes else 1.0
 
-    # UPGRADE: Decrement active neuromodulator buffs tick timers and apply ongoing biochemical bonuses
+    # Decrement active neuromodulator buffs tick timers and apply ongoing biochemical bonuses
     buffs = st.session_state.get("active_buffs", {"doping": 0, "ssri": 0, "focus": 0, "tyrosine": 0, "tryptophan": 0, "choline": 0})
     for k in list(buffs.keys()):
         if buffs[k] > 0:
@@ -571,7 +584,7 @@ def run_simulation_tick():
                 chems["acetylcholine"] = min(100.0, chems["acetylcholine"] + 2.5)
 
     # Decrement active hormone abilities cooldowns
-    cooldowns = st.session_state.get("cooldowns", {"doping": 0, "ssri": 0, "focus": 0, "rtms": 0, "opto": 0})
+    cooldowns = st.session_state.get("cooldowns", {"doping": 0, "ssri": 0, "focus": 0, "rtms": 0, "opto": 0, "cortisol": 0})
     for k in cooldowns:
         if cooldowns[k] > 0:
             cooldowns[k] -= 1
@@ -590,7 +603,44 @@ def run_simulation_tick():
         if degraded > 0:
             add_log(f"🧠 [Alzheimer] Suy giảm nhận thức khiến {degraded} nơ-ron bị chai lỳ, tăng ngưỡng kích hoạt (+{drift_rate})!")
 
-    # UPGRADE: Parkinson's Pathology Tick
+    # UPGRADE: Chronic Neuro-Inflammation threshold drift (Cytokine Storm)
+    # Inflammation above 80% causes slow, chronic neural threshold drift
+    if chems.get("neuro_inflammation", 0.0) > 80.0 and ticks % 8 == 0:
+        degraded = 0
+        for r in range(GRID_SIZE):
+            for c in range(GRID_SIZE):
+                cell = grid[r][c]
+                if cell["type"] != "Empty" and cell["threshold"] < 0.9:
+                    cell["threshold"] = min(0.9, cell["threshold"] + 0.02)
+                    degraded += 1
+        if degraded > 0:
+            add_log(f"🔥 [Bão Cytokine] Viêm thần kinh cực cao (>80%) gây chai lỳ, xơ hóa và tăng ngưỡng kích hoạt {degraded} tế bào (+0.02)!")
+
+    # UPGRADE: Dentate Gyrus Neurogenesis Anatomy Upgrade
+    # Every tick, if Dentate Gyrus is upgraded and serotonin is high, auto-implant Interneuron at random empty cells
+    if upgrades.get("dentate_gyrus", 0) >= 1:
+        if st.session_state.stats["memory"] >= 30.0 and chems["serotonin"] > 60.0:
+            if random.random() < 0.25:
+                empty_cells = []
+                for r in range(GRID_SIZE):
+                    for c in range(GRID_SIZE):
+                        if grid[r][c]["type"] == "Empty":
+                            empty_cells.append((r, c))
+                if empty_cells:
+                    sp_r, sp_c = random.choice(empty_cells)
+                    st.session_state.stats["memory"] -= 15.0
+                    grid[sp_r][sp_c] = {
+                        "type": "Interneuron",
+                        "charge": 0.0,
+                        "threshold": 0.5,
+                        "fire_rate": 0.0,
+                        "last_fired": -1,
+                        "direction": "All",
+                        "weight": 1.0
+                    }
+                    add_log(f"🌱 [Hải Mã Neurogenesis] Thùy răng (Dentate Gyrus) tự động sản sinh tế bào liên kết mới tại [{sp_r+1},{sp_c+1}]! (-15 MB Memory)")
+
+    # Parkinson's Pathology Tick
     # Low Dopamine causes random Motor cells to misfire (tremors), draining energy but yielding 0 IQ/Memory.
     if mode == "Parkinson" and chems["dopamine"] < 40.0:
         if random.random() < 0.30:
@@ -647,7 +697,7 @@ def run_simulation_tick():
         metabolic_cost *= 1.15
 
     max_energy = 100.0
-    # UPGRADE: Astrocytic Glycogen Shunt & PGC-1alpha genetics boost max energy storage capacity
+    # Astrocytic Glycogen Shunt & PGC-1alpha genetics boost max energy storage capacity
     if upgrades.get("glycogen_shunt", 0) == 1:
         max_energy = 150.0
     if "PGC-1alpha" in genes:
@@ -667,7 +717,7 @@ def run_simulation_tick():
         record_history(ticks, chems)
         return
 
-    # UPGRADE: Sleep Circus Loop Processing
+    # Sleep Circus Loop Processing
     if st.session_state.stats.get("sleep_state", False):
         # Sensory inputs, signal propagation, and motor output are skipped/disabled
         # Rapid sleep recovery heals biochemistry and flushes waste
@@ -684,6 +734,9 @@ def run_simulation_tick():
         chems["dopamine"] += (50.0 - chems["dopamine"]) * 0.35
         chems["serotonin"] += (50.0 - chems["serotonin"]) * 0.35
 
+        # Sleep flushes neuro-inflammation quickly
+        chems["neuro_inflammation"] = max(5.0, chems["neuro_inflammation"] - 6.0)
+
         if cycle_time == 0: # Day shifted, wake up automatically!
             st.session_state.stats["sleep_state"] = False
             add_log("🌞 [Circadian] Mặt trời lên! Bộ não tự động tỉnh giấc, khôi phục hệ thống kích thích.")
@@ -697,7 +750,9 @@ def run_simulation_tick():
         for c in range(GRID_SIZE):
             cell = grid[r][c]
             if cell["type"] == "Sensory":
-                boost = 1.0 + (chems["dopamine"] / 100.0)
+                # UPGRADE: DRD2 genetic mutation boosts dopamine sensory fire rate multipliers by +50%
+                drd2_mult = 1.5 if "DRD2" in genes else 1.0
+                boost = 1.0 + (chems["dopamine"] / 100.0) * drd2_mult
                 # Thalamus boosts sensory cell charge speed by +20% per level
                 thalamus_level = upgrades.get("thalamus", 0)
                 boost *= (1.0 + thalamus_level * 0.2)
@@ -775,7 +830,10 @@ def run_simulation_tick():
                 motor_fired_count += 1
                 iq_multiplier = 1.0 + (upgrades["cortex"] * 0.6)
                 focus_bonus = 1.0 + (chems["acetylcholine"] / 100.0)
-                motor_yield_iq += 5.0 * iq_multiplier * focus_bonus
+
+                # UPGRADE: COMT-Met gene mutation increases IQ gains from Motor fires by +30%
+                comtmet_mult = 1.3 if "COMT-Met" in genes else 1.0
+                motor_yield_iq += 5.0 * iq_multiplier * focus_bonus * comtmet_mult
 
                 mem_multiplier = 1.0 + (upgrades["hippocampus"] * 0.4)
                 motor_yield_mem += 2.0 * mem_multiplier
@@ -815,6 +873,9 @@ def run_simulation_tick():
     # SLC6A4 gene slightly dampens normal stress clearance by 30%
     if "SLC6A4" in genes:
         stress_clearance *= 0.7
+    # UPGRADE: COMT-Met genetic mutation decays stress 30% slower
+    if "COMT-Met" in genes:
+        stress_clearance *= 0.7
 
     # Active SSRI Buff reduces stress generation by 50%
     if buffs.get("ssri", 0) > 0:
@@ -831,6 +892,9 @@ def run_simulation_tick():
 
     # DRD4 mutation causes low dopamine (<30.0) to double stress damage on sanity
     drd4_sanity_mult = 2.0 if ("DRD4" in genes and chems["dopamine"] < 30.0) else 1.0
+    # UPGRADE: DRD2 genetic mutation causes high stress to inflict 1.5x sanity damage
+    if "DRD2" in genes and chems["stress"] > 50.0:
+        drd4_sanity_mult *= 1.5
 
     if effective_stress > 60.0:
         sanity_damage = (effective_stress - 60.0) * 0.35 * drd4_sanity_mult
@@ -840,6 +904,17 @@ def run_simulation_tick():
     else:
         healing = 0.5 + (chems["serotonin"] * 0.02)
         chems["sanity"] = max(0.0, min(100.0, chems["sanity"] + healing))
+
+    # UPGRADE: Neuro-Inflammation & Microglia Immune Delta Engine
+    # Neuro-inflammation rises on signals fired and high stress
+    inflammation_gain = (signals_fired * 0.4) + (effective_stress > 50.0 and (effective_stress - 50.0) * 0.2 or 0.0)
+    # Natural immune clearance of 1.0% per tick
+    chems["neuro_inflammation"] = max(0.0, min(100.0, chems["neuro_inflammation"] + inflammation_gain - 1.0))
+
+    # Active Cytokine Storm Sanity decay
+    if chems["neuro_inflammation"] > 80.0:
+        cyto_decay = (chems["neuro_inflammation"] - 80.0) * 0.4
+        chems["sanity"] = max(0.0, chems["sanity"] - cyto_decay)
 
     # COMT Gene Mutation decays Dopamine 40% slower and Stress 20% slower
     # MAOA Gene Mutation decays Dopamine and Serotonin 30% slower
@@ -855,6 +930,10 @@ def run_simulation_tick():
 
     # CHRNA7 boosts Acetylcholine generation / baseline stabilization by +25%
     ach_decay_rate = 0.08
+    # UPGRADE: ADHD Mode accelerates Acetylcholine decay rate by 50%
+    if mode == "ADHD":
+        ach_decay_rate *= 1.5
+
     ach_delta = (50.0 - chems["acetylcholine"]) * ach_decay_rate
     if "CHRNA7" in genes:
         ach_delta *= 1.25
@@ -870,6 +949,7 @@ def run_simulation_tick():
         chems["energy"] = 50.0
         chems["dopamine"] = 20.0
         chems["serotonin"] = 30.0
+        chems["neuro_inflammation"] = 30.0 # moderate post-burnout inflammation
 
         # Reset ongoing buffs on burnout
         st.session_state.active_buffs = {"doping": 0, "ssri": 0, "focus": 0, "tyrosine": 0, "tryptophan": 0, "choline": 0}
@@ -1001,7 +1081,7 @@ init_game_state()
 
 # ----------------- TAB 1: BRAIN GAME -----------------
 with tab1:
-    st.subheader("Trình Mô Phỏng Mạng Lưới Nơ-ron và Tiến Hóa Hóa Học Não")
+    st.subheader("Trình Mô Phỏng Mạng Lưới Nơ-ron và Tiến Hóa Hóa Học")
 
     # Personal records display
     st.markdown("##### 🏆 Bảng Kỷ Lục Nhận Thức Cá Nhân (Personal Records)")
@@ -1015,20 +1095,20 @@ with tab1:
     with record_cols[3]:
         st.write(f"👑 **Kỷ Lục Chuỗi:** `{st.session_state.stats['max_streak']} ticks`")
     with record_cols[4]:
-        # UPGRADE: Visual State indicator of Day/Night Circadian Cycle
         cycle_emoji = "🌞 Ngày (Day)" if st.session_state.stats["circadian_cycle"] == "Day" else "🌙 Đêm (Night)"
         st.write(f"⏰ **Chu kỳ sinh học:** `{cycle_emoji}`")
 
     st.markdown("---")
 
-    # Game pathology modes selector (Normal, Alzheimer, Epilepsy, Parkinson)
+    # Game pathology modes selector (Normal, Alzheimer, Epilepsy, Parkinson, ADHD)
     st.markdown("##### ⚙️ Lựa chọn Chế Độ Thử Thách Não Bộ")
-    modes_list = ["Normal", "Alzheimer", "Epilepsy", "Parkinson"]
+    modes_list = ["Normal", "Alzheimer", "Epilepsy", "Parkinson", "ADHD"]
     modes_names = {
         "Normal": "🟢 Bình Thường (Sức khỏe ổn định)",
         "Alzheimer": "👵 Thử Thách Alzheimer (Thoái hóa nơ-ron, chai lỳ điện thế)",
         "Epilepsy": "⚡ Thử Thách Động Kinh (Gia tăng xung điện cực độ, nhân đôi stress)",
-        "Parkinson": "🤝 Thử Thách Parkinson (Run giật nơ-ron vận động khi thiếu hụt Dopamine)"
+        "Parkinson": "🤝 Thử Thách Parkinson (Run giật nơ-ron vận động khi thiếu hụt Dopamine)",
+        "ADHD": "🧠 Thử Thách ADHD (Dao động Dopamine dữ dội, tăng tốc phân rã Acetylcholine)"
     }
     selected_mode = st.selectbox(
         "Cấu hình bệnh lý học vỏ não:",
@@ -1044,7 +1124,7 @@ with tab1:
         add_log(f"⚠️ CẤU HÌNH: Chuyển cấu hình vỏ não sang chế độ: {modes_names[selected_mode]}")
         st.rerun()
 
-    # UPGRADE: Continuous Active Buff badges indicators
+    # Continuous Active Buff badges indicators
     st.markdown("##### 🧪 Trạng thái hoạt hóa hóa học (Active Neuromodulator Buffs)")
     active_buffs = st.session_state.get("active_buffs", {"doping": 0, "ssri": 0, "focus": 0, "tyrosine": 0, "tryptophan": 0, "choline": 0})
     buffs_html = []
@@ -1087,23 +1167,27 @@ with tab1:
     with cols[5]:
         st.metric("Kho Glycogen tế bào hình sao", f"{st.session_state.stats.get('glycogen_pool', 0.0):.1f} units")
 
-    # Progress bars for detailed chemistry (added Melatonin)
-    chem_cols = st.columns(5)
+    # Progress bars for detailed chemistry (added Melatonin and Inflammation)
+    chem_cols = st.columns(6)
     with chem_cols[0]:
         val = st.session_state.chemicals["dopamine"]
-        st.progress(val / 100.0, text=f"Dopamine (Động lực, Thưởng): {val:.1f}%")
+        st.progress(val / 100.0, text=f"Dopamine (Động lực): {val:.1f}%")
     with chem_cols[1]:
         val = st.session_state.chemicals["serotonin"]
-        st.progress(val / 100.0, text=f"Serotonin (Ổn định cảm xúc): {val:.1f}%")
+        st.progress(val / 100.0, text=f"Serotonin (Ổn định): {val:.1f}%")
     with chem_cols[2]:
         val = st.session_state.chemicals["acetylcholine"]
-        st.progress(val / 100.0, text=f"Acetylcholine (Sự tập trung): {val:.1f}%")
+        st.progress(val / 100.0, text=f"Acetylcholine (Tập trung): {val:.1f}%")
     with chem_cols[3]:
         val = st.session_state.chemicals["stress"]
-        st.progress(val / 100.0, text=f"Căng thẳng (Stress Level): {val:.1f}%")
+        st.progress(val / 100.0, text=f"Căng thẳng (Stress): {val:.1f}%")
     with chem_cols[4]:
         val = st.session_state.chemicals.get("melatonin", 10.0)
         st.progress(val / 100.0, text=f"Melatonin (Gây ngủ): {val:.1f}%")
+    with chem_cols[5]:
+        val = st.session_state.chemicals.get("neuro_inflammation", 10.0)
+        micro_state = "🔥 Reactive (Bão)" if val > 80.0 else ("⚠️ Reactive" if val >= 50.0 else "Normal")
+        st.progress(val / 100.0, text=f"Viêm thần kinh: {val:.1f}% ({micro_state})")
 
     # Live EEG Brainwave Telemetry monitoring
     st.markdown("##### 📊 Sóng não lâm sàng (EEG Brainwave Telemetry)")
@@ -1128,7 +1212,7 @@ with tab1:
     with eeg_cols[4]:
         st.progress(delta / 100.0, text=f"Sóng Delta (Hồi phục/Ngủ): {delta:.1f} Hz")
 
-    # Hormone active abilities layout (added sleep & Optogenetics)
+    # Hormone active abilities layout
     st.markdown("##### 🧪 Trung tâm nội tiết tố & Liệu pháp Lâm sàng (Active Abilities)")
     hormone_cols = st.columns(6)
     cooldowns = st.session_state.cooldowns
@@ -1155,7 +1239,6 @@ with tab1:
             st.session_state.chemicals["stress"] = max(0.0, st.session_state.chemicals["stress"] - 50.0)
             st.session_state.chemicals["sanity"] = min(100.0, st.session_state.chemicals["sanity"] + 30.0)
 
-            # SLC6A4 gene increases SSRI duration x1.5 -> 18 ticks
             slc6a4_mult_val = 1.5 if "SLC6A4" in st.session_state.get("active_genes", []) else 1.0
             ssri_dur = int(12 * slc6a4_mult_val)
             st.session_state.active_buffs["ssri"] = ssri_dur
@@ -1190,7 +1273,7 @@ with tab1:
             add_log("🏥 LÂM SÀNG: Kích hoạt Từ trường xuyên sọ rTMS! Ngưỡng điện tích nơ-ron được khôi phục về trạng thái khỏe mạnh ban đầu.")
             st.rerun()
 
-    # UPGRADE: Sleep State recovery action
+    # Sleep State recovery action
     with hormone_cols[4]:
         is_sleeping = st.session_state.stats.get("sleep_state", False)
         btn_label_sleep = "🌞 Thức Dậy" if is_sleeping else "😴 Đi Ngủ (Sleep)"
@@ -1202,21 +1285,16 @@ with tab1:
                 add_log("🌞 [Circadian] Bộ não thức dậy sớm theo yêu cầu của bạn!")
             st.rerun()
 
-    # UPGRADE: Optogenetic Light Stimulation Active Ability
+    # UPGRADE: Clinical Anti-Inflammatory Cortisol Wash Active Ability
     with hormone_cols[5]:
-        opto_disabled = cooldowns["opto"] > 0
-        btn_label_opto = f"🔦 Optogenetic ({cooldowns['opto']}s)" if opto_disabled else "🔦 Optogenetic"
-        if st.button(btn_label_opto, disabled=opto_disabled, use_container_width=True, help="Kích thích Quang Di truyền: Bắn luồng sáng Laser cực mạnh, sạc lập tức +0.5 điện thế cho tất cả nơ-ron nằm cùng hàng & cột với nơ-ron được chọn. Cooldown 18s."):
-            sel_r, sel_c = st.session_state.selected_cell
-            charged_count = 0
-            t_grid = st.session_state.neuron_grid
-            for r in range(GRID_SIZE):
-                for c in range(GRID_SIZE):
-                    if (r == sel_r or c == sel_c) and t_grid[r][c]["type"] != "Empty":
-                        t_grid[r][c]["charge"] = min(1.0, t_grid[r][c]["charge"] + 0.5)
-                        charged_count += 1
-            cooldowns["opto"] = 18
-            add_log(f"🔦 QUANG DI TRUYỀN: Kích hoạt xung Laser nhắm vào hàng {sel_r+1} & cột {sel_c+1}! Đã sạc +0.5 điện thế cho {charged_count} tế bào.")
+        cortisol_disabled = cooldowns.get("cortisol", 0) > 0 or st.session_state.stats["memory"] < 30.0
+        btn_label_cortisol = f"🧪 Cortisol Wash ({cooldowns.get('cortisol', 0)}s)" if cooldowns.get("cortisol", 0) > 0 else "🧪 Cortisol Wash"
+        if st.button(btn_label_cortisol, disabled=cortisol_disabled, use_container_width=True, help="Liệu pháp rửa giải Kháng Viêm Cortisol: Phí tiêu thụ 30 MB bộ nhớ. Đặt mức Viêm thần kinh về 10%, phục hồi +15 Sanity lập tức. Cooldown 20s."):
+            st.session_state.stats["memory"] -= 30.0
+            st.session_state.chemicals["neuro_inflammation"] = 10.0
+            st.session_state.chemicals["sanity"] = min(100.0, st.session_state.chemicals["sanity"] + 15.0)
+            cooldowns["cortisol"] = 20
+            add_log("🧪 LÂM SÀNG: Kích hoạt liệu pháp Cortisol Wash! Rửa giải toàn bộ cytokine kháng viêm, dập tắt việm nơ-ron cấp tính.")
             st.rerun()
 
     # Neurotransmitter Synthesis Precursors & Diet System Layout
@@ -1491,7 +1569,7 @@ with tab1:
             tick_speed_val = 1.0
         st.session_state.tick_speed = tick_speed_val
 
-        # UPGRADE: Render Anatomical Brain Lobe Status with Glycogen upgrade!
+        # UPGRADE: Render Anatomical Brain Lobe Status with Dentate Gyrus upgrade!
         st.markdown("---")
         st.markdown("##### 🗺️ Bản Đồ Giải Phẫu Thùy Não (Anatomical Lobe Status)")
         st.caption("Trạng thái nâng cấp các cấu trúc giải phẫu sinh học quan trọng.")
@@ -1500,6 +1578,7 @@ with tab1:
         pfc_status = "Đã tích hợp 🟢" if upgrades.get("pfc", 0) == 1 else "Chưa mở khóa ⚪"
         pruning_status = "Đã kích hoạt 🟢" if upgrades.get("pruning", 0) == 1 else "Chưa mở khóa ⚪"
         gly_status = "Đã tích hợp (Max Fuel 150) 🟢" if upgrades.get("glycogen_shunt", 0) == 1 else "Chưa mở khóa ⚪"
+        dentate_status = f"Đã tích hợp (Tế bào gốc) [Lv.{upgrades.get('dentate_gyrus', 0)}] 🟢" if upgrades.get("dentate_gyrus", 0) >= 1 else "Chưa mở khóa ⚪"
 
         brain_art = f"""
         [ Frontal Cortex: Lv.{upgrades['cortex']} ] ---------.
@@ -1514,6 +1593,8 @@ with tab1:
                    |
         [ Thalamus (Đồi Thị): Lv.{upgrades.get('thalamus', 0)} ] (Kích sensory)
                    |
+        [ Dentate Gyrus (Thùy Răng): {dentate_status} ] (Neurogenesis)
+                   |
         [ Amygdala (Hạch Hạnh Nhân): Lv.{upgrades.get('amygdala', 0)} ] (Hạ stress)
                    |
         [ Astrocytic Glycogen Shunt: {gly_status} ] (Kho trữ năng lượng)
@@ -1526,11 +1607,11 @@ with tab1:
 
         st.markdown("---")
 
-        # UPGRADE: Genetic Mutation Modifier Board Panel (Now supports PGC-1alpha & SLC6A4!)
+        # UPGRADE: Genetic Mutation Modifier Board Panel (Now supports DRD2 and COMT-Met!)
         st.markdown("##### 🧬 Bản Đồ Biến Dị Di Truyền (Genetic Mutation Modifiers)")
         st.caption("Kích hoạt đột biến gen để áp dụng các thay đổi hóa học và liên kết vĩnh viễn cho tế bào.")
 
-        genes_list = ["APOE4", "BDNF", "COMT", "GABRA1", "DRD4", "SHANK3", "MAOA", "CHRNA7", "PGC-1alpha", "SLC6A4"]
+        genes_list = ["APOE4", "BDNF", "COMT", "GABRA1", "DRD4", "SHANK3", "MAOA", "CHRNA7", "PGC-1alpha", "SLC6A4", "DRD2", "COMT-Met"]
         genes_desc = {
             "APOE4": "👵 APOE4: Nhân đôi tốc độ Alzheimer, nhưng +50% IQ ban đầu.",
             "BDNF": "🌱 BDNF: Plasticity dẻo dai hơn 1.5x, đẩy nhanh Hebbian learning.",
@@ -1541,7 +1622,9 @@ with tab1:
             "MAOA": "🧘 MAOA: Dopamine và Serotonin phân hủy chậm hơn 30%, nhưng phát xung sinh stress +40%.",
             "CHRNA7": "⚡ CHRNA7: Acetylcholine gia tăng +25% hiệu quả, nhưng tiêu hao năng lượng cơ thể tăng 15%.",
             "PGC-1alpha": "🔋 PGC-1alpha: Đột biến nguyên sinh tế bào, gia tăng +40 Max Fuel của não bộ.",
-            "SLC6A4": "🧬 SLC6A4: Đột biến vận chuyển Serotonin, tăng thời gian duy trì SSRI thêm 1.5 lần."
+            "SLC6A4": "🧬 SLC6A4: Đột biến vận chuyển Serotonin, tăng thời gian duy trì SSRI thêm 1.5 lần.",
+            "DRD2": "🕹️ DRD2: Tăng cường thụ thể Dopamine, tăng +50% hiệu ứng động lực Sensory, nhưng stress cao hại gấp rưỡi sanity.",
+            "COMT-Met": "🧠 COMT-Met: Đột biến thùy trán siêu trí tuệ, +30% IQ nhận thức từ Motor, nhưng stress giảm chậm đi 30%."
         }
 
         # Multiselect for genes selection
@@ -1646,7 +1729,19 @@ with tab1:
                 add_log(f"Nâng cấp Đồi thị Thalamus lên cấp {upgrades['thalamus']}!")
                 st.rerun()
 
-        # UPGRADE: Astrocytic Glycogen Shunt Upgrade Item
+        # UPGRADE: Dentate Gyrus Anatomy Upgrade Item
+        cost_dentate = int(60 * (1.6 ** upgrades.get("dentate_gyrus", 0)))
+        upgrade_cols_dentate = st.columns([3, 1])
+        with upgrade_cols_dentate[0]:
+            st.write(f"**Thùy Răng (Dentate Gyrus) [Lv.{upgrades.get('dentate_gyrus', 0)}]**\nTự động sản sinh tế bào liên kết thần kinh mới (Neurogenesis) khi nồng độ Serotonin dồi dào (>60%).")
+        with upgrade_cols_dentate[1]:
+            if st.button(f"Mua ({cost_dentate} IQ)", key="up_dentate", disabled=st.session_state.stats["iq"] < cost_dentate, use_container_width=True):
+                st.session_state.stats["iq"] -= cost_dentate
+                upgrades["dentate_gyrus"] = upgrades.get("dentate_gyrus", 0) + 1
+                add_log(f"Nâng cấp Thùy Răng Dentate Gyrus lên cấp {upgrades['dentate_gyrus']}!")
+                st.rerun()
+
+        # Astrocytic Glycogen Shunt Upgrade Item
         cost_shunt = 150
         upgrade_cols_shunt = st.columns([3, 1])
         with upgrade_cols_shunt[0]:

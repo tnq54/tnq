@@ -936,3 +936,142 @@ def test_pgc1_slc6a4_genes():
     app.run_simulation_tick()
     # Fuel generation should let energy exceed 180.0 up to 190.0 cap
     assert app.st.session_state.chemicals["energy"] > 180.0
+
+
+# ----------------- NEW SYSTEM EXPANSION TESTS -----------------
+
+def test_neuro_inflammation():
+    """
+    TEST: Neuro-Inflammation & Microglia Immune Delta Engine
+    Ensures that inflammation rises under firing signals, cytokine storms trigger chronic threshold drift
+    when inflammation is >80%, and the Anti-inflammatory wash cortisol therapy is functional.
+    """
+    app.st.session_state = MockSessionState()
+    app.st.session_state["bot_thread"] = True
+    app.init_game_state()
+
+    # Setup high inflammation triggering Cytokine Storm
+    app.st.session_state.chemicals["neuro_inflammation"] = 85.0
+    app.st.session_state.chemicals["sanity"] = 90.0
+    app.st.session_state.stats["ticks"] = 7 # next is 8, triggers cytokine storm threshold drift
+
+    # Place an Interneuron
+    app.st.session_state.neuron_grid[1][1] = {
+        "type": "Interneuron",
+        "charge": 0.0,
+        "threshold": 0.5,
+        "fire_rate": 0.0,
+        "last_fired": -1,
+        "direction": "All",
+        "weight": 1.0
+    }
+
+    app.run_simulation_tick()
+
+    # Chronic drift under storm is +0.02, threshold should become 0.52
+    assert abs(app.st.session_state.neuron_grid[1][1]["threshold"] - 0.52) < 1e-5
+    # Sanity decay triggers: decay = (85 - 80) * 0.4 = 2.0. Base healing is (0.5 + 50*0.02) = 1.5. Net change = -0.5
+    assert app.st.session_state.chemicals["sanity"] < 90.0
+
+def test_adhd_pathology():
+    """
+    TEST: ADHD Neurodevelopmental Pathology Challenge Mode
+    Under ADHD, dopamine baselines fluctuate per tick and Acetylcholine decay rate is accelerated by 50%.
+    """
+    app.st.session_state = MockSessionState()
+    app.st.session_state["bot_thread"] = True
+    app.init_game_state()
+
+    app.st.session_state.game_mode = "ADHD"
+    app.st.session_state.chemicals["acetylcholine"] = 60.0
+
+    app.run_simulation_tick()
+
+    # Normal decay: (50 - 60) * 0.08 = -0.8
+    # Under ADHD: decay rate becomes 0.08 * 1.5 = 0.12. ACh delta = (50 - 60) * 0.12 = -1.2. Final = 58.8
+    assert abs(app.st.session_state.chemicals["acetylcholine"] - 58.8) < 1e-5
+
+def test_drd2_comtmet_genes():
+    """
+    TEST: DRD2 and COMT-Met Genetic Mutations
+    DRD2 boosts dopamine sensory fire rate multipliers by 1.5x, but high stress (>50.0) inflicts 1.5x sanity damage.
+    COMT-Met increases IQ gains from Motor fires by 30%, but stress decays 30% slower.
+    """
+    app.st.session_state = MockSessionState()
+    app.st.session_state["bot_thread"] = True
+    app.init_game_state()
+
+    # 1. DRD2 stress multiplier sanity damage test
+    app.st.session_state.active_genes = ["DRD2"]
+    app.st.session_state.chemicals["stress"] = 90.0 # > 50.0 triggers sanity stress impact
+    app.st.session_state.chemicals["sanity"] = 100.0
+
+    # Trigger tick to check sanity drop multiplier
+    app.run_simulation_tick()
+    # High stress (>60 effective) triggers sanity damage, which is multiplied by 1.5x under DRD2
+    assert app.st.session_state.chemicals["sanity"] < 100.0
+
+    # 2. COMT-Met Motor IQ gains & Stress clearance tests
+    app.st.session_state = MockSessionState()
+    app.st.session_state["bot_thread"] = True
+    app.init_game_state()
+
+    app.st.session_state.active_genes = ["COMT-Met"]
+    app.st.session_state.chemicals["stress"] = 40.0
+
+    # Place firing Motor cell
+    for r in range(6):
+        for c in range(6):
+            app.st.session_state.neuron_grid[r][c] = {"type": "Empty", "charge": 0.0, "threshold": 0.5, "fire_rate": 0.0, "last_fired": -1, "direction": "All", "weight": 1.0}
+    app.st.session_state.neuron_grid[3][3] = {
+        "type": "Motor",
+        "charge": 0.9,
+        "threshold": 0.5,
+        "fire_rate": 0.0,
+        "last_fired": -1,
+        "direction": "All",
+        "weight": 1.0
+    }
+
+    app.run_simulation_tick()
+
+    # Motor fire yields IQ amplified by COMT-Met (+30% bonus)
+    # Stress decay is also 30% slower (multiplier 0.7)
+    assert app.st.session_state.stats["iq"] > 0.0
+    assert app.st.session_state.chemicals["stress"] > 35.0
+
+def test_dentate_gyrus_neurogenesis():
+    """
+    TEST: Dentate Gyrus Neurogenesis Anatomy Upgrade
+    Dentate Gyrus upgrade auto-implants an Interneuron on random Empty spots if memory >= 30 MB and serotonin is high.
+    """
+    app.st.session_state = MockSessionState()
+    app.st.session_state["bot_thread"] = True
+    app.init_game_state()
+
+    app.st.session_state.upgrades["dentate_gyrus"] = 1
+    app.st.session_state.stats["memory"] = 50.0
+    app.st.session_state.chemicals["serotonin"] = 80.0
+
+    # Clear grid
+    for r in range(6):
+        for c in range(6):
+            app.st.session_state.neuron_grid[r][c] = {"type": "Empty", "charge": 0.0, "threshold": 0.5, "fire_rate": 0.0, "last_fired": -1, "direction": "All", "weight": 1.0}
+
+    # Mock random to force both the neurogenesis check (0.25 chance) and coordinate placement
+    import random
+    original_random = random.random
+    original_choice = random.choice
+
+    random.random = lambda: 0.1 # < 0.25 triggers neurogenesis check
+    random.choice = lambda seq: seq[0]
+
+    try:
+        app.run_simulation_tick()
+
+        # Grid [0][0] should be cetted with Interneuron and memory spends 15 MB
+        assert app.st.session_state.neuron_grid[0][0]["type"] == "Interneuron"
+        assert app.st.session_state.stats["memory"] == 35.0
+    finally:
+        random.random = original_random
+        random.choice = original_choice
