@@ -21,6 +21,21 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Suppress Streamlit's missing ScriptRunContext warning at import time / bare modes
+class ScriptRunContextFilter(logging.Filter):
+    def filter(self, record):
+        msg = record.getMessage()
+        if "missing ScriptRunContext" in msg:
+            return False
+        if "Session state does not function" in msg:
+            return False
+        return True
+
+logging.getLogger().addFilter(ScriptRunContextFilter())
+# Apply filter to all current and future loggers in streamlit namespace
+for name in ["streamlit", "streamlit.runtime.scriptrunner_utils.script_run_context", "streamlit.runtime.scriptrunner", "streamlit.runtime.state.session_state_proxy"]:
+    logging.getLogger(name).addFilter(ScriptRunContextFilter())
+
 # Try importing Google GenAI
 try:
     from google import genai
