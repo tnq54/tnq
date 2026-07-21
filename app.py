@@ -1,16 +1,14 @@
 import sys
 import os
+import streamlit as st
 
 if __name__ == "__main__":
     # If the script is executed directly via `python app.py` instead of `streamlit run app.py`
-    is_streamlit = any("streamlit" in arg for arg in sys.argv) or "streamlit" in sys.argv[0]
-    if not is_streamlit:
+    if not st.runtime.exists():
         port = os.environ.get("PORT", "8501")
         cmd = [sys.executable, "-m", "streamlit", "run", "app.py", "--server.port", port, "--server.address", "0.0.0.0"]
         print(f"Direct python execution detected. Relaunching under Streamlit: {' '.join(cmd)}")
         os.execv(sys.executable, cmd)
-
-import streamlit as st
 import time
 import threading
 import asyncio
