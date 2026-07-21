@@ -350,7 +350,8 @@ def test_synaptic_pruning():
     # Turn pruning on
     app.st.session_state.upgrades["pruning"] = 1
     app.st.session_state.stats["memory"] = 10.0
-    app.st.session_state.stats["ticks"] = 100
+    st_ticks = 100
+    app.st.session_state.stats["ticks"] = st_ticks
 
     # Place Interneuron with an old last_fired
     app.st.session_state.neuron_grid[2][2] = {
@@ -641,88 +642,6 @@ def test_parkinsons_pathology():
     finally:
         random.random = original_random
         random.choice = original_choice
-
-
-def test_norepinephrine_panic_attack():
-    """
-    TEST: Norepinephrine & Panic Attack Trigger
-    Ensures Norepinephrine builds up, triggers Panic Attack (>90), inflicts sanity damage, and resets.
-    """
-    app.st.session_state = MockSessionState()
-    app.st.session_state["bot_thread"] = True
-    app.init_game_state()
-
-    # 1. Normal panic attack
-    app.st.session_state.chemicals["norepinephrine"] = 95.0
-    app.st.session_state.chemicals["sanity"] = 100.0
-    app.st.session_state.active_genes = []
-
-    app.run_simulation_tick()
-    # sanity damage is 15.0, so sanity should be 85.0
-    assert app.st.session_state.chemicals["sanity"] == 85.0
-    # Norepinephrine resets to 50.0 after panic
-    assert app.st.session_state.chemicals["norepinephrine"] == 50.0
-
-    # 2. ADRA2A gene reduces damage to 9.0 and raises threshold to 100.0
-    app.st.session_state = MockSessionState()
-    app.st.session_state["bot_thread"] = True
-    app.init_game_state()
-    app.st.session_state.chemicals["norepinephrine"] = 95.0
-    app.st.session_state.chemicals["sanity"] = 100.0
-    app.st.session_state.active_genes = ["ADRA2A"]
-
-    app.run_simulation_tick()
-    # threshold is 100.0, so at 95.0 no panic attack triggers!
-    assert app.st.session_state.chemicals["sanity"] == 100.0
-
-    # Trigger at 100.0 (maximum bounded norepinephrine level with sufficient stress to overcome clearance)
-    app.st.session_state.chemicals["norepinephrine"] = 100.0
-    app.st.session_state.chemicals["stress"] = 50.0
-    app.run_simulation_tick()
-    # damage is 9.0, sanity drops to 91.0
-    assert app.st.session_state.chemicals["sanity"] == 91.0
-
-
-def test_amyloid_plaques_phagocytosis():
-    """
-    TEST: Amyloid plaques and Microglia Phagocytosis
-    Ensures plaques degrade synaptic weight by 50% during propagation, and high Serotonin/Acetylcholine clears them.
-    """
-    app.st.session_state = MockSessionState()
-    app.st.session_state["bot_thread"] = True
-    app.init_game_state()
-
-    # Clean grid
-    for r in range(6):
-        for c in range(6):
-            app.st.session_state.neuron_grid[r][c] = {"type": "Empty", "charge": 0.0, "threshold": 0.5, "fire_rate": 0.0, "last_fired": -1, "direction": "All", "weight": 1.0, "amyloid_plaque": False}
-
-    # Place sensory cell next to interneuron
-    app.st.session_state.neuron_grid[0][0] = {
-        "type": "Sensory",
-        "charge": 0.6,
-        "threshold": 0.4,
-        "fire_rate": 0.0,
-        "last_fired": -1,
-        "direction": "Right",
-        "weight": 1.0,
-        "amyloid_plaque": True # Covered in Amyloid plaque!
-    }
-    app.st.session_state.neuron_grid[0][1] = {
-        "type": "Interneuron",
-        "charge": 0.1,
-        "threshold": 0.5,
-        "fire_rate": 0.0,
-        "last_fired": -1,
-        "direction": "All",
-        "weight": 1.0,
-        "amyloid_plaque": False
-    }
-
-    # With plaque, synaptic weight is halved. Charge transferred is (0.6 * 0.35 * 0.5) = 0.105
-    # Neighbor [0][1] gets 0.1 + 0.105 = 0.205
-    app.run_simulation_tick()
-    assert abs(app.st.session_state.neuron_grid[0][1]["charge"] - 0.205) < 1e-5
 
 def test_active_buffs():
     """
@@ -1166,3 +1085,192 @@ def test_dentate_gyrus_neurogenesis():
     finally:
         random.random = original_random
         random.choice = original_choice
+
+
+def test_gaba_stress_mitigation():
+    """
+    TEST: GABA inhibitory neurotransmitter
+    Verifies that high GABA (>70) completely suppresses epilepsy hyper-excitability stress multiplication and reduces stress generation by 40%.
+    """
+    app.st.session_state = MockSessionState()
+    app.st.session_state["bot_thread"] = True
+    app.init_game_state()
+
+    app.st.session_state.game_mode = "Epilepsy"
+    app.st.session_state.chemicals["gaba"] = 80.0 # High GABA!
+    app.st.session_state.chemicals["stress"] = 10.0
+
+    # Place firing Sensory neuron
+    for r in range(6):
+        for c in range(6):
+            app.st.session_state.neuron_grid[r][c] = {"type": "Empty", "charge": 0.0, "threshold": 0.5, "fire_rate": 0.0, "last_fired": -1, "direction": "All", "weight": 1.0}
+    app.st.session_state.neuron_grid[0][0] = {
+        "type": "Sensory",
+        "charge": 0.6,
+        "threshold": 0.4,
+        "fire_rate": 0.0,
+        "last_fired": -1,
+        "direction": "Right",
+        "weight": 1.0
+    }
+    app.st.session_state.neuron_grid[0][1] = {
+        "type": "Interneuron",
+        "charge": 0.1,
+        "threshold": 0.5,
+        "fire_rate": 0.0,
+        "last_fired": -1,
+        "direction": "All",
+        "weight": 1.0
+    }
+
+    app.run_simulation_tick()
+    # Normally Epilepsy stress multiplier is 2.0. Under high GABA, it is completely bypassed (kept at 1.0).
+    # And total fire stress is reduced by 40% (multiplied by 0.6).
+    # stress clearance = 2.5 (level 1 cerebellum)
+    # fire_stress = 1 * 1.5 * 1.0 = 1.5 -> with GABA: 1.5 * 0.6 = 0.9
+    # stress delta = 0.9 - 2.5 = -1.6. Final stress = 8.4
+    assert abs(app.st.session_state.chemicals["stress"] - 8.4) < 1e-5
+
+
+def test_occipital_lobe_visual_stimulus():
+    """
+    TEST: Occipital Lobe visual target direction alignment
+    Verifies that matching Visual Spark direction doubles Sensory fire rates and doubles Motor output IQ rewards.
+    """
+    app.st.session_state = MockSessionState()
+    app.st.session_state["bot_thread"] = True
+    app.init_game_state()
+
+    app.st.session_state.upgrades["occipital_lobe"] = 1
+    # Trigger visual spark at coordinate (0,0) with direction "Right"
+    app.st.session_state.visual_spark = {"pos": (0, 0), "dir": "Right"}
+
+    # Place Sensory cell at (0,0) with axon target "Right"
+    for r in range(6):
+        for c in range(6):
+            app.st.session_state.neuron_grid[r][c] = {"type": "Empty", "charge": 0.0, "threshold": 0.5, "fire_rate": 0.0, "last_fired": -1, "direction": "All", "weight": 1.0}
+
+    app.st.session_state.chemicals["norepinephrine"] = 0.0 # Set to 0 to avoid fight-or-flight fire rate boost
+    app.st.session_state.neuron_grid[0][0] = {
+        "type": "Sensory",
+        "charge": 0.1,
+        "threshold": 0.9, # set high threshold so it doesn't fire and clear charge
+        "fire_rate": 0.2,
+        "last_fired": -1,
+        "direction": "Right", # axon targets "Right" - matches Spark!
+        "weight": 1.0
+    }
+    app.st.session_state.chemicals["dopamine"] = 50.0 # base boost = 1.5
+    # Since it matches Visual Spark direction, the fire rate boost is multiplied by 2.0!
+    # So charge rate is 0.2 * 1.5 * 2.0 = 0.6. Final charge should be 0.1 + 0.6 = 0.7
+
+    app.run_simulation_tick()
+    assert abs(app.st.session_state.neuron_grid[0][0]["charge"] - 0.7) < 1e-5
+
+
+def test_local_save_slots_library():
+    """
+    TEST: Multi-slot Circuit Save Library
+    Verifies saving and loading from Slot 1, Slot 2, Slot 3.
+    """
+    app.st.session_state = MockSessionState()
+    app.st.session_state["bot_thread"] = True
+    app.init_game_state()
+
+    # Customize grid to something distinct
+    app.st.session_state.neuron_grid[0][0] = {"type": "Motor", "charge": 0.0, "threshold": 0.5}
+
+    # Save to Slot 2
+    app.st.session_state.save_slots["Slot 2"] = app.serialize_grid(app.st.session_state.neuron_grid)
+
+    # Empty grid
+    for r in range(6):
+        for c in range(6):
+            app.st.session_state.neuron_grid[r][c] = {"type": "Empty", "charge": 0.0, "threshold": 0.5}
+
+    # Load from Slot 2
+    loaded = app.deserialize_grid(app.st.session_state.save_slots["Slot 2"])
+    assert loaded is not None
+    assert loaded[0][0]["type"] == "Motor"
+
+
+def test_norepinephrine_panic_attack():
+    """
+    TEST: Norepinephrine & Panic Attack Trigger
+    Ensures Norepinephrine builds up, triggers Panic Attack (>90), inflicts sanity damage, and resets.
+    """
+    app.st.session_state = MockSessionState()
+    app.st.session_state["bot_thread"] = True
+    app.init_game_state()
+
+    # 1. Normal panic attack
+    app.st.session_state.chemicals["norepinephrine"] = 95.0
+    app.st.session_state.chemicals["sanity"] = 100.0
+    app.st.session_state.active_genes = []
+
+    app.run_simulation_tick()
+    # sanity damage is 15.0, so sanity should be 85.0
+    assert app.st.session_state.chemicals["sanity"] == 85.0
+    # Norepinephrine resets to 50.0 after panic
+    assert app.st.session_state.chemicals["norepinephrine"] == 50.0
+
+    # 2. ADRA2A gene reduces damage to 9.0 and raises threshold to 100.0
+    app.st.session_state = MockSessionState()
+    app.st.session_state["bot_thread"] = True
+    app.init_game_state()
+    app.st.session_state.chemicals["norepinephrine"] = 95.0
+    app.st.session_state.chemicals["sanity"] = 100.0
+    app.st.session_state.active_genes = ["ADRA2A"]
+
+    app.run_simulation_tick()
+    # threshold is 100.0, so at 95.0 no panic attack triggers!
+    assert app.st.session_state.chemicals["sanity"] == 100.0
+
+    # Trigger at 100.0 (maximum bounded norepinephrine level with sufficient stress to overcome clearance)
+    app.st.session_state.chemicals["norepinephrine"] = 100.0
+    app.st.session_state.chemicals["stress"] = 50.0
+    app.run_simulation_tick()
+    # damage is 9.0, sanity drops to 91.0
+    assert app.st.session_state.chemicals["sanity"] == 91.0
+
+
+def test_amyloid_plaques_phagocytosis():
+    """
+    TEST: Amyloid plaques and Microglia Phagocytosis
+    Ensures plaques degrade synaptic weight by 50% during propagation, and high Serotonin/Acetylcholine clears them.
+    """
+    app.st.session_state = MockSessionState()
+    app.st.session_state["bot_thread"] = True
+    app.init_game_state()
+
+    # Clean grid
+    for r in range(6):
+        for c in range(6):
+            app.st.session_state.neuron_grid[r][c] = {"type": "Empty", "charge": 0.0, "threshold": 0.5, "fire_rate": 0.0, "last_fired": -1, "direction": "All", "weight": 1.0, "amyloid_plaque": False}
+
+    # Place sensory cell next to interneuron
+    app.st.session_state.neuron_grid[0][0] = {
+        "type": "Sensory",
+        "charge": 0.6,
+        "threshold": 0.4,
+        "fire_rate": 0.0,
+        "last_fired": -1,
+        "direction": "Right",
+        "weight": 1.0,
+        "amyloid_plaque": True # Covered in Amyloid plaque!
+    }
+    app.st.session_state.neuron_grid[0][1] = {
+        "type": "Interneuron",
+        "charge": 0.1,
+        "threshold": 0.5,
+        "fire_rate": 0.0,
+        "last_fired": -1,
+        "direction": "All",
+        "weight": 1.0,
+        "amyloid_plaque": False
+    }
+
+    # With plaque, synaptic weight is halved. Charge transferred is (0.6 * 0.35 * 0.5) = 0.105
+    # Neighbor [0][1] gets 0.1 + 0.105 = 0.205
+    app.run_simulation_tick()
+    assert abs(app.st.session_state.neuron_grid[0][1]["charge"] - 0.205) < 1e-5

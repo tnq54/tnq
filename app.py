@@ -242,6 +242,8 @@ def serialize_grid(grid):
     return "-".join(cells)
 
 def deserialize_grid(code_string):
+    if not isinstance(code_string, str):
+        return None
     code_string = code_string.strip()
     if not code_string:
         return None
@@ -310,7 +312,7 @@ def init_game_state():
 
         st.session_state.neuron_grid = grid
 
-        # Chemistry metrics (added melatonin, neuro_inflammation, norepinephrine)
+        # Chemistry metrics (added melatonin, neuro_inflammation, norepinephrine, gaba)
         st.session_state.chemicals = {
             "dopamine": 50.0,
             "serotonin": 50.0,
@@ -320,7 +322,8 @@ def init_game_state():
             "sanity": 100.0,
             "melatonin": 10.0,
             "neuro_inflammation": 10.0,
-            "norepinephrine": 10.0
+            "norepinephrine": 10.0,
+            "gaba": 30.0
         }
 
         # Advanced Game Modes (Normal, Alzheimer, Epilepsy, Parkinson, ADHD)
@@ -336,7 +339,8 @@ def init_game_state():
             "focus": 0,
             "tyrosine": 0,
             "tryptophan": 0,
-            "choline": 0
+            "choline": 0,
+            "glutamate": 0
         }
 
         # Cooldowns
@@ -390,7 +394,15 @@ def init_game_state():
             "amygdala": 0,
             "thalamus": 0,
             "glycogen_shunt": 0,
-            "dentate_gyrus": 0 # Dentate Gyrus Lv.0
+            "dentate_gyrus": 0, # Dentate Gyrus Lv.0
+            "occipital_lobe": 0
+        }
+
+        # Local Circuit Save Slots Library
+        st.session_state.save_slots = {
+            "Slot 1": None,
+            "Slot 2": None,
+            "Slot 3": None
         }
 
         # Logs, playing status, speed, selected cell, events
@@ -405,7 +417,8 @@ def init_game_state():
             "energy": [100.0],
             "dopamine": [50.0],
             "stress": [10.0],
-            "norepinephrine": [10.0]
+            "norepinephrine": [10.0],
+            "gaba": [30.0]
         }
 
 def get_evolution_stage(iq):
@@ -563,6 +576,19 @@ def run_simulation_tick():
     mode = st.session_state.get("game_mode", "Normal")
     genes = st.session_state.get("active_genes", [])
 
+    # UPGRADE: Occipital Lobe Visual Sensory Spark Game
+    if upgrades.get("occipital_lobe", 0) >= 1 and ticks % 10 == 0:
+        sensory_cells = []
+        for r in range(GRID_SIZE):
+            for c in range(GRID_SIZE):
+                if grid[r][c]["type"] == "Sensory":
+                    sensory_cells.append((r, c))
+        if sensory_cells:
+            sr, sc = random.choice(sensory_cells)
+            target_dir = random.choice(["Up", "Right", "Down", "Left"])
+            st.session_state.visual_spark = {"pos": (sr, sc), "dir": target_dir}
+            add_log(f"👁️ [Thùy Chẩm] Kích thích thị giác tại Sensory [{sr+1},{sc+1}]! Khớp hướng '{target_dir}' để kích hoạt 2x sạc nơ-ron.")
+
     # Increment burnout-free streak
     st.session_state.stats["burnout_streak"] += 1
     st.session_state.stats["max_streak"] = max(st.session_state.stats["max_streak"], st.session_state.stats["burnout_streak"])
@@ -592,7 +618,7 @@ def run_simulation_tick():
     slc6a4_mult = 1.5 if "SLC6A4" in genes else 1.0
 
     # Decrement active neuromodulator buffs tick timers and apply ongoing biochemical bonuses
-    buffs = st.session_state.get("active_buffs", {"doping": 0, "ssri": 0, "focus": 0, "tyrosine": 0, "tryptophan": 0, "choline": 0})
+    buffs = st.session_state.get("active_buffs", {"doping": 0, "ssri": 0, "focus": 0, "tyrosine": 0, "tryptophan": 0, "choline": 0, "glutamate": 0})
     for k in list(buffs.keys()):
         if buffs[k] > 0:
             buffs[k] -= 1
@@ -609,6 +635,8 @@ def run_simulation_tick():
                 chems["serotonin"] = min(100.0, chems["serotonin"] + 2.0)
             elif k == "choline":
                 chems["acetylcholine"] = min(100.0, chems["acetylcholine"] + 2.5)
+            elif k == "glutamate":
+                chems["gaba"] = min(100.0, chems.get("gaba", 30.0) + 3.0)
 
     # Decrement active hormone abilities cooldowns
     cooldowns = st.session_state.get("cooldowns", {"doping": 0, "ssri": 0, "focus": 0, "rtms": 0, "opto": 0, "cortisol": 0})
@@ -808,6 +836,9 @@ def run_simulation_tick():
 
     # 2. Sensory Stimuli Fire Check
     sensory_fires = 0
+    visual_boost_active = False
+    visual_spark = st.session_state.get("visual_spark", None)
+
     for r in range(GRID_SIZE):
         for c in range(GRID_SIZE):
             cell = grid[r][c]
@@ -823,9 +854,18 @@ def run_simulation_tick():
                 norepi_boost = 1.0 + (chems.get("norepinephrine", 10.0) / 100.0) * 0.4
                 boost *= norepi_boost
 
+                # Occipital Lobe visual alignment boost
+                if visual_spark and visual_spark["pos"] == (r, c):
+                    if cell.get("direction", "All") == visual_spark["dir"]:
+                        boost *= 2.0
+                        visual_boost_active = True
+                        add_log(f"👁️ [Thùy Chẩm] Khớp hướng thành công tại [{r+1},{c+1}]! Sensory nhận gia tốc 2.0x.")
+
                 cell["charge"] += cell["fire_rate"] * boost
                 if cell["charge"] >= cell["threshold"]:
                     sensory_fires += 1
+
+    st.session_state.visual_boost_active = visual_boost_active
 
     # 3. Signal Propagation Model with Output Weights
     next_charges = [[grid[r][c]["charge"] for c in range(GRID_SIZE)] for r in range(GRID_SIZE)]
@@ -902,7 +942,13 @@ def run_simulation_tick():
 
                 # UPGRADE: COMT-Met gene mutation increases IQ gains from Motor fires by +30%
                 comtmet_mult = 1.3 if "COMT-Met" in genes else 1.0
-                motor_yield_iq += 5.0 * iq_multiplier * focus_bonus * comtmet_mult
+                cell_iq = 5.0 * iq_multiplier * focus_bonus * comtmet_mult
+
+                # Occipital Lobe visual target stimulation bonus: +100% IQ
+                if st.session_state.get("visual_boost_active", False):
+                    cell_iq *= 2.0
+
+                motor_yield_iq += cell_iq
 
                 mem_multiplier = 1.0 + (upgrades["hippocampus"] * 0.4)
                 motor_yield_mem += 2.0 * mem_multiplier
@@ -932,7 +978,16 @@ def run_simulation_tick():
     # GABRA1 Gene Mutation reduces Epilepsy stress by 35%
     epilepsy_stress_mult = 1.3 if "GABRA1" in genes else 2.0
     fire_stress_mult = epilepsy_stress_mult if mode == "Epilepsy" else 1.0
+
+    # High GABA (>70) completely suppresses epilepsy hyper-excitability stress multiplication
+    if chems.get("gaba", 30.0) > 70.0:
+        fire_stress_mult = 1.0
+
     fire_stress = signals_fired * 1.5 * fire_stress_mult
+
+    # High GABA reduces overall stress generation by 40%
+    if chems.get("gaba", 30.0) > 70.0:
+        fire_stress *= 0.6
 
     # MAOA genetic mutation increases stress generation on firing by +40%
     if "MAOA" in genes:
@@ -1035,6 +1090,13 @@ def run_simulation_tick():
         ach_delta *= 1.25
     chems["acetylcholine"] += ach_delta
 
+    # GABA natural decay and stress response delta
+    gaba_decay = 1.0
+    gaba_gain = 0.0
+    if chems["stress"] > 40.0:
+        gaba_gain = (chems["stress"] - 40.0) * 0.05
+    chems["gaba"] = max(0.0, min(100.0, chems.get("gaba", 30.0) + gaba_gain - gaba_decay))
+
     # Burnout Check: Sanity is 0
     if chems["sanity"] <= 0.0:
         st.session_state.stats["burnout_count"] += 1
@@ -1094,6 +1156,9 @@ def run_simulation_tick():
         add_log(f"🧠 [PFC Tự Quyết] Thùy trán trước đã tự động quyết định tối ưu: '{choice['label']}'")
         st.session_state.current_event = None
 
+    # Clear visual boost at the end of the tick
+    st.session_state.visual_boost_active = False
+
     # Record history for plot
     record_history(ticks, chems)
 
@@ -1105,6 +1170,7 @@ def record_history(ticks, chems):
     hist["dopamine"].append(chems["dopamine"])
     hist["stress"].append(chems["stress"])
     hist["norepinephrine"].append(chems.get("norepinephrine", 10.0))
+    hist["gaba"].append(chems.get("gaba", 30.0))
 
     if len(hist["tick"]) > 40:
         for key in hist:
@@ -1171,7 +1237,17 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("🧠 Siêu Hệ Thống VBot1 & Game Mô Phỏng Não Bộ")
-st.write("Dự án tích hợp: Game mô phỏng tiến hóa nơ-ron sinh học kết hợp Trợ lý AI Telegram Llama 3 & Gemini 1.5.")
+st.write("Dự án tích hợp: Game mô phỏng tiến hóa nơ-ron sinh học kết hợp Trợ lý AI Telegram Llama 3 & Gemini 1.5. **(Version 3.0.0 - Neuro-Sensory Update)**")
+
+with st.expander("🆕 [CHANGELOG] Nhật Ký Cập Nhật Phiên Bản 3.0.0 - Siêu Hóa Sinh & Cảm Biến", expanded=False):
+    st.markdown("""
+    **🚀 Phiên bản 3.0.0 (Bản nâng cấp tối cao):**
+    *   **Hệ thống dẫn truyền ức chế GABA:** Bổ sung hóa chất mới GABA giúp giải tỏa stress và dập tắt hoàn toàn trạng thái quá kích của bệnh lý Động kinh. Bổ sung tiền chất **Glutamate Precursor** vào chế độ ăn uống.
+    *   **Thùy Chẩm (Occipital Lobe) & Visual Spark:** Cơ chế phản hồi kích thích thị giác ngẫu nhiên mỗi 10 ticks. Định hướng trục nơ-ron cảm giác khớp với hướng kích thích thị giác sẽ khuyếch đại tốc độ sạc nơ-ron x2 và nhân đôi (+100%) điểm IQ từ các hành động Motor.
+    *   **Thư viện Bản Lưu Cục Bộ (Save Slots Library):** Tích hợp 3 khe lưu trữ sơ đồ mạch thần kinh tức thì để cất trữ và khôi phục nhanh chóng sơ đồ nơ-ron trong phiên chơi.
+
+    *Cám ơn bạn đã luôn đồng hành cùng Trình tiến hóa não bộ sinh học!*
+    """)
 
 tab1, tab2 = st.tabs(["🧠 Game Mô Phỏng Não Bộ", "🤖 Trợ Lý AI VBot1 (Llama & Gemini)"])
 
@@ -1225,7 +1301,7 @@ with tab1:
 
     # Continuous Active Buff badges indicators
     st.markdown("##### 🧪 Trạng thái hoạt hóa hóa học (Active Neuromodulator Buffs)")
-    active_buffs = st.session_state.get("active_buffs", {"doping": 0, "ssri": 0, "focus": 0, "tyrosine": 0, "tryptophan": 0, "choline": 0})
+    active_buffs = st.session_state.get("active_buffs", {"doping": 0, "ssri": 0, "focus": 0, "tyrosine": 0, "tryptophan": 0, "choline": 0, "glutamate": 0})
     buffs_html = []
     if active_buffs.get("doping", 0) > 0:
         buffs_html.append(f"<span class='buff-badge badge-doping'>⚡ Hyper-Dopamine ({active_buffs['doping']} ticks)</span>")
@@ -1239,6 +1315,8 @@ with tab1:
         buffs_html.append(f"<span class='buff-badge badge-tryptophan'>🍌 L-Tryptophan Synthesis ({active_buffs['tryptophan']} ticks)</span>")
     if active_buffs.get("choline", 0) > 0:
         buffs_html.append(f"<span class='buff-badge badge-choline'>🥚 Choline Synthesis ({active_buffs['choline']} ticks)</span>")
+    if active_buffs.get("glutamate", 0) > 0:
+        buffs_html.append(f"<span class='buff-badge badge-choline'>🥦 Glutamate Synthesis ({active_buffs['glutamate']} ticks)</span>")
 
     if buffs_html:
         st.markdown(" ".join(buffs_html), unsafe_allow_html=True)
@@ -1266,8 +1344,8 @@ with tab1:
     with cols[5]:
         st.metric("Kho Glycogen tế bào hình sao", f"{st.session_state.stats.get('glycogen_pool', 0.0):.1f} units")
 
-    # Progress bars for detailed chemistry (added Melatonin, Inflammation, Norepinephrine)
-    chem_cols = st.columns(7)
+    # Progress bars for detailed chemistry (added Melatonin, Inflammation, Norepinephrine, GABA)
+    chem_cols = st.columns(8)
     with chem_cols[0]:
         val = st.session_state.chemicals["dopamine"]
         st.progress(val / 100.0, text=f"Dopamine (Động lực): {val:.1f}%")
@@ -1290,6 +1368,9 @@ with tab1:
     with chem_cols[6]:
         val = st.session_state.chemicals.get("norepinephrine", 10.0)
         st.progress(val / 100.0, text=f"Norepinephrine (Fight-or-Flight): {val:.1f}%")
+    with chem_cols[7]:
+        val = st.session_state.chemicals.get("gaba", 30.0)
+        st.progress(val / 100.0, text=f"GABA (Ức chế dịu não): {val:.1f}%")
 
     # Live EEG Brainwave Telemetry monitoring
     st.markdown("##### 📊 Sóng não lâm sàng (EEG Brainwave Telemetry)")
@@ -1413,7 +1494,7 @@ with tab1:
     st.markdown("##### 🧬 Dinh Dưỡng Học & Tiền Chất Thần Kinh (Precursor Dietary Intake)")
     st.caption("Tổng hợp trực tiếp các chất dẫn truyền thông qua bồi bổ dinh dưỡng. Phí tiêu thụ: 15 MB Bộ nhớ.")
 
-    diet_cols = st.columns(3)
+    diet_cols = st.columns(4)
     with diet_cols[0]:
         tyrosine_disabled = st.session_state.stats["memory"] < 15.0
         if st.button("🥩 Bổ sung L-Tyrosine (-15 MB)", disabled=tyrosine_disabled, use_container_width=True, help="Tiền chất Dopamine: Tăng +3.0 Dopamine/tick liên tục trong 15 ticks."):
@@ -1436,6 +1517,14 @@ with tab1:
             st.session_state.stats["memory"] -= 15.0
             st.session_state.active_buffs["choline"] = 15
             add_log("🥚 DINH DƯỠNG: Bổ sung Choline! Gia tăng nguyên liệu Acetylcholine tăng độ tập trung (+2.5 ACh/tick trong 15s).")
+            st.rerun()
+
+    with diet_cols[3]:
+        glutamate_disabled = st.session_state.stats["memory"] < 15.0
+        if st.button("🥦 Bổ sung Glutamate (-15 MB)", disabled=glutamate_disabled, use_container_width=True, help="Tiền chất GABA: Tăng +3.0 GABA/tick liên tục trong 15 ticks."):
+            st.session_state.stats["memory"] -= 15.0
+            st.session_state.active_buffs["glutamate"] = 15
+            add_log("🥦 DINH DƯỠNG: Bổ sung Glutamate! Thúc đẩy tổng hợp GABA giúp dập tắt hưng phấn động kinh và giảm stress (+3.0 GABA/tick trong 15s).")
             st.rerun()
 
     # Dynamic Game Event Modal/Alert
@@ -1520,6 +1609,34 @@ with tab1:
                     st.rerun()
                 else:
                     st.error("Mã sơ đồ không hợp lệ!")
+
+        st.markdown("---")
+        st.markdown("##### 📁 Thư Viện Bản Lưu Cục Bộ (Local Multi-slot Save Library)")
+        st.caption("Lưu nhanh sơ đồ mạch thần kinh hiện tại vào các khe cất trữ trong phiên hoạt động này.")
+
+        save_slots = st.session_state.get("save_slots", {"Slot 1": None, "Slot 2": None, "Slot 3": None})
+        slot_cols = st.columns(3)
+        for idx, slot_key in enumerate(["Slot 1", "Slot 2", "Slot 3"]):
+            with slot_cols[idx]:
+                slot_data = save_slots.get(slot_key, None)
+                status_txt = "🟢 Đã Lưu Sơ Đồ" if slot_data else "⚪ Khe Trống"
+                st.write(f"**{slot_key}:** `{status_txt}`")
+
+                btn_cols = st.columns(2)
+                with btn_cols[0]:
+                    if st.button(f"Lưu vào {slot_key}", key=f"save_to_{idx}", use_container_width=True):
+                        save_slots[slot_key] = serialize_grid(st.session_state.neuron_grid)
+                        st.session_state.save_slots = save_slots
+                        add_log(f"💾 THƯ VIỆN: Đã lưu nhanh sơ đồ mạch hiện tại vào {slot_key}!")
+                        st.rerun()
+                with btn_cols[1]:
+                    load_disabled = slot_data is None
+                    if st.button(f"Tải từ {slot_key}", key=f"load_from_{idx}", disabled=load_disabled, use_container_width=True):
+                        loaded_grid = deserialize_grid(slot_data)
+                        if loaded_grid:
+                            st.session_state.neuron_grid = loaded_grid
+                            add_log(f"📥 THƯ VIỆN: Đã tải nhanh sơ đồ mạch từ {slot_key}!")
+                            st.rerun()
 
         # Cell configuration section below grid
         st.markdown("---")
@@ -1700,6 +1817,7 @@ with tab1:
         plaques_count = sum(1 for r in range(GRID_SIZE) for c in range(GRID_SIZE) if st.session_state.neuron_grid[r][c].get("amyloid_plaque", False))
         adra2a_active = "Có 🟢" if "ADRA2A" in st.session_state.active_genes else "Không ⚪"
         trem2_active = "Có 🟢" if "TREM2" in st.session_state.active_genes else "Không ⚪"
+        occipital_status = f"Lv.{upgrades.get('occipital_lobe', 0)}" if upgrades.get("occipital_lobe", 0) >= 1 else "Chưa mở khóa ⚪"
 
         brain_art = f"""
         [ Frontal Cortex: Lv.{upgrades['cortex']} ] ---------.
@@ -1715,6 +1833,8 @@ with tab1:
         [ Thalamus (Đồi Thị): Lv.{upgrades.get('thalamus', 0)} ] (Kích sensory)
                    |
         [ Dentate Gyrus (Thùy Răng): {dentate_status} ] (Neurogenesis)
+                   |
+        [ Occipital Lobe (Thùy Chẩm): {occipital_status} ] (Xử lý thị giác 2x)
                    |
         [ Amygdala (Hạch Hạnh Nhân): Lv.{upgrades.get('amygdala', 0)} ] (Hạ stress)
                    |
@@ -1867,6 +1987,18 @@ with tab1:
                 st.session_state.stats["iq"] -= cost_dentate
                 upgrades["dentate_gyrus"] = upgrades.get("dentate_gyrus", 0) + 1
                 add_log(f"Nâng cấp Thùy Răng Dentate Gyrus lên cấp {upgrades['dentate_gyrus']}!")
+                st.rerun()
+
+        # UPGRADE: Occipital Lobe Upgrade Item
+        cost_occipital = int(50 * (1.6 ** upgrades.get("occipital_lobe", 0)))
+        upgrade_cols_occipital = st.columns([3, 1])
+        with upgrade_cols_occipital[0]:
+            st.write(f"**Thùy Chẩm (Occipital Lobe) [Lv.{upgrades.get('occipital_lobe', 0)}]**\nXử lý kích thích thị giác ngẫu nhiên (Visual Spark) mỗi 10 ticks: Khớp hướng nơ-ron cảm giác để nhận sạc nơ-ron x2 và gấp đôi điểm IQ nhận thức từ Motor.")
+        with upgrade_cols_occipital[1]:
+            if st.button(f"Mua ({cost_occipital} IQ)", key="up_occipital", disabled=st.session_state.stats["iq"] < cost_occipital, use_container_width=True):
+                st.session_state.stats["iq"] -= cost_occipital
+                upgrades["occipital_lobe"] = upgrades.get("occipital_lobe", 0) + 1
+                add_log(f"Nâng cấp Thùy Chẩm Occipital Lobe lên cấp {upgrades['occipital_lobe']}!")
                 st.rerun()
 
         # Astrocytic Glycogen Shunt Upgrade Item
