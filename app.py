@@ -69,7 +69,7 @@ else:
     hf_client = None
 
 # Network Check Utility
-def check_network(host="8.8.8.8", port=53, timeout=3):
+def check_network(host="8.8.8.8", port=53, timeout=1):
     try:
         socket.create_connection((host, port), timeout=timeout)
         return True
@@ -1112,11 +1112,12 @@ def record_history(ticks, chems):
         for key in hist:
             hist[key] = hist[key][-40:]
 
-# Start the Telegram background bot thread if not already running
-if "bot_thread" not in st.session_state:
-    st.session_state.bot_thread = True
-    thread = threading.Thread(target=run_bot, daemon=True)
-    thread.start()
+# Start the Telegram background bot thread if not already running (only when run as the main script)
+if __name__ == "__main__":
+    if "bot_thread" not in st.session_state:
+        st.session_state.bot_thread = True
+        thread = threading.Thread(target=run_bot, daemon=True)
+        thread.start()
 
 # ----------------- STREAMLIT INTERFACE RENDERING -----------------
 
