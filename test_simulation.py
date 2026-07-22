@@ -1274,3 +1274,71 @@ def test_amyloid_plaques_phagocytosis():
     # Neighbor [0][1] gets 0.1 + 0.105 = 0.205
     app.run_simulation_tick()
     assert abs(app.st.session_state.neuron_grid[0][1]["charge"] - 0.205) < 1e-5
+
+
+def test_temporal_lobe_auditory():
+    """
+    TEST: Temporal Lobe Auditory Spark and Resonance
+    Verifies that high and low frequencies increase different biochemical levels, and resonance triples Motor memory yields.
+    """
+    app.st.session_state = MockSessionState()
+    app.st.session_state["bot_thread"] = True
+    app.init_game_state()
+
+    app.st.session_state.upgrades["temporal_lobe"] = 1
+
+    # 1. High frequency (>600) boosts dopamine and gaba
+    app.st.session_state.auditory_freq = 800
+    app.st.session_state.chemicals["dopamine"] = 50.0
+    app.st.session_state.chemicals["gaba"] = 30.0
+
+    app.run_simulation_tick()
+    assert app.st.session_state.chemicals["dopamine"] > 50.0
+    assert app.st.session_state.chemicals["gaba"] > 30.0
+
+    # 2. Auditory resonance (400 to 500 Hz) triples Motor memory yields
+    app.st = MagicMock()
+    app.st.session_state = MockSessionState()
+    app.init_game_state()
+    app.st.session_state.upgrades["temporal_lobe"] = 1
+    app.st.session_state.upgrades["hippocampus"] = 0 # set to 0 for baseline yield of 2.0
+    app.st.session_state.auditory_freq = 450 # resonant!
+    app.st.session_state.stats["memory"] = 10.0
+
+    # Place firing Motor cell
+    for r in range(6):
+        for c in range(6):
+            app.st.session_state.neuron_grid[r][c] = {"type": "Empty", "charge": 0.0, "threshold": 0.5, "weight": 1.0}
+    app.st.session_state.neuron_grid[3][3] = {
+        "type": "Motor",
+        "charge": 0.9,
+        "threshold": 0.5,
+        "weight": 1.0
+    }
+
+    app.run_simulation_tick()
+    # Base memory yield is 2.0. With resonance, it is tripled (3.0 * 2.0 = 6.0).
+    # Memory starts at 10.0, so 10.0 + 6.0 = 16.0
+    assert app.st.session_state.stats["memory"] == 16.0
+
+
+def test_ltp_consolidation():
+    """
+    TEST: Hebbian LTP Memory Consolidator
+    Verifies that every 12 ticks, 30% of Memory is automatically converted to permanent IQ points.
+    """
+    app.st.session_state = MockSessionState()
+    app.st.session_state["bot_thread"] = True
+    app.init_game_state()
+
+    app.st.session_state.upgrades["ltp_consolidator"] = 1
+    app.st.session_state.stats["ticks"] = 11 # next tick is 12, triggers consolidator
+    app.st.session_state.stats["memory"] = 100.0
+    app.st.session_state.stats["iq"] = 0.0
+
+    app.run_simulation_tick()
+
+    # 30% of 100.0 = 30.0 is consolidated
+    # memory becomes 100.0 - 30.0 = 70.0 (plus any motor additions, none here)
+    assert app.st.session_state.stats["memory"] == 70.0
+    assert app.st.session_state.stats["iq"] == 30.0

@@ -395,7 +395,9 @@ def init_game_state():
             "thalamus": 0,
             "glycogen_shunt": 0,
             "dentate_gyrus": 0, # Dentate Gyrus Lv.0
-            "occipital_lobe": 0
+            "occipital_lobe": 0,
+            "temporal_lobe": 0,
+            "ltp_consolidator": 0
         }
 
         # Local Circuit Save Slots Library
@@ -588,6 +590,22 @@ def run_simulation_tick():
             target_dir = random.choice(["Up", "Right", "Down", "Left"])
             st.session_state.visual_spark = {"pos": (sr, sc), "dir": target_dir}
             add_log(f"👁️ [Thùy Chẩm] Kích thích thị giác tại Sensory [{sr+1},{sc+1}]! Khớp hướng '{target_dir}' để kích hoạt 2x sạc nơ-ron.")
+
+    # UPGRADE: Temporal Lobe Auditory Stimulation System
+    if upgrades.get("temporal_lobe", 0) >= 1 and ticks % 15 == 0:
+        auditory_freq = random.randint(200, 1000)
+        st.session_state.auditory_freq = auditory_freq
+        resonance = "Khớp cộng hưởng! 3x Memory" if (400 <= auditory_freq <= 500) else "Bình thường"
+        add_log(f"🎵 [Thùy Thái Dương] Kích thích thính giác: Tần số {auditory_freq} Hz ({resonance})!")
+
+    # UPGRADE: LTP Memory Consolidator (Long-Term Potentiation)
+    if upgrades.get("ltp_consolidator", 0) >= 1 and ticks % 12 == 0:
+        current_mem = st.session_state.stats["memory"]
+        if current_mem > 10.0:
+            consolidated_mem = current_mem * 0.30
+            st.session_state.stats["memory"] -= consolidated_mem
+            st.session_state.stats["iq"] += consolidated_mem
+            add_log(f"💾 [LTP Consolidator] Tự động củng cố Hebbian LTP chuyển đổi 30% Trí nhớ sang IQ (+{consolidated_mem:.1f} IQ/MB)!")
 
     # Increment burnout-free streak
     st.session_state.stats["burnout_streak"] += 1
@@ -951,7 +969,14 @@ def run_simulation_tick():
                 motor_yield_iq += cell_iq
 
                 mem_multiplier = 1.0 + (upgrades["hippocampus"] * 0.4)
-                motor_yield_mem += 2.0 * mem_multiplier
+                cell_mem = 2.0 * mem_multiplier
+
+                # Temporal Lobe auditory resonance: 3x Memory!
+                freq_val = st.session_state.get("auditory_freq", 0)
+                if upgrades.get("temporal_lobe", 0) >= 1 and 400 <= freq_val <= 500:
+                    cell_mem *= 3.0
+
+                motor_yield_mem += cell_mem
 
                 # DRD4 Mutation doubles dopamine reward from Motor fires
                 doping_multiplier = 2.0 if "DRD4" in genes else 1.0
@@ -1097,6 +1122,15 @@ def run_simulation_tick():
         gaba_gain = (chems["stress"] - 40.0) * 0.05
     chems["gaba"] = max(0.0, min(100.0, chems.get("gaba", 30.0) + gaba_gain - gaba_decay))
 
+    # Apply Temporal Lobe sound effects
+    freq_sound = st.session_state.get("auditory_freq", None)
+    if upgrades.get("temporal_lobe", 0) >= 1 and freq_sound:
+        if freq_sound > 600:
+            chems["dopamine"] = min(100.0, chems["dopamine"] + 2.0)
+            chems["gaba"] = min(100.0, chems.get("gaba", 30.0) + 2.0)
+        else:
+            chems["acetylcholine"] = min(100.0, chems["acetylcholine"] + 2.0)
+
     # Burnout Check: Sanity is 0
     if chems["sanity"] <= 0.0:
         st.session_state.stats["burnout_count"] += 1
@@ -1237,11 +1271,16 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("🧠 Siêu Hệ Thống VBot1 & Game Mô Phỏng Não Bộ")
-st.write("Dự án tích hợp: Game mô phỏng tiến hóa nơ-ron sinh học kết hợp Trợ lý AI Telegram Llama 3 & Gemini 1.5. **(Version 3.0.0 - Neuro-Sensory Update)**")
+st.write("Dự án tích hợp: Game mô phỏng tiến hóa nơ-ron sinh học kết hợp Trợ lý AI Telegram Llama 3 & Gemini 1.5. **(Version 3.1.0 - Auditory & Memory Integration Update)**")
 
-with st.expander("🆕 [CHANGELOG] Nhật Ký Cập Nhật Phiên Bản 3.0.0 - Siêu Hóa Sinh & Cảm Biến", expanded=False):
+with st.expander("🆕 [CHANGELOG] Nhật Ký Cập Nhật Phiên Bản 3.1.0 - Thính Giác & Cộng Hưởng LTP", expanded=False):
     st.markdown("""
-    **🚀 Phiên bản 3.0.0 (Bản nâng cấp tối cao):**
+    **🚀 Phiên bản 3.1.0 (Bản nâng cấp thính giác và tích hợp trí nhớ):**
+    *   **Thùy Thái Dương (Temporal Lobe) & Thính giác:** Nhận kích thích âm thanh (Auditory Stimulus) ngẫu nhiên mỗi 15 ticks. Tần số cao (>600 Hz) kích thích tăng Dopamine/GABA, tần số thấp (<=600 Hz) tăng Acetylcholine.
+    *   **Cộng hưởng Thính giác - Vận động:** Tần số cộng hưởng (400 Hz đến 500 Hz) sẽ kích hoạt trạng thái cộng hưởng thính giác-vận động, nhân ba (3.0x) sản lượng Trí nhớ (Memory MB) từ các hành động Motor phát xung thành công.
+    *   **Bộ củng cố Trí nhớ dài hạn Hebbian LTP (LTP Consolidator):** Nâng cấp giải phẫu tự động củng cố 30% bộ nhớ sang IQ vĩnh viễn Hebbian LTP sau mỗi 12 ticks hoạt động.
+
+    **🚀 Phiên bản 3.0.0:**
     *   **Hệ thống dẫn truyền ức chế GABA:** Bổ sung hóa chất mới GABA giúp giải tỏa stress và dập tắt hoàn toàn trạng thái quá kích của bệnh lý Động kinh. Bổ sung tiền chất **Glutamate Precursor** vào chế độ ăn uống.
     *   **Thùy Chẩm (Occipital Lobe) & Visual Spark:** Cơ chế phản hồi kích thích thị giác ngẫu nhiên mỗi 10 ticks. Định hướng trục nơ-ron cảm giác khớp với hướng kích thích thị giác sẽ khuyếch đại tốc độ sạc nơ-ron x2 và nhân đôi (+100%) điểm IQ từ các hành động Motor.
     *   **Thư viện Bản Lưu Cục Bộ (Save Slots Library):** Tích hợp 3 khe lưu trữ sơ đồ mạch thần kinh tức thì để cất trữ và khôi phục nhanh chóng sơ đồ nơ-ron trong phiên chơi.
@@ -1818,6 +1857,7 @@ with tab1:
         adra2a_active = "Có 🟢" if "ADRA2A" in st.session_state.active_genes else "Không ⚪"
         trem2_active = "Có 🟢" if "TREM2" in st.session_state.active_genes else "Không ⚪"
         occipital_status = f"Lv.{upgrades.get('occipital_lobe', 0)}" if upgrades.get("occipital_lobe", 0) >= 1 else "Chưa mở khóa ⚪"
+        temporal_status = f"Lv.{upgrades.get('temporal_lobe', 0)}" if upgrades.get("temporal_lobe", 0) >= 1 else "Chưa mở khóa ⚪"
 
         brain_art = f"""
         [ Frontal Cortex: Lv.{upgrades['cortex']} ] ---------.
@@ -1835,6 +1875,8 @@ with tab1:
         [ Dentate Gyrus (Thùy Răng): {dentate_status} ] (Neurogenesis)
                    |
         [ Occipital Lobe (Thùy Chẩm): {occipital_status} ] (Xử lý thị giác 2x)
+                   |
+        [ Temporal Lobe (Thùy Thái Dương): {temporal_status} ] (Xử lý âm thanh & LTP)
                    |
         [ Amygdala (Hạch Hạnh Nhân): Lv.{upgrades.get('amygdala', 0)} ] (Hạ stress)
                    |
@@ -1999,6 +2041,31 @@ with tab1:
                 st.session_state.stats["iq"] -= cost_occipital
                 upgrades["occipital_lobe"] = upgrades.get("occipital_lobe", 0) + 1
                 add_log(f"Nâng cấp Thùy Chẩm Occipital Lobe lên cấp {upgrades['occipital_lobe']}!")
+                st.rerun()
+
+        # UPGRADE: Temporal Lobe Upgrade Item
+        cost_temporal = int(50 * (1.6 ** upgrades.get("temporal_lobe", 0)))
+        upgrade_cols_temporal = st.columns([3, 1])
+        with upgrade_cols_temporal[0]:
+            st.write(f"**Thùy Thái Dương (Temporal Lobe) [Lv.{upgrades.get('temporal_lobe', 0)}]**\nXử lý kích thích thính giác ngẫu nhiên (Auditory Stimulus) mỗi 15 ticks: Tần số cao >600 Hz tăng Dopamine/GABA, tần số thấp <=600 Hz tăng Acetylcholine. Tần số cộng hưởng 400-500 Hz nhân ba (3x) sản lượng Trí nhớ từ Motor.")
+        with upgrade_cols_temporal[1]:
+            if st.button(f"Mua ({cost_temporal} IQ)", key="up_temporal", disabled=st.session_state.stats["iq"] < cost_temporal, use_container_width=True):
+                st.session_state.stats["iq"] -= cost_temporal
+                upgrades["temporal_lobe"] = upgrades.get("temporal_lobe", 0) + 1
+                add_log(f"Nâng cấp Thùy Thái Dương Temporal Lobe lên cấp {upgrades['temporal_lobe']}!")
+                st.rerun()
+
+        # UPGRADE: LTP Consolidator Upgrade Item
+        cost_ltp = 100
+        upgrade_cols_ltp = st.columns([3, 1])
+        with upgrade_cols_ltp[0]:
+            st.write(f"**Hebbian LTP Consolidator [Lv.{upgrades.get('ltp_consolidator', 0)}/1]**\nCủng cố liên kết trí nhớ dài hạn: Tự động chuyển đổi 30% bộ nhớ sang IQ vĩnh viễn Hebbian LTP sau mỗi 12 ticks hoạt động.")
+        with upgrade_cols_ltp[1]:
+            ltp_disabled = upgrades.get("ltp_consolidator", 0) >= 1 or st.session_state.stats["iq"] < cost_ltp
+            if st.button(f"Mua ({cost_ltp} IQ)", key="up_ltp", disabled=ltp_disabled, use_container_width=True):
+                st.session_state.stats["iq"] -= cost_ltp
+                upgrades["ltp_consolidator"] = 1
+                add_log("💾 NÂNG CẤP: Kích hoạt Hebbian LTP Consolidator củng cố bộ nhớ dài hạn tự động!")
                 st.rerun()
 
         # Astrocytic Glycogen Shunt Upgrade Item
