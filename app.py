@@ -341,7 +341,8 @@ def init_game_state():
             "tryptophan": 0,
             "choline": 0,
             "glutamate": 0,
-            "somatosensory_gating": 0
+            "somatosensory_gating": 0,
+            "oxytocin": 0
         }
 
         # Cooldowns
@@ -400,7 +401,8 @@ def init_game_state():
             "occipital_lobe": 0,
             "temporal_lobe": 0,
             "ltp_consolidator": 0,
-            "parietal_lobe": 0
+            "parietal_lobe": 0,
+            "pituitary_gland": 0
         }
 
         # Local Circuit Save Slots Library
@@ -617,6 +619,11 @@ def run_simulation_tick():
         st.session_state.spatial_gate = (pr, pc)
         add_log(f"🧭 [Thùy Đỉnh] Luồng định vị không gian: Điểm Gating xuất hiện tại nơ-ron [{pr+1},{pc+1}]! Truyền điện thế qua đây để kích hoạt giảm stress và năng lượng.")
 
+    # UPGRADE: Pituitary Gland (Tuyến Yên) Oxytocin Surge Game
+    if upgrades.get("pituitary_gland", 0) >= 1 and ticks % 20 == 0:
+        st.session_state.active_buffs["oxytocin"] = 5
+        add_log("🧠 [Tuyến Yên] Kích hoạt giải phóng Oxytocin Surge! Giảm 50% Stress phát sinh và nhân đôi tốc độ hồi phục Tỉnh táo trong 5 ticks.")
+
     # Increment burnout-free streak
     st.session_state.stats["burnout_streak"] += 1
     st.session_state.stats["max_streak"] = max(st.session_state.stats["max_streak"], st.session_state.stats["burnout_streak"])
@@ -646,7 +653,7 @@ def run_simulation_tick():
     slc6a4_mult = 1.5 if "SLC6A4" in genes else 1.0
 
     # Decrement active neuromodulator buffs tick timers and apply ongoing biochemical bonuses
-    buffs = st.session_state.get("active_buffs", {"doping": 0, "ssri": 0, "focus": 0, "tyrosine": 0, "tryptophan": 0, "choline": 0, "glutamate": 0, "somatosensory_gating": 0})
+    buffs = st.session_state.get("active_buffs", {"doping": 0, "ssri": 0, "focus": 0, "tyrosine": 0, "tryptophan": 0, "choline": 0, "glutamate": 0, "somatosensory_gating": 0, "oxytocin": 0})
     for k in list(buffs.keys()):
         if buffs[k] > 0:
             buffs[k] -= 1
@@ -712,7 +719,7 @@ def run_simulation_tick():
             if plaque_cells:
                 cr, cc = random.choice(plaque_cells)
                 grid[cr][cc]["amyloid_plaque"] = False
-                add_log(f"🧹 [Thực bào Microglia] Tế bào thần green đệm dọn sạch mảng bám Amyloid tại [{cr+1},{cc+1}]!")
+                add_log(f"🧹 [Thực bào Microglia] Tế bào thần kinh đệm dọn sạch mảng bám Amyloid tại [{cr+1},{cc+1}]!")
 
     # UPGRADE: Chronic Neuro-Inflammation threshold drift (Cytokine Storm)
     # Inflammation above 80% causes slow, chronic neural threshold drift
@@ -750,6 +757,19 @@ def run_simulation_tick():
                         "weight": 1.0
                     }
                     add_log(f"🌱 [Hải Mã Neurogenesis] Thùy răng (Dentate Gyrus) tự động sản sinh tế bào liên kết mới tại [{sp_r+1},{sp_c+1}]! (-15 MB Memory)")
+
+    # Schizophrenia Pathology Tick
+    # Trigger Auditory Hallucinations setting a random cell charge directly to threshold
+    if mode == "Schizophrenia" and ticks % 8 == 0:
+        non_empty = []
+        for r in range(GRID_SIZE):
+            for c in range(GRID_SIZE):
+                if grid[r][c]["type"] != "Empty":
+                    non_empty.append((r, c))
+        if non_empty:
+            hr, hc = random.choice(non_empty)
+            grid[hr][hc]["charge"] = grid[hr][hc]["threshold"]
+            add_log(f"📢 [Tâm thần phân liệt] Ảo thanh kích hoạt đột ngột tại nơ-ron [{hr+1},{hc+1}]!")
 
     # Parkinson's Pathology Tick
     # Low Dopamine causes random Motor cells to misfire (tremors), draining energy but yielding 0 IQ/Memory.
@@ -1035,6 +1055,10 @@ def run_simulation_tick():
     if chems.get("gaba", 30.0) > 70.0:
         fire_stress *= 0.6
 
+    # Oxytocin active buff reduces stress generation by 50%
+    if buffs.get("oxytocin", 0) > 0:
+        fire_stress *= 0.5
+
     # MAOA genetic mutation increases stress generation on firing by +40%
     if "MAOA" in genes:
         fire_stress *= 1.4
@@ -1073,6 +1097,10 @@ def run_simulation_tick():
             add_log(f"⚡ Căng thẳng cực độ gây tổn hại myelin và nơ-ron! (-{sanity_damage:.1f} Tỉnh táo)")
     else:
         healing = 0.5 + (chems["serotonin"] * 0.02)
+        if buffs.get("oxytocin", 0) > 0:
+            healing *= 2.0
+        if mode == "Schizophrenia":
+            healing *= 0.7
         chems["sanity"] = max(0.0, min(100.0, chems["sanity"] + healing))
 
     # UPGRADE: Neuro-Inflammation & Microglia Immune Delta Engine
@@ -1292,11 +1320,15 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("🧠 Siêu Hệ Thống VBot1 & Game Mô Phỏng Não Bộ")
-st.write("Dự án tích hợp: Game mô phỏng tiến hóa nơ-ron sinh học kết hợp Trợ lý AI Telegram Llama 3 & Gemini 1.5. **(Version 3.2.0 - Spatial Gating & Synaptic Sprouting Update)**")
+st.write("Dự án tích hợp: Game mô phỏng tiến hóa nơ-ron sinh học kết hợp Trợ lý AI Telegram Llama 3 & Gemini 1.5. **(Version 4.0.0 - The Ultimate Neurological Integration Update)**")
 
-with st.expander("🆕 [CHANGELOG] Nhật Ký Cập Nhật Phiên Bản 3.2.0 - Định Vị Đỉnh & Nảy Mầm Sprouting", expanded=False):
+with st.expander("🆕 [CHANGELOG] Nhật Ký Cập Nhật Phiên Bản 4.0.0 - Hệ Nội Tiết & Thử Thách Tâm Thần", expanded=False):
     st.markdown("""
-    **🚀 Phiên bản 3.2.0 (Bản nâng cấp định vị không gian và nảy mầm khớp thần kinh):**
+    **🚀 Phiên bản 4.0.0 (Bản nâng cấp tối thượng hệ nội tiết và bệnh lý học):**
+    *   **Tuyến Yên (Pituitary Gland) & Giải phóng Oxytocin:** Mở rộng cấu trúc giải phẫu Tuyến Yên điều hòa hormone. Tự động kích hoạt **Oxytocin Surge** mỗi 20 ticks trong 5 ticks liên tục giúp triệt tiêu 50% Stress phát sinh và nhân đôi tốc độ hồi phục Tỉnh táo (Sanity).
+    *   **Bệnh lý học Tâm Thần Phân Liệt (Schizophrenia Mode):** Thử thách thứ 6 mô phỏng ảo giác thần kinh. Cứ mỗi 8 ticks, ảo thanh đột ngột kích phát điện thế của một nơ-ron ngẫu nhiên lên mức tối đa gây hỗn loạn liên kết truyền dẫn, đồng thời giảm 30% tốc độ tự chữa lành Sanity của não bộ.
+
+    **🚀 Phiên bản 3.2.0:**
     *   **Thùy Đỉnh (Parietal Lobe) & Định vị không gian:** Nhận điểm định vị Gating ngẫu nhiên mỗi 18 ticks. Truyền điện thế qua ô Gating này để kích hoạt **Somatosensory Gating** dập tắt ngay lập tức 20% Stress và cắt giảm 50% tiêu hao Năng lượng (Fuel) trong 3 ticks kế tiếp.
     *   **Nảy mầm liên kết Synaptic Sprouting:** Thêm khả năng chủ động mới "🌱 Sprouting" (cooldown 30s, chi phí 40 MB). Sao chép ngẫu nhiên cấu hình một Interneuron sang một ô trống lân cận để xây dựng liên kết free.
 
@@ -1341,13 +1373,14 @@ with tab1:
 
     # Game pathology modes selector (Normal, Alzheimer, Epilepsy, Parkinson, ADHD)
     st.markdown("##### ⚙️ Lựa chọn Chế Độ Thử Thách Não Bộ")
-    modes_list = ["Normal", "Alzheimer", "Epilepsy", "Parkinson", "ADHD"]
+    modes_list = ["Normal", "Alzheimer", "Epilepsy", "Parkinson", "ADHD", "Schizophrenia"]
     modes_names = {
         "Normal": "🟢 Bình Thường (Sức khỏe ổn định)",
         "Alzheimer": "👵 Thử Thách Alzheimer (Thoái hóa nơ-ron, chai lỳ điện thế)",
         "Epilepsy": "⚡ Thử Thách Động Kinh (Gia tăng xung điện cực độ, nhân đôi stress)",
         "Parkinson": "🤝 Thử Thách Parkinson (Run giật nơ-ron vận động khi thiếu hụt Dopamine)",
-        "ADHD": "🧠 Thử Thách ADHD (Dao động Dopamine dữ dội, tăng tốc phân rã Acetylcholine)"
+        "ADHD": "🧠 Thử Thách ADHD (Dao động Dopamine dữ dội, tăng tốc phân rã Acetylcholine)",
+        "Schizophrenia": "📢 Thử Thách Tâm Thần Phân Liệt (Ảo thanh kích phát điện thế bất ngờ, giảm 30% hồi tỉnh táo)"
     }
     selected_mode = st.selectbox(
         "Cấu hình bệnh lý học vỏ não:",
@@ -1365,7 +1398,7 @@ with tab1:
 
     # Continuous Active Buff badges indicators
     st.markdown("##### 🧪 Trạng thái hoạt hóa hóa học (Active Neuromodulator Buffs)")
-    active_buffs = st.session_state.get("active_buffs", {"doping": 0, "ssri": 0, "focus": 0, "tyrosine": 0, "tryptophan": 0, "choline": 0, "glutamate": 0})
+    active_buffs = st.session_state.get("active_buffs", {"doping": 0, "ssri": 0, "focus": 0, "tyrosine": 0, "tryptophan": 0, "choline": 0, "glutamate": 0, "oxytocin": 0})
     buffs_html = []
     if active_buffs.get("doping", 0) > 0:
         buffs_html.append(f"<span class='buff-badge badge-doping'>⚡ Hyper-Dopamine ({active_buffs['doping']} ticks)</span>")
@@ -1381,6 +1414,8 @@ with tab1:
         buffs_html.append(f"<span class='buff-badge badge-choline'>🥚 Choline Synthesis ({active_buffs['choline']} ticks)</span>")
     if active_buffs.get("glutamate", 0) > 0:
         buffs_html.append(f"<span class='buff-badge badge-choline'>🥦 Glutamate Synthesis ({active_buffs['glutamate']} ticks)</span>")
+    if active_buffs.get("oxytocin", 0) > 0:
+        buffs_html.append(f"<span class='buff-badge badge-ssri'>💕 Oxytocin Surge ({active_buffs['oxytocin']} ticks)</span>")
 
     if buffs_html:
         st.markdown(" ".join(buffs_html), unsafe_allow_html=True)
@@ -1921,6 +1956,7 @@ with tab1:
         occipital_status = f"Lv.{upgrades.get('occipital_lobe', 0)}" if upgrades.get("occipital_lobe", 0) >= 1 else "Chưa mở khóa ⚪"
         temporal_status = f"Lv.{upgrades.get('temporal_lobe', 0)}" if upgrades.get("temporal_lobe", 0) >= 1 else "Chưa mở khóa ⚪"
         parietal_status = f"Lv.{upgrades.get('parietal_lobe', 0)}" if upgrades.get("parietal_lobe", 0) >= 1 else "Chưa mở khóa ⚪"
+        pituitary_status = f"Lv.{upgrades.get('pituitary_gland', 0)}" if upgrades.get("pituitary_gland", 0) >= 1 else "Chưa mở khóa ⚪"
 
         brain_art = f"""
         [ Frontal Cortex: Lv.{upgrades['cortex']} ] ---------.
@@ -1942,6 +1978,8 @@ with tab1:
         [ Temporal Lobe (Thùy Thái Dương): {temporal_status} ] (Xử lý âm thanh & LTP)
                    |
         [ Parietal Lobe (Thùy Đỉnh): {parietal_status} ] (Xử lý không gian & Gating)
+                   |
+        [ Pituitary Gland (Tuyến Yên): {pituitary_status} ] (Hormone cascade & Oxytocin)
                    |
         [ Amygdala (Hạch Hạnh Nhân): Lv.{upgrades.get('amygdala', 0)} ] (Hạ stress)
                    |
@@ -2130,6 +2168,18 @@ with tab1:
                 st.session_state.stats["iq"] -= cost_parietal
                 upgrades["parietal_lobe"] = upgrades.get("parietal_lobe", 0) + 1
                 add_log(f"Nâng cấp Thùy Đỉnh Parietal Lobe lên cấp {upgrades['parietal_lobe']}!")
+                st.rerun()
+
+        # UPGRADE: Pituitary Gland Upgrade Item
+        cost_pituitary = int(50 * (1.6 ** upgrades.get("pituitary_gland", 0)))
+        upgrade_cols_pituitary = st.columns([3, 1])
+        with upgrade_cols_pituitary[0]:
+            st.write(f"**Tuyến Yên (Pituitary Gland) [Lv.{upgrades.get('pituitary_gland', 0)}]**\nĐiều hòa giải phóng hormone tuyến yên mỗi 20 ticks: Kích hoạt Oxytocin Surge kéo dài 5 ticks giúp triệt tiêu 50% Stress phát sinh và nhân đôi tốc độ hồi phục Tỉnh táo (Sanity).")
+        with upgrade_cols_pituitary[1]:
+            if st.button(f"Mua ({cost_pituitary} IQ)", key="up_pituitary", disabled=st.session_state.stats["iq"] < cost_pituitary, use_container_width=True):
+                st.session_state.stats["iq"] -= cost_pituitary
+                upgrades["pituitary_gland"] = upgrades.get("pituitary_gland", 0) + 1
+                add_log(f"Nâng cấp Tuyến Yên Pituitary Gland lên cấp {upgrades['pituitary_gland']}!")
                 st.rerun()
 
         # UPGRADE: LTP Consolidator Upgrade Item

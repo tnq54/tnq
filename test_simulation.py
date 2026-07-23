@@ -1453,3 +1453,81 @@ def test_synaptic_sprouting_ability():
     assert grid[child_r][child_c]["weight"] == 1.8
     assert app.st.session_state.stats["memory"] == 60.0
     assert cooldowns["sprouting"] == 30
+
+
+def test_pituitary_oxytocin_surge():
+    """
+    TEST: Pituitary Gland Oxytocin Surge
+    Verifies that every 20 ticks, the pituitary gland triggers an oxytocin surge active buff, reducing stress generation by 50% and doubling sanity healing.
+    """
+    app.st.session_state = MockSessionState()
+    app.st.session_state["bot_thread"] = True
+    app.init_game_state()
+
+    app.st.session_state.upgrades["pituitary_gland"] = 1
+    app.st.session_state.stats["ticks"] = 19 # next tick is 20, triggers oxytocin
+    app.st.session_state.chemicals["gaba"] = 0.0 # reset to avoid gaba stress reduction
+    app.st.session_state.chemicals["stress"] = 10.0
+
+    # Place firing Sensory cell next to Interneuron
+    for r in range(6):
+        for c in range(6):
+            app.st.session_state.neuron_grid[r][c] = {"type": "Empty", "charge": 0.0, "threshold": 0.5, "weight": 1.0, "amyloid_plaque": False}
+    app.st.session_state.neuron_grid[0][0] = {
+        "type": "Sensory",
+        "charge": 0.6,
+        "threshold": 0.4,
+        "fire_rate": 0.0,
+        "last_fired": -1,
+        "direction": "Right",
+        "weight": 1.0
+    }
+    app.st.session_state.neuron_grid[0][1] = {
+        "type": "Interneuron",
+        "charge": 0.1,
+        "threshold": 0.5,
+        "fire_rate": 0.0,
+        "last_fired": -1,
+        "direction": "All",
+        "weight": 1.0
+    }
+
+    app.run_simulation_tick()
+    # Ticks is now 20, oxytocin surge buff timer is set to 5, which decrements to 4 during tick processing.
+    # Fire stress of 1.5 is multiplied by 0.5 (under Oxytocin) -> 0.75.
+    # stress clearance = 2.5 (level 1 cerebellum)
+    # Stress delta = 0.75 - 2.5 = -1.75. Final stress = 8.25
+    assert app.st.session_state.active_buffs["oxytocin"] == 4
+    assert abs(app.st.session_state.chemicals["stress"] - 8.25) < 1e-5
+
+
+def test_schizophrenia_hallucinations():
+    """
+    TEST: Schizophrenia Mode Auditory Hallucinations
+    Verifies that every 8 ticks, Schizophrenia mode triggers auditory hallucinations, setting a random cell charge directly to its threshold.
+    """
+    app.st.session_state = MockSessionState()
+    app.st.session_state["bot_thread"] = True
+    app.init_game_state()
+
+    app.st.session_state.game_mode = "Schizophrenia"
+    app.st.session_state.stats["ticks"] = 7 # next is 8, triggers hallucinations
+
+    # Place one Sensory cell
+    for r in range(6):
+        for c in range(6):
+            app.st.session_state.neuron_grid[r][c] = {"type": "Empty", "charge": 0.0, "threshold": 0.5, "weight": 1.0, "direction": "All"}
+    app.st.session_state.neuron_grid[1][1] = {
+        "type": "Sensory",
+        "charge": 0.1,
+        "threshold": 0.8,
+        "fire_rate": 0.0,
+        "last_fired": -1,
+        "direction": "All",
+        "weight": 1.0
+    }
+
+    app.run_simulation_tick()
+    # Sensory cell charge is directly elevated to its threshold of 0.8!
+    # And since it hits threshold, it fires, and after propagation, Hebbian resets its charge to 0.0.
+    assert app.st.session_state.neuron_grid[1][1]["charge"] == 0.0
