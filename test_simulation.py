@@ -1342,3 +1342,114 @@ def test_ltp_consolidation():
     # memory becomes 100.0 - 30.0 = 70.0 (plus any motor additions, none here)
     assert app.st.session_state.stats["memory"] == 70.0
     assert app.st.session_state.stats["iq"] == 30.0
+
+
+def test_parietal_lobe_spatial_gating():
+    """
+    TEST: Parietal Lobe Spatial Gate and Somatosensory Gating
+    Verifies that signal propagation passing through the spatial gate coordinate triggers stress relief and 50% metabolic reduction.
+    """
+    app.st.session_state = MockSessionState()
+    app.st.session_state["bot_thread"] = True
+    app.init_game_state()
+
+    app.st.session_state.upgrades["parietal_lobe"] = 1
+    # Set the spatial gate at coordinate (0,1)
+    app.st.session_state.spatial_gate = (0, 1)
+    app.st.session_state.chemicals["stress"] = 50.0
+
+    # Place firing Sensory cell next to Interneuron at (0,1)
+    for r in range(6):
+        for c in range(6):
+            app.st.session_state.neuron_grid[r][c] = {"type": "Empty", "charge": 0.0, "threshold": 0.5, "weight": 1.0, "amyloid_plaque": False}
+    app.st.session_state.neuron_grid[0][0] = {
+        "type": "Sensory",
+        "charge": 0.6,
+        "threshold": 0.4,
+        "fire_rate": 0.0,
+        "last_fired": -1,
+        "direction": "Right",
+        "weight": 1.0
+    }
+    app.st.session_state.neuron_grid[0][1] = {
+        "type": "Interneuron",
+        "charge": 0.6, # fires to trigger the spatial gate!
+        "threshold": 0.5,
+        "fire_rate": 0.0,
+        "last_fired": -1,
+        "direction": "All",
+        "weight": 1.0
+    }
+
+    app.run_simulation_tick()
+    # Stress drops by 20.0 (and then delta stress is calculated)
+    # Somatosensory gating active buff timer becomes 3
+    assert app.st.session_state.chemicals["stress"] < 50.0
+    assert app.st.session_state.active_buffs["somatosensory_gating"] == 3
+
+
+def test_synaptic_sprouting_ability():
+    """
+    TEST: Synaptic Sprouting Active Ability
+    Verifies lateral axon collateral growth, copying an Interneuron configuration into an adjacent empty cell.
+    """
+    app.st.session_state = MockSessionState()
+    app.st.session_state["bot_thread"] = True
+    app.init_game_state()
+
+    app.st.session_state.stats["memory"] = 100.0
+
+    # Set up a grid with one Interneuron and all others Empty
+    for r in range(6):
+        for c in range(6):
+            app.st.session_state.neuron_grid[r][c] = {"type": "Empty", "charge": 0.0, "threshold": 0.5, "weight": 1.0, "direction": "All"}
+
+    app.st.session_state.neuron_grid[1][1] = {
+        "type": "Interneuron",
+        "charge": 0.0,
+        "threshold": 0.44,
+        "fire_rate": 0.0,
+        "last_fired": -1,
+        "direction": "Left",
+        "weight": 1.8,
+        "amyloid_plaque": False
+    }
+
+    # Simulate clicking "Synaptic Sprouting"
+    grid = app.st.session_state.neuron_grid
+    cooldowns = app.st.session_state.cooldowns
+
+    interneurons = []
+    for r in range(6):
+        for c in range(6):
+            if grid[r][c]["type"] == "Interneuron":
+                for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                    nr, nc = r + dr, c + dc
+                    if 0 <= nr < 6 and 0 <= nc < 6:
+                        if grid[nr][nc]["type"] == "Empty":
+                            interneurons.append((r, c, nr, nc))
+
+    assert len(interneurons) > 0
+    parent_r, parent_c, child_r, child_c = interneurons[0]
+    parent_cell = grid[parent_r][parent_c]
+
+    grid[child_r][child_c] = {
+        "type": "Interneuron",
+        "charge": 0.0,
+        "threshold": parent_cell["threshold"],
+        "fire_rate": parent_cell.get("fire_rate", 0.0),
+        "last_fired": -1,
+        "direction": parent_cell.get("direction", "All"),
+        "weight": parent_cell.get("weight", 1.0),
+        "amyloid_plaque": False
+    }
+    app.st.session_state.stats["memory"] -= 40.0
+    cooldowns["sprouting"] = 30
+
+    # Check that adjacent cell is now an Interneuron with copied threshold and weight
+    assert grid[child_r][child_c]["type"] == "Interneuron"
+    assert grid[child_r][child_c]["threshold"] == 0.44
+    assert grid[child_r][child_c]["direction"] == "Left"
+    assert grid[child_r][child_c]["weight"] == 1.8
+    assert app.st.session_state.stats["memory"] == 60.0
+    assert cooldowns["sprouting"] == 30

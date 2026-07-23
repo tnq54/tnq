@@ -340,7 +340,8 @@ def init_game_state():
             "tyrosine": 0,
             "tryptophan": 0,
             "choline": 0,
-            "glutamate": 0
+            "glutamate": 0,
+            "somatosensory_gating": 0
         }
 
         # Cooldowns
@@ -351,7 +352,8 @@ def init_game_state():
             "rtms": 0,
             "opto": 0,
             "cortisol": 0, # clinical anti-inflammatory wash cooldown
-            "propranolol": 0 # clinical beta-blocker cooldown
+            "propranolol": 0, # clinical beta-blocker cooldown
+            "sprouting": 0 # clinical synaptic sprouting cooldown
         }
 
         # Audio Synthesizer Triggers
@@ -397,7 +399,8 @@ def init_game_state():
             "dentate_gyrus": 0, # Dentate Gyrus Lv.0
             "occipital_lobe": 0,
             "temporal_lobe": 0,
-            "ltp_consolidator": 0
+            "ltp_consolidator": 0,
+            "parietal_lobe": 0
         }
 
         # Local Circuit Save Slots Library
@@ -607,6 +610,13 @@ def run_simulation_tick():
             st.session_state.stats["iq"] += consolidated_mem
             add_log(f"💾 [LTP Consolidator] Tự động củng cố Hebbian LTP chuyển đổi 30% Trí nhớ sang IQ (+{consolidated_mem:.1f} IQ/MB)!")
 
+    # UPGRADE: Parietal Lobe Spatial Prophecy Game
+    if upgrades.get("parietal_lobe", 0) >= 1 and ticks % 18 == 0:
+        pr = random.randint(0, GRID_SIZE-1)
+        pc = random.randint(0, GRID_SIZE-1)
+        st.session_state.spatial_gate = (pr, pc)
+        add_log(f"🧭 [Thùy Đỉnh] Luồng định vị không gian: Điểm Gating xuất hiện tại nơ-ron [{pr+1},{pc+1}]! Truyền điện thế qua đây để kích hoạt giảm stress và năng lượng.")
+
     # Increment burnout-free streak
     st.session_state.stats["burnout_streak"] += 1
     st.session_state.stats["max_streak"] = max(st.session_state.stats["max_streak"], st.session_state.stats["burnout_streak"])
@@ -636,7 +646,7 @@ def run_simulation_tick():
     slc6a4_mult = 1.5 if "SLC6A4" in genes else 1.0
 
     # Decrement active neuromodulator buffs tick timers and apply ongoing biochemical bonuses
-    buffs = st.session_state.get("active_buffs", {"doping": 0, "ssri": 0, "focus": 0, "tyrosine": 0, "tryptophan": 0, "choline": 0, "glutamate": 0})
+    buffs = st.session_state.get("active_buffs", {"doping": 0, "ssri": 0, "focus": 0, "tyrosine": 0, "tryptophan": 0, "choline": 0, "glutamate": 0, "somatosensory_gating": 0})
     for k in list(buffs.keys()):
         if buffs[k] > 0:
             buffs[k] -= 1
@@ -801,6 +811,10 @@ def run_simulation_tick():
     norepi_val = chems.get("norepinephrine", 10.0)
     metabolic_cost += (norepi_val / 100.0) * 3.0
 
+    # Somatosensory gating active buff reduces metabolic cost by 50%
+    if buffs.get("somatosensory_gating", 0) > 0:
+        metabolic_cost *= 0.5
+
     max_energy = 100.0
     # Astrocytic Glycogen Shunt & PGC-1alpha genetics boost max energy storage capacity
     if upgrades.get("glycogen_shunt", 0) == 1:
@@ -896,6 +910,13 @@ def run_simulation_tick():
             if cell["type"] != "Empty" and cell["charge"] >= cell["threshold"]:
                 fired_cells.add((r, c))
                 cell["last_fired"] = ticks
+
+                # Check Parietal Lobe Spatial Gate
+                gate = st.session_state.get("spatial_gate", None)
+                if upgrades.get("parietal_lobe", 0) >= 1 and gate == (r, c):
+                    chems["stress"] = max(0.0, chems["stress"] - 20.0)
+                    st.session_state.active_buffs["somatosensory_gating"] = 3
+                    add_log(f"🧭 [Thùy Đỉnh] Luồng điện tích khớp vị trí Gating [{r+1},{c+1}]! Giải tỏa stress lập tức và kích hoạt Somatosensory Gating (giảm 50% tiêu hao năng lượng).")
                 carry_over = 0.05 * upgrades["plasticity"] if cell["type"] == "Interneuron" else 0.0
                 next_charges[r][c] = carry_over
 
@@ -1271,11 +1292,15 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("🧠 Siêu Hệ Thống VBot1 & Game Mô Phỏng Não Bộ")
-st.write("Dự án tích hợp: Game mô phỏng tiến hóa nơ-ron sinh học kết hợp Trợ lý AI Telegram Llama 3 & Gemini 1.5. **(Version 3.1.0 - Auditory & Memory Integration Update)**")
+st.write("Dự án tích hợp: Game mô phỏng tiến hóa nơ-ron sinh học kết hợp Trợ lý AI Telegram Llama 3 & Gemini 1.5. **(Version 3.2.0 - Spatial Gating & Synaptic Sprouting Update)**")
 
-with st.expander("🆕 [CHANGELOG] Nhật Ký Cập Nhật Phiên Bản 3.1.0 - Thính Giác & Cộng Hưởng LTP", expanded=False):
+with st.expander("🆕 [CHANGELOG] Nhật Ký Cập Nhật Phiên Bản 3.2.0 - Định Vị Đỉnh & Nảy Mầm Sprouting", expanded=False):
     st.markdown("""
-    **🚀 Phiên bản 3.1.0 (Bản nâng cấp thính giác và tích hợp trí nhớ):**
+    **🚀 Phiên bản 3.2.0 (Bản nâng cấp định vị không gian và nảy mầm khớp thần kinh):**
+    *   **Thùy Đỉnh (Parietal Lobe) & Định vị không gian:** Nhận điểm định vị Gating ngẫu nhiên mỗi 18 ticks. Truyền điện thế qua ô Gating này để kích hoạt **Somatosensory Gating** dập tắt ngay lập tức 20% Stress và cắt giảm 50% tiêu hao Năng lượng (Fuel) trong 3 ticks kế tiếp.
+    *   **Nảy mầm liên kết Synaptic Sprouting:** Thêm khả năng chủ động mới "🌱 Sprouting" (cooldown 30s, chi phí 40 MB). Sao chép ngẫu nhiên cấu hình một Interneuron sang một ô trống lân cận để xây dựng liên kết free.
+
+    **🚀 Phiên bản 3.1.0:**
     *   **Thùy Thái Dương (Temporal Lobe) & Thính giác:** Nhận kích thích âm thanh (Auditory Stimulus) ngẫu nhiên mỗi 15 ticks. Tần số cao (>600 Hz) kích thích tăng Dopamine/GABA, tần số thấp (<=600 Hz) tăng Acetylcholine.
     *   **Cộng hưởng Thính giác - Vận động:** Tần số cộng hưởng (400 Hz đến 500 Hz) sẽ kích hoạt trạng thái cộng hưởng thính giác-vận động, nhân ba (3.0x) sản lượng Trí nhớ (Memory MB) từ các hành động Motor phát xung thành công.
     *   **Bộ củng cố Trí nhớ dài hạn Hebbian LTP (LTP Consolidator):** Nâng cấp giải phẫu tự động củng cố 30% bộ nhớ sang IQ vĩnh viễn Hebbian LTP sau mỗi 12 ticks hoạt động.
@@ -1436,7 +1461,7 @@ with tab1:
 
     # Hormone active abilities layout
     st.markdown("##### 🧪 Trung tâm nội tiết tố & Liệu pháp Lâm sàng (Active Abilities)")
-    hormone_cols = st.columns(7)
+    hormone_cols = st.columns(8)
     cooldowns = st.session_state.cooldowns
 
     with hormone_cols[0]:
@@ -1528,6 +1553,43 @@ with tab1:
             cooldowns["propranolol"] = 20
             add_log("🩺 LÂM SÀNG: Sử dụng Propranolol Beta-Blocker! Chặn đứng Norepinephrine kích thích, dập tắt hoàn toàn các triệu chứng hoảng loạn cấp tính.")
             st.rerun()
+
+    # UPGRADE: Clinical Synaptic Sprouting Active Ability (lateral collateral growth)
+    with hormone_cols[7]:
+        sprouting_disabled = cooldowns.get("sprouting", 0) > 0 or st.session_state.stats["memory"] < 40.0
+        btn_label_sprouting = f"🌱 Sprouting ({cooldowns.get('sprouting', 0)}s)" if cooldowns.get("sprouting", 0) > 0 else "🌱 Sprouting"
+        if st.button(btn_label_sprouting, disabled=sprouting_disabled, use_container_width=True, help="Kích thích nảy mầm liên kết (Synaptic Sprouting): Chi phí 40 MB Bộ nhớ. Sao chép cấu hình của một nơ-ron liên kết (Interneuron) ngẫu nhiên sang một ô trống lân cận nó để nhân bản miễn phí. Cooldown 30s."):
+            grid = st.session_state.neuron_grid
+            # Find Interneurons with adjacent Empty cells
+            interneurons = []
+            for r in range(GRID_SIZE):
+                for c in range(GRID_SIZE):
+                    if grid[r][c]["type"] == "Interneuron":
+                        for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                            nr, nc = r + dr, c + dc
+                            if 0 <= nr < GRID_SIZE and 0 <= nc < GRID_SIZE:
+                                if grid[nr][nc]["type"] == "Empty":
+                                    interneurons.append((r, c, nr, nc))
+            if interneurons:
+                parent_r, parent_c, child_r, child_c = random.choice(interneurons)
+                parent_cell = grid[parent_r][parent_c]
+
+                grid[child_r][child_c] = {
+                    "type": "Interneuron",
+                    "charge": 0.0,
+                    "threshold": parent_cell["threshold"],
+                    "fire_rate": parent_cell.get("fire_rate", 0.0),
+                    "last_fired": -1,
+                    "direction": parent_cell.get("direction", "All"),
+                    "weight": parent_cell.get("weight", 1.0),
+                    "amyloid_plaque": False
+                }
+                st.session_state.stats["memory"] -= 40.0
+                cooldowns["sprouting"] = 30
+                add_log(f"🌱 LÂM SÀNG: Kích hoạt mọc mầm Synaptic Sprouting! Sao chép liên kết từ [{parent_r+1},{parent_c+1}] sang ô trống [{child_r+1},{child_c+1}] (-40 MB Memory).")
+                st.rerun()
+            else:
+                st.warning("Không tìm thấy Interneuron nào có ô trống lân cận để mọc mầm!")
 
     # Neurotransmitter Synthesis Precursors & Diet System Layout
     st.markdown("##### 🧬 Dinh Dưỡng Học & Tiền Chất Thần Kinh (Precursor Dietary Intake)")
@@ -1858,6 +1920,7 @@ with tab1:
         trem2_active = "Có 🟢" if "TREM2" in st.session_state.active_genes else "Không ⚪"
         occipital_status = f"Lv.{upgrades.get('occipital_lobe', 0)}" if upgrades.get("occipital_lobe", 0) >= 1 else "Chưa mở khóa ⚪"
         temporal_status = f"Lv.{upgrades.get('temporal_lobe', 0)}" if upgrades.get("temporal_lobe", 0) >= 1 else "Chưa mở khóa ⚪"
+        parietal_status = f"Lv.{upgrades.get('parietal_lobe', 0)}" if upgrades.get("parietal_lobe", 0) >= 1 else "Chưa mở khóa ⚪"
 
         brain_art = f"""
         [ Frontal Cortex: Lv.{upgrades['cortex']} ] ---------.
@@ -1877,6 +1940,8 @@ with tab1:
         [ Occipital Lobe (Thùy Chẩm): {occipital_status} ] (Xử lý thị giác 2x)
                    |
         [ Temporal Lobe (Thùy Thái Dương): {temporal_status} ] (Xử lý âm thanh & LTP)
+                   |
+        [ Parietal Lobe (Thùy Đỉnh): {parietal_status} ] (Xử lý không gian & Gating)
                    |
         [ Amygdala (Hạch Hạnh Nhân): Lv.{upgrades.get('amygdala', 0)} ] (Hạ stress)
                    |
@@ -2053,6 +2118,18 @@ with tab1:
                 st.session_state.stats["iq"] -= cost_temporal
                 upgrades["temporal_lobe"] = upgrades.get("temporal_lobe", 0) + 1
                 add_log(f"Nâng cấp Thùy Thái Dương Temporal Lobe lên cấp {upgrades['temporal_lobe']}!")
+                st.rerun()
+
+        # UPGRADE: Parietal Lobe Upgrade Item
+        cost_parietal = int(50 * (1.6 ** upgrades.get("parietal_lobe", 0)))
+        upgrade_cols_parietal = st.columns([3, 1])
+        with upgrade_cols_parietal[0]:
+            st.write(f"**Thùy Đỉnh (Parietal Lobe) [Lv.{upgrades.get('parietal_lobe', 0)}]**\nXử lý bản đồ định vị không gian mỗi 18 ticks: Khi dòng điện tích truyền qua điểm Gating ngẫu nhiên sẽ kích hoạt Somatosensory Gating hạ -20% Stress và cắt 50% tiêu hao năng lượng trong 3 ticks.")
+        with upgrade_cols_parietal[1]:
+            if st.button(f"Mua ({cost_parietal} IQ)", key="up_parietal", disabled=st.session_state.stats["iq"] < cost_parietal, use_container_width=True):
+                st.session_state.stats["iq"] -= cost_parietal
+                upgrades["parietal_lobe"] = upgrades.get("parietal_lobe", 0) + 1
+                add_log(f"Nâng cấp Thùy Đỉnh Parietal Lobe lên cấp {upgrades['parietal_lobe']}!")
                 st.rerun()
 
         # UPGRADE: LTP Consolidator Upgrade Item
