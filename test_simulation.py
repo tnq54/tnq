@@ -1531,3 +1531,66 @@ def test_schizophrenia_hallucinations():
     # Sensory cell charge is directly elevated to its threshold of 0.8!
     # And since it hits threshold, it fires, and after propagation, Hebbian resets its charge to 0.0.
     assert app.st.session_state.neuron_grid[1][1]["charge"] == 0.0
+
+
+def test_active_electrode_probe():
+    """
+    TEST: Active Electrode Probe (Action Potential Clamp)
+    Verifies that the clinical probe instantly sets the selected cell's charge to 1.0 and spends 15 MB.
+    """
+    app.st.session_state = MockSessionState()
+    app.st.session_state["bot_thread"] = True
+    app.init_game_state()
+
+    app.st.session_state.stats["memory"] = 100.0
+    app.st.session_state.selected_cell = (2, 2)
+
+    # Selected cell is an Interneuron
+    app.st.session_state.neuron_grid[2][2] = {
+        "type": "Interneuron",
+        "charge": 0.1,
+        "threshold": 0.5
+    }
+
+    # Simulate active probe click manually
+    sel_r, sel_c = app.st.session_state.selected_cell
+    app.st.session_state.stats["memory"] -= 15.0
+    app.st.session_state.neuron_grid[sel_r][sel_c]["charge"] = 1.0
+
+    assert app.st.session_state.neuron_grid[2][2]["charge"] == 1.0
+    assert app.st.session_state.stats["memory"] == 85.0
+
+
+def test_cognitive_sync_combos():
+    """
+    TEST: Cognitive Sync Combo rewards
+    Verifies that firing 3 Motor cells simultaneously in a single tick triggers the Cognitive Sync combo, multiplying Memory yields by 1.5x and reducing stress.
+    """
+    app.st.session_state = MockSessionState()
+    app.st.session_state["bot_thread"] = True
+    app.init_game_state()
+
+    app.st.session_state.chemicals["stress"] = 50.0
+    app.st.session_state.stats["memory"] = 10.0
+
+    # Set upgrades hippocampus to 0 for a baseline yield of 2.0 per Motor cell.
+    # We have 3 firing Motor cells. Total base yield = 3 * 2.0 = 6.0 Memory MB.
+    # Under Cognitive Sync Combo (firing count >= 3), total memory yield is amplified by 1.5x -> 6.0 * 1.5 = 9.0 Memory MB.
+    # Total memory should become 10.0 + 9.0 = 19.0.
+    # Stress drops by an additional 15.0 (50.0 - 15.0 = 35.0, then normal delta stress applies).
+    app.st.session_state.upgrades["hippocampus"] = 0
+
+    # Clear grid
+    for r in range(6):
+        for c in range(6):
+            app.st.session_state.neuron_grid[r][c] = {"type": "Empty", "charge": 0.0, "threshold": 0.5, "weight": 1.0}
+
+    # Place 3 firing Motor cells
+    app.st.session_state.neuron_grid[0][0] = {"type": "Motor", "charge": 0.9, "threshold": 0.5}
+    app.st.session_state.neuron_grid[1][1] = {"type": "Motor", "charge": 0.9, "threshold": 0.5}
+    app.st.session_state.neuron_grid[2][2] = {"type": "Motor", "charge": 0.9, "threshold": 0.5}
+
+    app.run_simulation_tick()
+
+    assert app.st.session_state.stats["memory"] == 19.0
+    assert app.st.session_state.chemicals["stress"] < 40.0

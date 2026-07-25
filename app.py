@@ -1024,6 +1024,12 @@ def run_simulation_tick():
                 chems["dopamine"] = min(100.0, chems["dopamine"] + (8.0 * doping_multiplier))
                 chems["acetylcholine"] = max(0.0, chems["acetylcholine"] - 4.0)
 
+    # UPGRADE: Cognitive Sync Combo Reward System
+    if motor_fired_count >= 3:
+        motor_yield_mem *= 1.5
+        chems["stress"] = max(0.0, chems["stress"] - 15.0)
+        add_log(f"✨ [COGNITIVE SYNC] Đồng bộ nhận thức cực độ! Đồng loạt kích hoạt {motor_fired_count} Motor cells giúp khuyếch đại +50% Trí nhớ và giảm 15% Stress.")
+
     # Apply motor accomplishments
     if motor_fired_count > 0:
         st.session_state.stats["iq"] += motor_yield_iq
@@ -1320,11 +1326,15 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("🧠 Siêu Hệ Thống VBot1 & Game Mô Phỏng Não Bộ")
-st.write("Dự án tích hợp: Game mô phỏng tiến hóa nơ-ron sinh học kết hợp Trợ lý AI Telegram Llama 3 & Gemini 1.5. **(Version 4.0.0 - The Ultimate Neurological Integration Update)**")
+st.write("Dự án tích hợp: Game mô phỏng tiến hóa nơ-ron sinh học kết hợp Trợ lý AI Telegram Llama 3 & Gemini 1.5. **(Version 4.1.0 - Interactive Electrodes & Cognitive Sync Update)**")
 
-with st.expander("🆕 [CHANGELOG] Nhật Ký Cập Nhật Phiên Bản 4.0.0 - Hệ Nội Tiết & Thử Thách Tâm Thần", expanded=False):
+with st.expander("🆕 [CHANGELOG] Nhật Ký Cập Nhật Phiên Bản 4.1.0 - Kẹp Điện Cực & Đồng Bộ Nhận Thức", expanded=False):
     st.markdown("""
-    **🚀 Phiên bản 4.0.0 (Bản nâng cấp tối thượng hệ nội tiết và bệnh lý học):**
+    **🚀 Phiên bản 4.1.0 (Bản nâng cấp tương tác điện cực và combo nhận thức):**
+    *   **Kẹp Điện Cực Chủ Động (Action Potential Clamp):** Cho phép người chơi chủ động kích phát nơ-ron được chọn lên mức tối đa 1.0 điện tích bằng phím bấm trực quan `🔌 Kích xung điện cực` (tiêu tốn 15 MB), tạo ra luồng kích thích điện chủ động tức thời.
+    *   **Hệ Thống Combo Đồng Bộ Nhận Thức (Cognitive Sync Combo):** Khi có từ 3 Motor cells phát xung đồng loạt trong cùng một tick, hệ thống kích hoạt trạng thái đồng bộ nhận thức cực đại, khuyếch đại +50% sản lượng Trí nhớ thu được và giảm ngay lập tức 15% nồng độ Stress tích tụ.
+
+    **🚀 Phiên bản 4.0.0:**
     *   **Tuyến Yên (Pituitary Gland) & Giải phóng Oxytocin:** Mở rộng cấu trúc giải phẫu Tuyến Yên điều hòa hormone. Tự động kích hoạt **Oxytocin Surge** mỗi 20 ticks trong 5 ticks liên tục giúp triệt tiêu 50% Stress phát sinh và nhân đôi tốc độ hồi phục Tỉnh táo (Sanity).
     *   **Bệnh lý học Tâm Thần Phân Liệt (Schizophrenia Mode):** Thử thách thứ 6 mô phỏng ảo giác thần kinh. Cứ mỗi 8 ticks, ảo thanh đột ngột kích phát điện thế của một nơ-ron ngẫu nhiên lên mức tối đa gây hỗn loạn liên kết truyền dẫn, đồng thời giảm 30% tốc độ tự chữa lành Sanity của não bộ.
 
@@ -1865,6 +1875,15 @@ with tab1:
                 st.rerun()
 
         if current_cell["type"] != "Empty":
+            st.write("---")
+            # Active Electrode Probe (Action Potential Clamp) Button!
+            probe_disabled = st.session_state.stats["memory"] < 15.0
+            if st.button("🔌 Kích xung điện cực (+1.0 Charge) (-15 MB Memory)", disabled=probe_disabled, use_container_width=True, help="Điện cực kẹp thế năng chủ động (Action Potential Clamp): Chi phí 15 MB Bộ nhớ. Kích hoạt trực tiếp điện thế nơ-ron được chọn lên mức tối đa 1.0, kích phát xung điện tức thời."):
+                st.session_state.stats["memory"] -= 15.0
+                grid[selected_r][selected_c]["charge"] = 1.0
+                add_log(f"🔌 [Điện cực chủ động] Kích xung điện thế trực tiếp tại nơ-ron [{selected_r+1},{selected_c+1}]!")
+                st.rerun()
+
             st.write("---")
             axon_cols = st.columns(2)
             with axon_cols[0]:
