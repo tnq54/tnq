@@ -312,7 +312,7 @@ def init_game_state():
 
         st.session_state.neuron_grid = grid
 
-        # Chemistry metrics (added melatonin, neuro_inflammation, norepinephrine, gaba)
+        # Chemistry metrics (added melatonin, neuro_inflammation, norepinephrine, gaba, neuro_nutrients)
         st.session_state.chemicals = {
             "dopamine": 50.0,
             "serotonin": 50.0,
@@ -323,7 +323,8 @@ def init_game_state():
             "melatonin": 10.0,
             "neuro_inflammation": 10.0,
             "norepinephrine": 10.0,
-            "gaba": 30.0
+            "gaba": 30.0,
+            "neuro_nutrients": 80.0
         }
 
         # Advanced Game Modes (Normal, Alzheimer, Epilepsy, Parkinson, ADHD)
@@ -354,7 +355,8 @@ def init_game_state():
             "opto": 0,
             "cortisol": 0, # clinical anti-inflammatory wash cooldown
             "propranolol": 0, # clinical beta-blocker cooldown
-            "sprouting": 0 # clinical synaptic sprouting cooldown
+            "sprouting": 0, # clinical synaptic sprouting cooldown
+            "vns": 0 # clinical vagus nerve stimulation cooldown
         }
 
         # Audio Synthesizer Triggers
@@ -402,7 +404,8 @@ def init_game_state():
             "temporal_lobe": 0,
             "ltp_consolidator": 0,
             "parietal_lobe": 0,
-            "pituitary_gland": 0
+            "pituitary_gland": 0,
+            "blood_brain_barrier": 0
         }
 
         # Local Circuit Save Slots Library
@@ -425,7 +428,8 @@ def init_game_state():
             "dopamine": [50.0],
             "stress": [10.0],
             "norepinephrine": [10.0],
-            "gaba": [30.0]
+            "gaba": [30.0],
+            "neuro_nutrients": [80.0]
         }
 
 def get_evolution_stage(iq):
@@ -813,8 +817,15 @@ def run_simulation_tick():
         if pruned_count > 0:
             add_log(f"✂️ [Cắt tỉa] Đã tự động cắt tỉa {pruned_count} liên kết nơ-ron nhàn rỗi (>15 ticks) và hoàn phí +75% MB.")
 
+    # Neuro-nutrients decay and BBB protection
+    nutrients_decay = 1.0 if upgrades.get("blood_brain_barrier", 0) >= 1 else 1.5
+    chems["neuro_nutrients"] = max(0.0, min(100.0, chems.get("neuro_nutrients", 80.0) - nutrients_decay))
+
     # 1. Metabolism and Fuel Check
     energy_generation = 4.0 + upgrades["brainstem"] * 2.0
+    # Half energy generation if neuro_nutrients drop below 30%
+    if chems.get("neuro_nutrients", 80.0) < 30.0:
+        energy_generation *= 0.5
 
     neuron_count = 0
     for r in range(GRID_SIZE):
@@ -974,7 +985,7 @@ def run_simulation_tick():
 
                     for nr, nc in neighbors:
                         next_charges[nr][nc] = min(1.0, next_charges[nr][nc] + transfer_charge)
-                        if upgrades["plasticity"] > 0 and grid[nr][nc]["charge"] > 0.3:
+                        if upgrades["plasticity"] > 0 and grid[nr][nc]["charge"] > 0.3 and chems.get("neuro_nutrients", 80.0) >= 30.0:
                             # BDNF Gene Mutation increases plasticity learning speed x1.5
                             learn_rate = 0.015 if "BDNF" in genes else 0.01
                             grid[nr][nc]["threshold"] = max(0.2, grid[nr][nc]["threshold"] - learn_rate)
@@ -1069,6 +1080,10 @@ def run_simulation_tick():
     if "MAOA" in genes:
         fire_stress *= 1.4
 
+    # Mania pathological mode doubles stress generation by fires
+    if mode == "Mania":
+        fire_stress *= 2.0
+
     stress_clearance = 1.5 + (upgrades["cerebellum"] * 1.0)
     # SLC6A4 gene slightly dampens normal stress clearance by 30%
     if "SLC6A4" in genes:
@@ -1109,9 +1124,17 @@ def run_simulation_tick():
             healing *= 0.7
         chems["sanity"] = max(0.0, min(100.0, chems["sanity"] + healing))
 
+    # Mania pathological mode continuously drains sanity & auto-generates dopamine
+    if mode == "Mania":
+        chems["dopamine"] = min(100.0, chems["dopamine"] + 1.5)
+        chems["sanity"] = max(0.0, chems["sanity"] - 1.0)
+
     # UPGRADE: Neuro-Inflammation & Microglia Immune Delta Engine
     # Neuro-inflammation rises on signals fired and high stress
     inflammation_gain = (signals_fired * 0.4) + (effective_stress > 50.0 and (effective_stress - 50.0) * 0.2 or 0.0)
+    # Blood-Brain Barrier Lv1+ reduces neuro-inflammation generation by 50%
+    if upgrades.get("blood_brain_barrier", 0) >= 1:
+        inflammation_gain *= 0.5
     # Natural immune clearance of 1.0% per tick
     chems["neuro_inflammation"] = max(0.0, min(100.0, chems["neuro_inflammation"] + inflammation_gain - 1.0))
 
@@ -1123,8 +1146,9 @@ def run_simulation_tick():
     # UPGRADE: Norepinephrine Fight-or-Flight & Panic Attack Delta Engine
     # Norepinephrine rises with signals fired and high stress
     norepi_gain = (signals_fired * 0.5) + (chems["stress"] * 0.1)
-    # Natural clearance of 1.5% per tick
-    chems["norepinephrine"] = max(0.0, min(100.0, chems.get("norepinephrine", 10.0) + norepi_gain - 1.5))
+    # Natural clearance of 1.5% per tick (Mania slows Norepinephrine clearance in half)
+    norepi_clearance = 0.75 if mode == "Mania" else 1.5
+    chems["norepinephrine"] = max(0.0, min(100.0, chems.get("norepinephrine", 10.0) + norepi_gain - norepi_clearance))
 
     # Panic Attack Trigger Check (threshold is 90% normally, or 100% if ADRA2A gene is active)
     panic_threshold = 100.0 if "ADRA2A" in genes else 90.0
@@ -1260,6 +1284,7 @@ def record_history(ticks, chems):
     hist["stress"].append(chems["stress"])
     hist["norepinephrine"].append(chems.get("norepinephrine", 10.0))
     hist["gaba"].append(chems.get("gaba", 30.0))
+    hist["neuro_nutrients"].append(chems.get("neuro_nutrients", 80.0))
 
     if len(hist["tick"]) > 40:
         for key in hist:
@@ -1326,10 +1351,15 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("🧠 Siêu Hệ Thống VBot1 & Game Mô Phỏng Não Bộ")
-st.write("Dự án tích hợp: Game mô phỏng tiến hóa nơ-ron sinh học kết hợp Trợ lý AI Telegram Llama 3 & Gemini 1.5. **(Version 4.1.0 - Interactive Electrodes & Cognitive Sync Update)**")
+st.write("Dự án tích hợp: Game mô phỏng tiến hóa nơ-ron sinh học kết hợp Trợ lý AI Telegram Llama 3 & Gemini 1.5. **(Version 6.0.0 - Ultimate Neuro-Endocrine & Vascular Update)**")
 
-with st.expander("🆕 [CHANGELOG] Nhật Ký Cập Nhật Phiên Bản 4.1.0 - Kẹp Điện Cực & Đồng Bộ Nhận Thức", expanded=False):
+with st.expander("🆕 [CHANGELOG] Nhật Ký Cập Nhật Phiên Bản 6.0.0 - Ultimate Neuro-Endocrine & Vascular Update", expanded=False):
     st.markdown("""
+    **🚀 Phiên bản 6.0.0 (Bản nâng cấp tối hậu về Mạch máu, Nội tiết tố & Liệu pháp phế vị):**
+    *   **Hàng Rào Máu Não (Blood-Brain Barrier - BBB) & Dinh Dưỡng Thần Kinh (Neuro-Nutrients):** Bổ sung chỉ số Dinh dưỡng Thần kinh tiêu hao 1.5% mỗi tick. Nếu dinh dưỡng < 30%, hiệu năng sinh năng lượng giảm 50% và chặn cơ chế Hebbian LTP. Bồi bổ Tiền chất dinh dưỡng (Diet Precursors) hồi phục +25% Dinh dưỡng. Nâng cấp Hàng rào máu não (BBB Upgrade) giúp giảm tốc độ hao hụt dinh dưỡng còn 1.0% và giảm 50% lượng Độc tố/Viêm nhiễm phát sinh.
+    *   **Bệnh lý học Hưng Cảm (Mania Mode):** Trạng thái bệnh lý thứ 7 mô tả cơn cuồng sảng kích động. Tự động tăng Dopamine cực nhanh (+1.5%/tick), hao hụt Sanity mạnh (-1.0%/tick), giảm 50% tốc độ tự triệt tiêu Norepinephrine (0.75%) và nhân đôi Stress phát sinh từ các xung kích hỏa.
+    *   **Liệu pháp Kích thích Dây Thần Kinh Phế Vị (VNS):** Khả năng lâm sàng chủ động mới. Tiêu hao 30 MB bộ nhớ, lập tức đặt Stress về 0.0%, hồi phục +20% Sanity và sạc đầy GABA lên 90% (Cooldown 40s).
+
     **🚀 Phiên bản 4.1.0 (Bản nâng cấp tương tác điện cực và combo nhận thức):**
     *   **Kẹp Điện Cực Chủ Động (Action Potential Clamp):** Cho phép người chơi chủ động kích phát nơ-ron được chọn lên mức tối đa 1.0 điện tích bằng phím bấm trực quan `🔌 Kích xung điện cực` (tiêu tốn 15 MB), tạo ra luồng kích thích điện chủ động tức thời.
     *   **Hệ Thống Combo Đồng Bộ Nhận Thức (Cognitive Sync Combo):** Khi có từ 3 Motor cells phát xung đồng loạt trong cùng một tick, hệ thống kích hoạt trạng thái đồng bộ nhận thức cực đại, khuyếch đại +50% sản lượng Trí nhớ thu được và giảm ngay lập tức 15% nồng độ Stress tích tụ.
@@ -1453,8 +1483,8 @@ with tab1:
     with cols[5]:
         st.metric("Kho Glycogen tế bào hình sao", f"{st.session_state.stats.get('glycogen_pool', 0.0):.1f} units")
 
-    # Progress bars for detailed chemistry (added Melatonin, Inflammation, Norepinephrine, GABA)
-    chem_cols = st.columns(8)
+    # Progress bars for detailed chemistry (added Melatonin, Inflammation, Norepinephrine, GABA, Neuro-nutrients)
+    chem_cols = st.columns(9)
     with chem_cols[0]:
         val = st.session_state.chemicals["dopamine"]
         st.progress(val / 100.0, text=f"Dopamine (Động lực): {val:.1f}%")
@@ -1480,6 +1510,10 @@ with tab1:
     with chem_cols[7]:
         val = st.session_state.chemicals.get("gaba", 30.0)
         st.progress(val / 100.0, text=f"GABA (Ức chế dịu não): {val:.1f}%")
+    with chem_cols[8]:
+        val = st.session_state.chemicals.get("neuro_nutrients", 80.0)
+        nutrient_state = "⚠️ Cạn kiệt (Tê liệt Hebbian)" if val < 30.0 else "Normal"
+        st.progress(val / 100.0, text=f"Neuro-nutrients: {val:.1f}% ({nutrient_state})")
 
     # Live EEG Brainwave Telemetry monitoring
     st.markdown("##### 📊 Sóng não lâm sàng (EEG Brainwave Telemetry)")
@@ -1506,7 +1540,7 @@ with tab1:
 
     # Hormone active abilities layout
     st.markdown("##### 🧪 Trung tâm nội tiết tố & Liệu pháp Lâm sàng (Active Abilities)")
-    hormone_cols = st.columns(8)
+    hormone_cols = st.columns(9)
     cooldowns = st.session_state.cooldowns
 
     with hormone_cols[0]:
@@ -1636,6 +1670,20 @@ with tab1:
             else:
                 st.warning("Không tìm thấy Interneuron nào có ô trống lân cận để mọc mầm!")
 
+    # UPGRADE: Clinical Vagus Nerve Stimulation (VNS) Active Ability
+    with hormone_cols[8]:
+        vns_disabled = cooldowns.get("vns", 0) > 0 or st.session_state.stats["memory"] < 30.0
+        btn_label_vns = f"❤️ VNS ({cooldowns.get('vns', 0)}s)" if cooldowns.get("vns", 0) > 0 else "❤️ VNS"
+        if st.button(btn_label_vns, disabled=vns_disabled, use_container_width=True, help="Kích thích dây thần kinh phế vị (Vagus Nerve Stimulation - VNS): Chi phí 30 MB Bộ nhớ. Lập tức đặt mức Stress về 0.0%, phục hồi +20% Sanity, và sạc đầy GABA lên 90.0% ngay tức thì. Cooldown 40s."):
+            grid = st.session_state.neuron_grid
+            st.session_state.stats["memory"] -= 30.0
+            st.session_state.chemicals["stress"] = 0.0
+            st.session_state.chemicals["sanity"] = min(100.0, st.session_state.chemicals["sanity"] + 20.0)
+            st.session_state.chemicals["gaba"] = 90.0
+            cooldowns["vns"] = 40
+            add_log("❤️ LÂM SÀNG: Kích thích dây thần kinh phế vị VNS! Hạ stress về không, bình ổn tối đa nhịp hóa sinh vỏ não.")
+            st.rerun()
+
     # Neurotransmitter Synthesis Precursors & Diet System Layout
     st.markdown("##### 🧬 Dinh Dưỡng Học & Tiền Chất Thần Kinh (Precursor Dietary Intake)")
     st.caption("Tổng hợp trực tiếp các chất dẫn truyền thông qua bồi bổ dinh dưỡng. Phí tiêu thụ: 15 MB Bộ nhớ.")
@@ -1646,7 +1694,8 @@ with tab1:
         if st.button("🥩 Bổ sung L-Tyrosine (-15 MB)", disabled=tyrosine_disabled, use_container_width=True, help="Tiền chất Dopamine: Tăng +3.0 Dopamine/tick liên tục trong 15 ticks."):
             st.session_state.stats["memory"] -= 15.0
             st.session_state.active_buffs["tyrosine"] = 15
-            add_log("🥩 DINH DƯỠNG: Bổ sung L-Tyrosine! Thúc đẩy tổng hợp dopamine nội sinh (+3.0 DA/tick trong 15s).")
+            st.session_state.chemicals["neuro_nutrients"] = min(100.0, st.session_state.chemicals.get("neuro_nutrients", 80.0) + 25.0)
+            add_log("🥩 DINH DƯỠNG: Bổ sung L-Tyrosine! Thúc đẩy tổng hợp dopamine nội sinh (+3.0 DA/tick trong 15s) & hồi phục +25% Neuro-nutrients.")
             st.rerun()
 
     with diet_cols[1]:
@@ -1654,7 +1703,8 @@ with tab1:
         if st.button("🍌 Bổ sung L-Tryptophan (-15 MB)", disabled=tryptophan_disabled, use_container_width=True, help="Tiền chất Serotonin: Tăng +2.0 Serotonin/tick liên tục trong 15 ticks."):
             st.session_state.stats["memory"] -= 15.0
             st.session_state.active_buffs["tryptophan"] = 15
-            add_log("🍌 DINH DƯỠNG: Bổ sung L-Tryptophan! Thúc đẩy tổng hợp serotonin giúp ổn định tinh thần (+2.0 SE/tick trong 15s).")
+            st.session_state.chemicals["neuro_nutrients"] = min(100.0, st.session_state.chemicals.get("neuro_nutrients", 80.0) + 25.0)
+            add_log("🍌 DINH DƯỠNG: Bổ sung L-Tryptophan! Thúc đẩy tổng hợp serotonin giúp ổn định tinh thần (+2.0 SE/tick trong 15s) & hồi phục +25% Neuro-nutrients.")
             st.rerun()
 
     with diet_cols[2]:
@@ -1662,7 +1712,8 @@ with tab1:
         if st.button("🥚 Bổ sung Choline (-15 MB)", disabled=choline_disabled, use_container_width=True, help="Tiền chất Acetylcholine: Tăng +2.5 Acetylcholine/tick liên tục trong 15 ticks."):
             st.session_state.stats["memory"] -= 15.0
             st.session_state.active_buffs["choline"] = 15
-            add_log("🥚 DINH DƯỠNG: Bổ sung Choline! Gia tăng nguyên liệu Acetylcholine tăng độ tập trung (+2.5 ACh/tick trong 15s).")
+            st.session_state.chemicals["neuro_nutrients"] = min(100.0, st.session_state.chemicals.get("neuro_nutrients", 80.0) + 25.0)
+            add_log("🥚 DINH DƯỠNG: Bổ sung Choline! Gia tăng nguyên liệu Acetylcholine tăng độ tập trung (+2.5 ACh/tick trong 15s) & hồi phục +25% Neuro-nutrients.")
             st.rerun()
 
     with diet_cols[3]:
@@ -1670,7 +1721,8 @@ with tab1:
         if st.button("🥦 Bổ sung Glutamate (-15 MB)", disabled=glutamate_disabled, use_container_width=True, help="Tiền chất GABA: Tăng +3.0 GABA/tick liên tục trong 15 ticks."):
             st.session_state.stats["memory"] -= 15.0
             st.session_state.active_buffs["glutamate"] = 15
-            add_log("🥦 DINH DƯỠNG: Bổ sung Glutamate! Thúc đẩy tổng hợp GABA giúp dập tắt hưng phấn động kinh và giảm stress (+3.0 GABA/tick trong 15s).")
+            st.session_state.chemicals["neuro_nutrients"] = min(100.0, st.session_state.chemicals.get("neuro_nutrients", 80.0) + 25.0)
+            add_log("🥦 DINH DƯỠNG: Bổ sung Glutamate! Thúc đẩy tổng hợp GABA giúp dập tắt hưng phấn động kinh và giảm stress (+3.0 GABA/tick trong 15s) & hồi phục +25% Neuro-nutrients.")
             st.rerun()
 
     # Dynamic Game Event Modal/Alert

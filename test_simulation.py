@@ -1594,3 +1594,146 @@ def test_cognitive_sync_combos():
 
     assert app.st.session_state.stats["memory"] == 19.0
     assert app.st.session_state.chemicals["stress"] < 40.0
+
+
+# ----------------- VERSION 6.0.0 UPGRADE TESTS -----------------
+
+def test_blood_brain_barrier_and_nutrients():
+    """
+    TEST: Blood-Brain Barrier (BBB) & Neuro-Nutrients system.
+    """
+    app.st.session_state = MockSessionState()
+    app.st.session_state["bot_thread"] = True
+    app.init_game_state()
+
+    # 1. Base decay is 1.5% without BBB upgrade
+    app.st.session_state.chemicals["neuro_nutrients"] = 100.0
+    app.st.session_state.upgrades["bbb_upgrade"] = 0
+    app.st.session_state.upgrades["brainstem"] = 1 # generates 6.0 energy
+    app.run_simulation_tick()
+    assert abs(app.st.session_state.chemicals["neuro_nutrients"] - 98.5) < 1e-5
+
+    # 2. Slow decay is 1.0% with BBB upgrade
+    app.st.session_state.chemicals["neuro_nutrients"] = 100.0
+    app.st.session_state.upgrades["blood_brain_barrier"] = 1
+    app.run_simulation_tick()
+    assert abs(app.st.session_state.chemicals["neuro_nutrients"] - 99.0) < 1e-5
+
+    # 3. Low nutrients (< 30) halves energy generation & blocks Hebbian Learning Plasticity
+    app.st.session_state.chemicals["neuro_nutrients"] = 25.0
+    app.st.session_state.chemicals["norepinephrine"] = 0.0 # avoid fight-or-flight energy drain
+    app.st.session_state.upgrades["plasticity"] = 1
+
+    # Set up a firing cell to trigger learning on neighbor cell
+    for r in range(6):
+        for c in range(6):
+            app.st.session_state.neuron_grid[r][c] = {"type": "Empty", "charge": 0.0, "threshold": 0.5, "weight": 1.0, "direction": "All"}
+    app.st.session_state.neuron_grid[0][0] = {
+        "type": "Sensory",
+        "charge": 0.6,
+        "threshold": 0.4,
+        "fire_rate": 0.0,
+        "last_fired": -1,
+        "direction": "Right",
+        "weight": 1.0
+    }
+    app.st.session_state.neuron_grid[0][1] = {
+        "type": "Interneuron",
+        "charge": 0.4, # > 0.3 triggers learning plasticity (threshold drift)
+        "threshold": 0.5,
+        "fire_rate": 0.0,
+        "last_fired": -1,
+        "direction": "All",
+        "weight": 1.0
+    }
+
+    app.st.session_state.chemicals["energy"] = 50.0
+    app.st.session_state.upgrades["brainstem"] = 1 # normally +6.0 energy
+    # Under low nutrients, net energy gain is halved.
+    # Total cost = 1.0 + 2 * 0.4 = 1.8. Normally net change is 6.0 - 1.8 = +4.2.
+    # Halved generator: 3.0 - 1.8 = +1.2.
+    app.run_simulation_tick()
+    assert abs(app.st.session_state.chemicals["energy"] - 51.2) < 1e-5
+    # Hebbian plasticity was blocked due to low nutrients, so neighbor threshold must remain unchanged (0.5)!
+    assert app.st.session_state.neuron_grid[0][1]["threshold"] == 0.5
+
+
+def test_mania_mode():
+    """
+    TEST: Mania (Hưng cảm) Pathological Mode.
+    """
+    app.st.session_state = MockSessionState()
+    app.st.session_state["bot_thread"] = True
+    app.init_game_state()
+
+    app.st.session_state.game_mode = "Mania"
+    app.st.session_state.chemicals["dopamine"] = 40.0
+    app.st.session_state.chemicals["sanity"] = 100.0
+    app.st.session_state.chemicals["norepinephrine"] = 50.0
+    app.st.session_state.chemicals["stress"] = 0.0
+
+    # Place a firing sensory cell to trigger stress
+    for r in range(6):
+        for c in range(6):
+            app.st.session_state.neuron_grid[r][c] = {"type": "Empty", "charge": 0.0, "threshold": 0.5, "weight": 1.0}
+    app.st.session_state.neuron_grid[0][0] = {
+        "type": "Sensory",
+        "charge": 0.6,
+        "threshold": 0.4,
+        "fire_rate": 0.0,
+        "last_fired": -1,
+        "direction": "Right",
+        "weight": 1.0
+    }
+    app.st.session_state.neuron_grid[0][1] = {
+        "type": "Interneuron",
+        "charge": 0.1,
+        "threshold": 0.5,
+        "fire_rate": 0.0,
+        "last_fired": -1,
+        "direction": "All",
+        "weight": 1.0
+    }
+
+    app.run_simulation_tick()
+    # 1. Sanity decay under mania is -1.0%
+    assert app.st.session_state.chemicals["sanity"] == 99.0
+    # 2. Dopamine auto-increases (+1.5%) before normal stabilization
+    # 40.0 + 1.5 = 41.5 -> 41.5 + (50 - 41.5) * 0.08 = 42.18
+    assert abs(app.st.session_state.chemicals["dopamine"] - 42.18) < 1e-5
+    # 3. Norepinephrine clearance is halved (0.75 multiplier of clearance delta)
+    # Target is 0.0. Start 50.0. Clearance is normally (50.0 - 0.0)*0.1 = 5.0.
+    # Halved clearance means 2.5 clearance -> 50.0 - 2.5 = 47.5
+    # Since we have 1 firing cell, norepi_gain = 0.5 (signals) + 0.05 (stress) = 0.55
+    # Net change: +0.55 - 0.75 = -0.2 -> 50.0 - 0.2 = 49.8
+    assert abs(app.st.session_state.chemicals["norepinephrine"] - 49.8) < 1e-5
+    # 4. Fire stress is doubled (1.5 * 2.0 = 3.0 stress).
+    # Stress starts at 0.0. Delta stress = 3.0 - 2.5 (clearance) = 0.5.
+    assert abs(app.st.session_state.chemicals["stress"] - 0.5) < 1e-5
+
+
+def test_vns_active_ability():
+    """
+    TEST: Clinical Vagus Nerve Stimulation (VNS) Active Ability.
+    """
+    app.st.session_state = MockSessionState()
+    app.st.session_state["bot_thread"] = True
+    app.init_game_state()
+
+    app.st.session_state.stats["memory"] = 100.0
+    app.st.session_state.chemicals["stress"] = 80.0
+    app.st.session_state.chemicals["sanity"] = 50.0
+    app.st.session_state.chemicals["gaba"] = 10.0
+
+    # Trigger active ability
+    app.st.session_state.stats["memory"] -= 30.0
+    app.st.session_state.chemicals["stress"] = 0.0
+    app.st.session_state.chemicals["sanity"] = min(100.0, app.st.session_state.chemicals["sanity"] + 20.0)
+    app.st.session_state.chemicals["gaba"] = 90.0
+    app.st.session_state.cooldowns["vns"] = 40
+
+    assert app.st.session_state.stats["memory"] == 70.0
+    assert app.st.session_state.chemicals["stress"] == 0.0
+    assert app.st.session_state.chemicals["sanity"] == 70.0
+    assert app.st.session_state.chemicals["gaba"] == 90.0
+    assert app.st.session_state.cooldowns["vns"] == 40
