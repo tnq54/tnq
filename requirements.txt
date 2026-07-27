@@ -4,3 +4,4 @@ google-genai
 pypdf
 huggingface_hub
 pandas
+plotly

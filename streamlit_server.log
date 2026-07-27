@@ -1,15 +1,17 @@
 
 Collecting usage statistics. To deactivate, set browser.gatherUsageStats to false.
 
-2026-07-25 07:39:43.326 Uvicorn server started on :::7860
+2026-07-27 06:17:04.727 Uvicorn server started on :::7860
 
   You can now view your Streamlit app in your browser.
 
   Local URL: http://localhost:7860
   Network URL: http://192.168.0.2:7860
-  External URL: http://34.72.116.213:7860
+  External URL: http://34.133.87.101:7860
 
-2026-07-25 07:47:40,346 - __main__ - INFO - Initializing Telegram Bot Runner thread...
-2026-07-25 07:47:40,353 - __main__ - INFO - Network check passed successfully!
-2026-07-25 07:47:40,353 - __main__ - ERROR - TELEGRAM_TOKEN is missing. Bot cannot be started.
+2026-07-27 06:23:33.127 Please replace `use_container_width` with `width`.
+
+`use_container_width` will be removed after 2025-12-31.
+
+For `use_container_width=True`, use `width='stretch'`. For `use_container_width=False`, use `width='content'`.
   Stopping...
