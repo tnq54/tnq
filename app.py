@@ -333,12 +333,12 @@ def init_game_state():
             "neuro_nutrients": 80.0
         }
 
-        # 3D Index stats
+        # 3D Index stats (glowing WebGPU diagnostics)
         st.session_state.csi = 0.0 # Cognitive Sync Index
         st.session_state.pdi = 0.0 # Plasticity Density Index
         st.session_state.vpi = 80.0 # Vascular Perfusion Index
 
-        # Advanced Game Modes (Normal, Alzheimer, Epilepsy, Parkinson, ADHD, Schizophrenia, Mania)
+        # Advanced Game Modes
         st.session_state.game_mode = "Normal"
         st.session_state.active_genes = []
 
@@ -422,7 +422,7 @@ def init_game_state():
             "Slot 3": None
         }
 
-        st.session_state.game_log = ["Khởi tạo bộ não 3D thành công. Trạng thái tiến hóa: Hành não Bò sát."]
+        st.session_state.game_log = ["Khởi tạo bộ não 3D WebGPU thành công. Trạng thái tiến hóa: Hành não Bò sát."]
         st.session_state.playing = False
         st.session_state.tick_speed = 1.0
         st.session_state.selected_cell = (0, 0, 0) # 3D Coordinate
@@ -539,7 +539,6 @@ def check_mission_statuses():
     chems = st.session_state.chemicals
     stats = st.session_state.stats
 
-    # 1. Reflex Arc 3D: Check if at least 1 Sensory and 1 Motor exists on grid
     has_sensory = False
     has_motor = False
     active_count = 0
@@ -559,17 +558,14 @@ def check_mission_statuses():
         missions["reflex"]["status"] = "Completed"
         add_log("🎉 NHIỆM VỤ HOÀN THÀNH: [⚡ Cung Phản Xạ Sinh Học 3D]! Đã nhận thưởng +100 MB Trí nhớ.")
 
-    # 2. Autonomous feedback loop 3D: at least 6 active cells
     if missions["loop"]["status"] == "In Progress" and active_count >= 6:
         missions["loop"]["status"] = "Completed"
         add_log("🎉 NHIỆM VỤ HOÀN THÀNH: [🧠 Vòng Lặp Phản Hồi Tự Trị 3D]! Đã nhận thưởng +300 IQ.")
 
-    # 3. Zen Meditation: Stress < 5% and Sanity > 95%
     if missions["zen"]["status"] == "In Progress" and chems["stress"] < 5.0 and chems["sanity"] > 95.0:
         missions["zen"]["status"] = "Completed"
         add_log("🎉 NHIỆM VỤ HOÀN THÀNH: [🧘 Thiền Tĩnh Tâm Trị Liệu]! Đã nhận thưởng +40 Dopamine & +40 Serotonin.")
 
-    # 4. Superhuman Cognitive Marathon: IQ >= 500
     if missions["marathon"]["status"] == "In Progress" and stats["iq"] >= 500.0:
         missions["marathon"]["status"] = "Completed"
         add_log("🎉 NHIỆM VỤ HOÀN THÀNH: [🏆 Chạy Đua Nhận Thức Siêu Phàm]! Đã nhận thưởng +50 Acetylcholine & +200 MB Trí nhớ.")
@@ -585,42 +581,33 @@ def run_simulation_tick():
     st.session_state.stats["ticks"] += 1
     ticks = st.session_state.stats["ticks"]
 
-    # Decrement active hormone abilities cooldowns
     cooldowns = st.session_state.get("cooldowns", {"doping": 0, "ssri": 0, "focus": 0, "rtms": 0, "opto": 0, "cortisol": 0, "propranolol": 0, "sprouting": 0, "vns": 0})
     for k in cooldowns:
         if cooldowns[k] > 0:
             cooldowns[k] -= 1
 
-    # Decrement active buffs
     for k in buffs:
         if buffs[k] > 0:
             buffs[k] -= 1
 
-    # Circadian biological cycle logic (30s Day, 10s Night)
     cycle_time = ticks % 40
     if cycle_time < 30:
         st.session_state.stats["circadian_cycle"] = "Day"
-        # Melatonin decays during day
         chems["melatonin"] = max(5.0, chems["melatonin"] - 1.0)
     else:
         st.session_state.stats["circadian_cycle"] = "Night"
-        # Melatonin rises during night
         chems["melatonin"] = min(100.0, chems["melatonin"] + 4.0)
 
-    # Prefrontal Cortex (PFC) AI Decision Maker Automation Upgrade
     if upgrades.get("pfc", 0) >= 1 and st.session_state.current_event:
         evt = st.session_state.current_event
-        # PFC chooses choice with highest positive values
         best_choice = evt["choices"][0]
         best_choice["apply"]()
         add_log(f"🤖 [Vỏ Não Trước Trán PFC] Tự động giải quyết biến cố tối ưu: '{best_choice['label']}'")
         st.session_state.current_event = None
 
-    # Random Event Triggering Chance (3% chance per tick, if no active event)
     if not st.session_state.current_event and random.random() < 0.03:
         trigger_random_event()
 
-    # UPGRADE: Synaptic Pruning (Tự động cắt tỉa liên kết nơ-ron nhàn rỗi)
     if upgrades.get("pruning", 0) >= 1:
         pruned_count = 0
         for x in range(GRID_SIZE):
@@ -629,7 +616,6 @@ def run_simulation_tick():
                     cell = grid[x][y][z]
                     if cell["type"] == "Interneuron" and cell["last_fired"] != -1:
                         if (ticks - cell["last_fired"]) > 15:
-                            # Prune and refund 75% memory
                             refund = int(15 * 0.75)
                             st.session_state.stats["memory"] = min(st.session_state.stats["max_memory"], st.session_state.stats["memory"] + refund)
                             grid[x][y][z] = {
@@ -646,13 +632,10 @@ def run_simulation_tick():
         if pruned_count > 0:
             add_log(f"✂️ [Cắt tỉa 3D] Đã tự động cắt tỉa {pruned_count} liên kết nơ-ron nhàn rỗi (>15 ticks) và hoàn phí +75% MB.")
 
-    # Neuro-nutrients decay and BBB protection
     nutrients_decay = 1.0 if upgrades.get("blood_brain_barrier", 0) >= 1 else 1.5
     chems["neuro_nutrients"] = max(0.0, min(100.0, chems.get("neuro_nutrients", 80.0) - nutrients_decay))
 
-    # 1. Metabolism and Fuel Check
     energy_generation = 4.0 + upgrades["brainstem"] * 2.0
-    # Half energy generation if neuro_nutrients drop below 30%
     if chems.get("neuro_nutrients", 80.0) < 30.0:
         energy_generation *= 0.5
 
@@ -664,26 +647,21 @@ def run_simulation_tick():
                     neuron_count += 1
 
     metabolic_cost = 1.0 + (neuron_count * 0.4)
-    # CHRNA7 genetic mutation increases Energy metabolic consumption by 15%
     if "CHRNA7" in genes:
         metabolic_cost *= 1.15
 
-    # Norepinephrine drains energy faster (Fight-or-Flight cost)
     norepi_val = chems.get("norepinephrine", 10.0)
     metabolic_cost += (norepi_val / 100.0) * 3.0
 
-    # Somatosensory gating active buff reduces metabolic cost by 50%
     if buffs.get("somatosensory_gating", 0) > 0:
         metabolic_cost *= 0.5
 
     max_energy = 100.0
-    # Astrocytic Glycogen Shunt & PGC-1alpha genetics boost max energy storage capacity
     if upgrades.get("glycogen_shunt", 0) == 1:
         max_energy = 150.0
     if "PGC-1alpha" in genes:
         max_energy += 40.0
 
-    # Auto-release emergency glycogen pool
     if chems["energy"] < 15.0 and st.session_state.stats["glycogen_pool"] > 0:
         chems["energy"] = min(max_energy, chems["energy"] + 30.0)
         st.session_state.stats["glycogen_pool"] = max(0.0, st.session_state.stats["glycogen_pool"] - 30.0)
@@ -694,13 +672,11 @@ def run_simulation_tick():
     if chems["energy"] <= 0.0:
         add_log("⚠️ Cảnh báo: Bộ não cạn kiệt Glucose và Oxy! Không thể truyền tín hiệu.")
 
-    # 1.1. Upgrades continuous chemical rate adjustments & Buffs
     da_delta = 0.0
     se_delta = 0.0
     ach_delta = 0.0
     gaba_delta = 0.0
 
-    # Upgrades influence baseline stabilization
     if upgrades["brainstem"] >= 2: da_delta += 1.0
     if upgrades["brainstem"] >= 3: da_delta += 1.5
     if upgrades["cerebellum"] >= 2: se_delta += 1.0
@@ -708,64 +684,49 @@ def run_simulation_tick():
     if upgrades["hippocampus"] >= 2: ach_delta += 1.0
     if upgrades["hippocampus"] >= 3: ach_delta += 1.5
 
-    # Active Buffs tick injection
     if buffs.get("doping", 0) > 0: da_delta += 5.0
     if buffs.get("ssri", 0) > 0: se_delta += 3.0
     if buffs.get("focus", 0) > 0: ach_delta += 4.0
 
-    # Precursors Diet Intake injection
     if buffs.get("tyrosine", 0) > 0: da_delta += 3.0
     if buffs.get("tryptophan", 0) > 0: se_delta += 2.0
     if buffs.get("choline", 0) > 0: ach_delta += 2.5
     if buffs.get("glutamate", 0) > 0: gaba_delta += 3.0
 
-    # MAOA genetic mutation slows down Dopamine and Serotonin decay by 30%
     decay_rate = 0.08
     if "MAOA" in genes:
         decay_rate *= 0.7
 
-    # CHRNA7 genetic mutation increases Acetylcholine delta by 25%
     ach_mult = 1.25 if "CHRNA7" in genes else 1.0
 
-    # Apply chemical updates towards 50.0 homeostasis
     chems["dopamine"] = max(0.0, min(100.0, chems["dopamine"] + da_delta + (50.0 - chems["dopamine"]) * decay_rate))
     chems["serotonin"] = max(0.0, min(100.0, chems["serotonin"] + se_delta + (50.0 - chems["serotonin"]) * decay_rate))
     chems["acetylcholine"] = max(0.0, min(100.0, chems["acetylcholine"] + ach_delta + (50.0 - chems["acetylcholine"]) * 0.08 * ach_mult))
     chems["gaba"] = max(0.0, min(100.0, chems["gaba"] + gaba_delta + (30.0 - chems["gaba"]) * 0.10))
 
     if st.session_state.stats.get("sleep_state", False):
-        # Sensory inputs, signal propagation, and motor output are skipped/disabled
-        # Rapid sleep recovery heals biochemistry and flushes waste
         chems["energy"] = min(max_energy, chems["energy"] + 15.0)
         chems["sanity"] = min(100.0, chems["sanity"] + 8.0)
         chems["stress"] = max(0.0, chems["stress"] - 12.0)
 
-        # Reset cell charges to 0.0 during deep sleep
         for x in range(GRID_SIZE):
             for y in range(GRID_SIZE):
                 for z in range(GRID_SIZE):
                     grid[x][y][z]["charge"] = 0.0
 
-        # Stabilize dopamine and serotonin extremely quickly back towards 50%
         chems["dopamine"] += (50.0 - chems["dopamine"]) * 0.35
         chems["serotonin"] += (50.0 - chems["serotonin"]) * 0.35
-
-        # Sleep flushes neuro-inflammation quickly
         chems["neuro_inflammation"] = max(5.0, chems["neuro_inflammation"] - 6.0)
-
-        # Sleep flushes norepinephrine quickly
         chems["norepinephrine"] = max(5.0, chems.get("norepinephrine", 10.0) - 8.0)
 
-        if cycle_time == 0: # Day shifted, wake up automatically!
+        if cycle_time == 0:
             st.session_state.stats["sleep_state"] = False
             add_log("🌞 [Circadian] Mặt trời lên! Bộ não tự động tỉnh giấc, khôi phục hệ thống kích thích.")
 
-        # Update 3D Gameplay Indices
         update_3d_indices(grid, chems, upgrades)
         record_history(ticks, chems)
         return
 
-    # 2. Sensory Stimuli Fire Check
     sensory_fires = 0
     visual_boost_active = False
     visual_spark = st.session_state.get("visual_spark", None)
@@ -775,18 +736,14 @@ def run_simulation_tick():
             for z in range(GRID_SIZE):
                 cell = grid[x][y][z]
                 if cell["type"] == "Sensory":
-                    # UPGRADE: DRD2 genetic mutation boosts dopamine sensory fire rate multipliers by +50%
                     drd2_mult = 1.5 if "DRD2" in genes else 1.0
                     boost = 1.0 + (chems["dopamine"] / 100.0) * drd2_mult
-                    # Thalamus boosts sensory cell charge speed by +20% per level
                     thalamus_level = upgrades.get("thalamus", 0)
                     boost *= (1.0 + thalamus_level * 0.2)
 
-                    # Fight-or-flight Norepinephrine boost: up to +40% fire rate boost
                     norepi_boost = 1.0 + (chems.get("norepinephrine", 10.0) / 100.0) * 0.4
                     boost *= norepi_boost
 
-                    # Occipital Lobe visual alignment boost
                     if visual_spark and visual_spark["pos"] == (x, y, z):
                         if cell.get("direction", "All") == visual_spark["dir"]:
                             boost *= 2.0
@@ -799,7 +756,6 @@ def run_simulation_tick():
 
     st.session_state.visual_boost_active = visual_boost_active
 
-    # 3. Signal Propagation Model with Output Weights in 3D Space
     next_charges = [[[grid[x][y][z]["charge"] for z in range(GRID_SIZE)] for y in range(GRID_SIZE)] for x in range(GRID_SIZE)]
     signals_fired = 0
     fired_cells = set()
@@ -812,7 +768,6 @@ def run_simulation_tick():
                     fired_cells.add((x, y, z))
                     cell["last_fired"] = ticks
 
-                    # Check Parietal Lobe Spatial Gate
                     gate = st.session_state.get("spatial_gate", None)
                     if upgrades.get("parietal_lobe", 0) >= 1 and gate == (x, y, z):
                         chems["stress"] = max(0.0, chems["stress"] - 20.0)
@@ -844,17 +799,13 @@ def run_simulation_tick():
                                 neighbors.append((nx, ny, nz))
 
                     if neighbors:
-                        # SHANK3 (Synaptic Scaffolding) boosts Myelin transmission efficiency by +15%
                         shank3_bonus = 0.15 if "SHANK3" in genes else 0.0
                         signal_efficiency = 0.35 + (upgrades["myelin"] * 0.05) + shank3_bonus
 
-                        # Epilepsy Pathology increases charge speed
                         if mode == "Epilepsy":
                             signal_efficiency *= 1.35
 
-                        # Synaptic Output Weight scale
                         cell_weight = cell.get("weight", 1.0)
-                        # Amyloid-Beta plaques reduce effective Synaptic weight by 50%
                         if cell.get("amyloid_plaque", False):
                             cell_weight *= 0.5
                         transfer_charge = (cell["charge"] * signal_efficiency * cell_weight) / len(neighbors)
@@ -862,19 +813,16 @@ def run_simulation_tick():
                         for nx, ny, nz in neighbors:
                             next_charges[nx][ny][nz] = min(1.0, next_charges[nx][ny][nz] + transfer_charge)
                             if upgrades["plasticity"] > 0 and grid[nx][ny][nz]["charge"] > 0.3 and chems.get("neuro_nutrients", 80.0) >= 30.0:
-                                # BDNF Gene Mutation increases plasticity learning speed x1.5
                                 learn_rate = 0.015 if "BDNF" in genes else 0.01
                                 grid[nx][ny][nz]["threshold"] = max(0.2, grid[nx][ny][nz]["threshold"] - learn_rate)
 
                     signals_fired += 1
 
-    # Apply calculated charges
     for x in range(GRID_SIZE):
         for y in range(GRID_SIZE):
             for z in range(GRID_SIZE):
                 grid[x][y][z]["charge"] = next_charges[x][y][z]
 
-    # 4. Motor Output Processing
     motor_yield_iq = 0.0
     motor_yield_mem = 0.0
     motor_fired_count = 0
@@ -887,33 +835,24 @@ def run_simulation_tick():
                     motor_fired_count += 1
                     iq_multiplier = 1.0 + (upgrades["cortex"] * 0.6)
                     focus_bonus = 1.0 + (chems["acetylcholine"] / 100.0)
-
-                    # Occipital Lobe visual sync IQ reward bonus (+100% IQ)
                     visual_iq_bonus = 2.0 if st.session_state.get("visual_boost_active", False) else 1.0
-
-                    # DRD4 dopamine multiplier reward bonus
                     drd4_iq_mult = 2.0 if "DRD4" in genes else 1.0
-
-                    # COMT-Met gene mutation increases IQ gains from Motor fire by 30%
                     comt_met_mult = 1.30 if "COMT-Met" in genes else 1.0
 
                     motor_yield_iq += 5.0 * iq_multiplier * focus_bonus * visual_iq_bonus * drd4_iq_mult * comt_met_mult
 
                     mem_multiplier = 1.0 + (upgrades["hippocampus"] * 0.5)
-                    # Auditory Temporal Lobe resonance triples (3.0x) Motor Memory MB yield
                     is_resonant = (upgrades.get("temporal_lobe", 0) >= 1 and 400 <= st.session_state.get("auditory_freq", 0) <= 500)
                     auditory_resonance_mult = 3.0 if is_resonant else 1.0
 
                     motor_yield_mem += 2.0 * mem_multiplier * auditory_resonance_mult
 
-    # 4.1 Cognitive Sync Combo checking! (Firing >= 3 Motor cells simultaneously)
     if motor_fired_count >= 3:
         motor_yield_mem *= 1.5
         chems["stress"] = max(0.0, chems["stress"] - 15.0)
         add_log("🔥 [DỒNG BỘ NHẬN THỨC] Kích hoạt Cognitive Sync Combo! +50% sản lượng Trí nhớ và triệt tiêu -15% Stress.")
 
     if motor_fired_count > 0:
-        # Increase Dopamine reward under DRD4 gene
         drd4_da_reward = 16.0 if "DRD4" in genes else 8.0
         chems["dopamine"] = min(100.0, chems["dopamine"] + drd4_da_reward)
         chems["sanity"] = min(100.0, chems["sanity"] + 3.0)
@@ -922,12 +861,8 @@ def run_simulation_tick():
         st.session_state.stats["memory"] = min(st.session_state.stats["max_memory"], st.session_state.stats["memory"] + motor_yield_mem)
 
         add_log(f"💪 Xung động vận động phát hỏa thành công! Thu hoạch +{motor_yield_iq:.1f} IQ, +{motor_yield_mem:.1f} MB Trí nhớ.")
-        # Trigger visual chime and sound
         st.session_state.audio_trigger = {"sensory": sensory_fires, "motor": motor_fired_count}
 
-    # 5. Advanced Clinical Upgrade: Anatomy Pathologies & Genes
-
-    # Alzheimer's Amyloid plaque growth and APOE4 genetics modifier
     if mode == "Alzheimer":
         if ticks % 10 == 0:
             apoe4_speed = 0.08 if "APOE4" in genes else 0.04
@@ -942,7 +877,6 @@ def run_simulation_tick():
             if degraded_count > 0:
                 add_log(f"👵 [Alzheimer xơ hóa] Mạch nơ-ron chai lỳ điện thế! Tăng ngưỡng kích hoạt {degraded_count} tế bào (+{apoe4_speed:.2f}).")
 
-            # Plaques deposition
             empty_plaques = []
             for x in range(GRID_SIZE):
                 for y in range(GRID_SIZE):
@@ -954,9 +888,7 @@ def run_simulation_tick():
                 grid[px][py][pz]["amyloid_plaque"] = True
                 add_log(f"🧬 [Amyloid Plaques] Xuất hiện mảng xơ hóa beta-amyloid bám phủ tế bào [{px+1},{py+1},{pz+1}], giảm 50% hiệu suất dẫn truyền.")
 
-    # Microglia Plaques Cleansing (Active if acetylcholine & serotonin are high)
     if chems["acetylcholine"] > 60.0 and chems["serotonin"] > 60.0:
-        # TREM2 gene mutation doubles clearance probability
         clear_prob = 0.40 if "TREM2" in genes else 0.20
         if random.random() < clear_prob:
             plaque_cells = []
@@ -970,7 +902,6 @@ def run_simulation_tick():
                 grid[cx][cy][cz]["amyloid_plaque"] = False
                 add_log(f"✨ [Microglia Phục Hồi] Đại thực bào dọn dẹp sạch mảng bám Amyloid tại nơ-ron [{cx+1},{cy+1},{cz+1}]!")
 
-    # Active Cytokine Storm: high inflammation triggers threshold degradation
     if chems["neuro_inflammation"] > 80.0:
         degraded = 0
         for x in range(GRID_SIZE):
@@ -983,7 +914,6 @@ def run_simulation_tick():
         if degraded > 0:
             add_log(f"🔥 [Bão Cytokine 3D] Viêm thần kinh cực cao (>80%) gây chai lỳ, xơ hóa và tăng ngưỡng kích hoạt {degraded} tế bào (+0.02)!")
 
-    # UPGRADE: Dentate Gyrus Neurogenesis Anatomy Upgrade
     if upgrades.get("dentate_gyrus", 0) >= 1:
         if st.session_state.stats["memory"] >= 30.0 and chems["serotonin"] > 60.0:
             if random.random() < 0.25:
@@ -1008,7 +938,6 @@ def run_simulation_tick():
                     }
                     add_log(f"🌱 [Hải Mã Neurogenesis 3D] Thùy răng (Dentate Gyrus) tự động sản sinh tế bào liên kết mới tại [{sp_x+1},{sp_y+1},{sp_z+1}]! (-15 MB Memory)")
 
-    # Schizophrenia Pathology Tick
     if mode == "Schizophrenia" and ticks % 8 == 0:
         non_empty = []
         for x in range(GRID_SIZE):
@@ -1021,7 +950,6 @@ def run_simulation_tick():
             grid[hx][hy][hz]["charge"] = grid[hx][hy][hz]["threshold"]
             add_log(f"📢 [Ảo thanh Phân liệt] Kích phát ảo giác kích động điện cực đại tại [{hx+1},{hy+1},{hz+1}]!")
 
-    # Parkinson's Pathology Tremors (Low Dopamine causes tremors in motor cells, draining energy)
     if mode == "Parkinson" and chems["dopamine"] < 40.0:
         if random.random() < 0.30:
             motor_cells = []
@@ -1036,16 +964,11 @@ def run_simulation_tick():
                 grid[tr_x][tr_y][tr_z]["charge"] = 0.0
                 add_log(f"🤝 [Parkinson Run Giật] Thiếu Dopamine trầm trọng gây run giật vô thức tại [{tr_x+1},{tr_y+1},{tr_z+1}]! Hao hụt -5 Glucose.")
 
-    # ADHD Pathology: Fluctuate dopamine & accelerate acetylcholine decay
     if mode == "ADHD":
         chems["dopamine"] = max(10.0, min(90.0, chems["dopamine"] + random.choice([-15.0, 15.0])))
-        # Acetylcholine decays 50% faster
         chems["acetylcholine"] = max(0.0, min(100.0, chems["acetylcholine"] + (50.0 - chems["acetylcholine"]) * 0.12))
 
-    # 6. Stress, Sanity, Waste management & Norepinephrine Panic Attack
-    # Epilespy pathology increases stress accumulation significantly
     epilepsy_mult = 2.0 if (mode == "Epilepsy") else 1.0
-    # GABA Inhibitory System: high GABA completely suppresses Epilepsy stress multiplication, and reduces stress generation by 40%
     if chems.get("gaba", 30.0) >= 70.0:
         epilepsy_mult = 1.0
 
@@ -1056,20 +979,15 @@ def run_simulation_tick():
     if chems.get("gaba", 30.0) >= 70.0:
         fire_stress *= 0.6
 
-    # Stress clearance depends on cerebellum upgrade
     stress_clearance = 1.5 + (upgrades["cerebellum"] * 1.0)
-    # GABRA1 genetic mutation cuts stress clearance in half under Epilepsy
     if mode == "Epilepsy" and "GABRA1" in genes:
         stress_clearance *= 0.7
-    # COMT-Met genetic mutation decays stress 30% slower
     if "COMT-Met" in genes:
         stress_clearance *= 0.7
 
-    # Active SSRI Buff reduces stress generation by 50%
     if buffs.get("ssri", 0) > 0:
         fire_stress *= 0.5
 
-    # Amygdala anatomy reduces active stress generation by -15% per level
     amygdala_level = upgrades.get("amygdala", 0)
     fire_stress *= max(0.1, 1.0 - amygdala_level * 0.15)
 
@@ -1078,9 +996,7 @@ def run_simulation_tick():
     serotonin_dampening = chems["serotonin"] * 0.1
     effective_stress = max(0.0, chems["stress"] - serotonin_dampening)
 
-    # DRD4 mutation causes low dopamine (<30.0) to double stress damage on sanity
     drd4_sanity_mult = 2.0 if ("DRD4" in genes and chems["dopamine"] < 30.0) else 1.0
-    # UPGRADE: DRD2 genetic mutation causes high stress to inflict 1.5x sanity damage
     if "DRD2" in genes and chems["stress"] > 50.0:
         drd4_sanity_mult *= 1.5
 
@@ -1096,39 +1012,28 @@ def run_simulation_tick():
             healing *= 0.7
         chems["sanity"] = max(0.0, min(100.0, chems["sanity"] + healing))
 
-    # Mania pathological mode continuously drains sanity & auto-generates dopamine
     if mode == "Mania":
         chems["dopamine"] = min(100.0, chems["dopamine"] + 1.5)
         chems["sanity"] = max(0.0, chems["sanity"] - 1.0)
 
-    # UPGRADE: Neuro-Inflammation & Microglia Immune Delta Engine
-    # Neuro-inflammation rises on signals fired and high stress
     inflammation_gain = (signals_fired * 0.4) + (effective_stress > 50.0 and (effective_stress - 50.0) * 0.2 or 0.0)
-    # Blood-Brain Barrier Lv1+ reduces neuro-inflammation generation by 50%
     if upgrades.get("blood_brain_barrier", 0) >= 1:
         inflammation_gain *= 0.5
-    # Natural immune clearance of 1.0% per tick
     chems["neuro_inflammation"] = max(0.0, min(100.0, chems["neuro_inflammation"] + inflammation_gain - 1.0))
 
-    # Active Cytokine Storm Sanity decay
     if chems["neuro_inflammation"] > 80.0:
         cyto_decay = (chems["neuro_inflammation"] - 80.0) * 0.4
         chems["sanity"] = max(0.0, chems["sanity"] - cyto_decay)
 
-    # UPGRADE: Norepinephrine Fight-or-Flight & Panic Attack Delta Engine
-    # Norepinephrine rises with signals fired and high stress
     norepi_gain = (signals_fired * 0.5) + (chems["stress"] * 0.1)
-    # Natural clearance of 1.5% per tick (Mania slows Norepinephrine clearance in half)
     norepi_clearance = 0.75 if mode == "Mania" else 1.5
     chems["norepinephrine"] = max(0.0, min(100.0, chems.get("norepinephrine", 10.0) + norepi_gain - norepi_clearance))
 
-    # Panic Attack Trigger Check (threshold is 90% normally, or 100% if ADRA2A gene is active)
     panic_threshold = 100.0 if "ADRA2A" in genes else 90.0
     if chems.get("norepinephrine", 10.0) >= panic_threshold:
         damage = 9.0 if "ADRA2A" in genes else 15.0
         chems["sanity"] = max(0.0, chems["sanity"] - damage)
 
-        # Paralyze 3 random cells: find non-empty neurons and set their charge to 0
         non_empty = []
         for x in range(GRID_SIZE):
             for y in range(GRID_SIZE):
@@ -1142,15 +1047,13 @@ def run_simulation_tick():
         add_log(f"🚨 [HOẢNG LOẠN 3D] Norepinephrine ({chems['norepinephrine']:.1f}%) vượt ngưỡng {panic_threshold}%! Gây mất -{damage:.1f} Sanity và đóng băng 3 nơ-ron.")
         chems["norepinephrine"] = 50.0
 
-    # Sanity Burnout Check
     if chems["sanity"] <= 0.0:
         st.session_state.stats["burnout_count"] += 1
-        st.session_state.stats["burnout_streak"] = 0 # reset streak
+        st.session_state.stats["burnout_streak"] = 0
         chems["sanity"] = 25.0
         chems["stress"] = 10.0
         chems["norepinephrine"] = 20.0
 
-        # Damage: clear 40% of interneurons randomly
         damaged = 0
         for x in range(GRID_SIZE):
             for y in range(GRID_SIZE):
@@ -1160,28 +1063,21 @@ def run_simulation_tick():
                         damaged += 1
         add_log(f"⚠️ [SỤP ĐỔ TÂM THẦN 3D] Trạng thái Tỉnh táo sụt giảm về không! Kích phát cơn hoảng loạn xóa sổ {damaged} liên kết nơ-ron liên kết.")
     else:
-        # Increment streak if sanity is sustained high (>80%)
         if chems["sanity"] >= 80.0:
             st.session_state.stats["burnout_streak"] += 1
             if st.session_state.stats["burnout_streak"] > st.session_state.stats["max_streak"]:
                 st.session_state.stats["max_streak"] = st.session_state.stats["burnout_streak"]
 
-    # Limit personal achievements high score
     if st.session_state.stats["iq"] > st.session_state.stats["high_score_iq"]:
         st.session_state.stats["high_score_iq"] = st.session_state.stats["iq"]
     if st.session_state.stats["memory"] > st.session_state.stats["max_memory"]:
         st.session_state.stats["max_memory"] = st.session_state.stats["memory"]
 
-    # Check achievements missions
     check_mission_statuses()
-
-    # Update 3D Gameplay Indices
     update_3d_indices(grid, chems, upgrades)
     record_history(ticks, chems)
 
 def update_3d_indices(grid, chems, upgrades):
-    # 1. Cognitive Sync Index (CSI)
-    # Measures the proportion of active (firing or charged) non-empty cells to reflect network-wide electrical coherence
     total_neurons = 0
     active_charged = 0
     total_interneurons = 0
@@ -1201,129 +1097,12 @@ def update_3d_indices(grid, chems, upgrades):
                         modified_interneurons += 1
 
     st.session_state.csi = (active_charged / max(1, total_neurons)) * 100.0
-
-    # 2. Plasticity Density Index (PDI)
-    # Measures active Hebbian threshold learning density across the 3D space
     st.session_state.pdi = (modified_interneurons / max(1, total_interneurons)) * 100.0
 
-    # 3. Vascular Perfusion Index (VPI)
-    # Reflects the vascular/blood supply effectiveness across the 3D grid
     bbb_mult = 1.2 if upgrades.get("blood_brain_barrier", 0) >= 1 else 0.8
     st.session_state.vpi = min(100.0, chems.get("neuro_nutrients", 80.0) * bbb_mult)
 
 import plotly.graph_objects as go
-
-def render_3d_brain(grid, selected_cell):
-    x_nodes = []
-    y_nodes = []
-    z_nodes = []
-    colors = []
-    sizes = []
-    texts = []
-
-    sel_x, sel_y, sel_z = selected_cell
-
-    color_map = {
-        "Empty": "#3A3D40",
-        "Sensory": "#00F0FF",
-        "Interneuron": "#39FF14",
-        "Motor": "#FF007F"
-    }
-
-    for x in range(GRID_SIZE):
-        for y in range(GRID_SIZE):
-            for z in range(GRID_SIZE):
-                cell = grid[x][y][z]
-                ctype = cell["type"]
-                charge = cell["charge"]
-                threshold = cell["threshold"]
-                is_firing = cell["type"] != "Empty" and charge >= threshold
-
-                x_nodes.append(x)
-                y_nodes.append(y)
-                z_nodes.append(z)
-
-                if is_firing:
-                    colors.append("#FFFFFF")
-                    sizes.append(18)
-                else:
-                    colors.append(color_map.get(ctype, "#3A3D40"))
-                    sizes.append(12 if ctype != "Empty" else 6)
-
-                if (x, y, z) == (sel_x, sel_y, sel_z):
-                    sizes[-1] = sizes[-1] + 8
-
-                texts.append(f"Vị trí: [{x+1}, {y+1}, {z+1}]<br>Loại: {ctype}<br>Điện thế: {charge:.2f}/{threshold:.2f}")
-
-    trace_nodes = go.Scatter3d(
-        x=x_nodes, y=y_nodes, z=z_nodes,
-        mode="markers",
-        marker=dict(
-            size=sizes,
-            color=colors,
-            opacity=0.9,
-            line=dict(color='#000000', width=1)
-        ),
-        text=texts,
-        hoverinfo="text"
-    )
-
-    edge_x = []
-    edge_y = []
-    edge_z = []
-
-    dir_deltas = {
-        "Up": [(0, 1, 0)],
-        "Down": [(0, -1, 0)],
-        "Left": [(-1, 0, 0)],
-        "Right": [(1, 0, 0)],
-        "Front": [(0, 0, 1)],
-        "Back": [(0, 0, -1)],
-        "All": [
-            (0, 1, 0), (0, -1, 0),
-            (-1, 0, 0), (1, 0, 0),
-            (0, 0, 1), (0, 0, -1)
-        ]
-    }
-
-    for x in range(GRID_SIZE):
-        for y in range(GRID_SIZE):
-            for z in range(GRID_SIZE):
-                cell = grid[x][y][z]
-                if cell["type"] == "Empty":
-                    continue
-                allowed_deltas = dir_deltas.get(cell.get("direction", "All"), dir_deltas["All"])
-                for dx, dy, dz in allowed_deltas:
-                    nx, ny, nz = x + dx, y + dy, z + dz
-                    if 0 <= nx < GRID_SIZE and 0 <= ny < GRID_SIZE and 0 <= nz < GRID_SIZE:
-                        if grid[nx][ny][nz]["type"] != "Empty":
-                            edge_x.extend([x, nx, None])
-                            edge_y.extend([y, ny, None])
-                            edge_z.extend([z, nz, None])
-
-    trace_edges = go.Scatter3d(
-        x=edge_x, y=edge_y, z=edge_z,
-        mode="lines",
-        line=dict(color="#888888", width=2),
-        hoverinfo="none"
-    )
-
-    fig = go.Figure(data=[trace_edges, trace_nodes])
-    fig.update_layout(
-        scene=dict(
-            xaxis=dict(title="Trục X (Left-Right)", backgroundcolor="rgba(0,0,0,0)", gridcolor="gray", showbackground=True),
-            yaxis=dict(title="Trục Y (Down-Up)", backgroundcolor="rgba(0,0,0,0)", gridcolor="gray", showbackground=True),
-            zaxis=dict(title="Trục Z (Back-Front)", backgroundcolor="rgba(0,0,0,0)", gridcolor="gray", showbackground=True),
-            aspectmode="manual",
-            aspectratio=dict(x=1, y=1, z=1)
-        ),
-        margin=dict(l=0, r=0, b=0, t=0),
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)"
-    )
-    return fig
-
-
 import streamlit as st
 import random
 
@@ -1373,13 +1152,268 @@ if audio_html:
 # Initialize Session
 init_game_state()
 
-# Header & Changelog Update to Version 6.0.0
-st.title("🧠 Siêu Hệ Thống VBot1 & Game Mô Phỏng Não Bộ 3D")
-st.write("Dự án tích hợp: Game mô phỏng tiến hóa nơ-ron sinh học 3D kết hợp Trợ lý AI Telegram Llama 3 & Gemini 1.5. **(Version 6.0.0 - Interactive 3D Plotly & Neuro-Vascular Update)**")
+# Visualizing 3D Interactive WebGPU-Style Brain Utility
+def render_3d_brain(grid, selected_cell):
+    x_nodes = []
+    y_nodes = []
+    z_nodes = []
 
-with st.expander("🆕 [CHANGELOG] Nhật Ký Cập Nhật Phiên Bản 6.0.0 - Interactive 3D Plotly & Neuro-Vascular Update", expanded=False):
+    # Nested layers lists to simulate multi-pass WebGPU bloom shaders
+    colors_core = []
+    sizes_core = []
+
+    colors_glow = []
+    sizes_glow = []
+
+    colors_halo = []
+    sizes_halo = []
+
+    texts = []
+
+    sel_x, sel_y, sel_z = selected_cell
+
+    # WebGPU vibrant emissive palettes
+    color_map = {
+        "Empty": "#1A1C1E",        # deep dim gray
+        "Sensory": "#00F0FF",      # electric cyan
+        "Interneuron": "#39FF14",  # high-energy green
+        "Motor": "#FF007F"         # hot magenta
+    }
+
+    for x in range(GRID_SIZE):
+        for y in range(GRID_SIZE):
+            for z in range(GRID_SIZE):
+                cell = grid[x][y][z]
+                ctype = cell["type"]
+                charge = cell["charge"]
+                threshold = cell["threshold"]
+                is_firing = cell["type"] != "Empty" and charge >= threshold
+
+                x_nodes.append(x)
+                y_nodes.append(y)
+                z_nodes.append(z)
+
+                # Default styling
+                base_color = color_map.get(ctype, "#1A1C1E")
+
+                # Active firing state flashes white-hot
+                if is_firing:
+                    core_c = "#FFFFFF"
+                    glow_c = "#FFCC00"
+                    halo_c = "rgba(255, 170, 0, 0.3)"
+
+                    core_s = 14
+                    glow_s = 28
+                    halo_s = 48
+                else:
+                    core_c = base_color
+                    glow_c = base_color
+                    # Convert hex colors to semi-transparent rgba strings for outer bloom layers
+                    if ctype == "Sensory":
+                        halo_c = "rgba(0, 240, 255, 0.25)"
+                        glow_c = "rgba(0, 240, 255, 0.45)"
+                    elif ctype == "Interneuron":
+                        halo_c = "rgba(57, 255, 20, 0.25)"
+                        glow_c = "rgba(57, 255, 20, 0.45)"
+                    elif ctype == "Motor":
+                        halo_c = "rgba(255, 0, 127, 0.25)"
+                        glow_c = "rgba(255, 0, 127, 0.45)"
+                    else:
+                        halo_c = "rgba(40, 40, 40, 0.1)"
+                        glow_c = "rgba(40, 40, 40, 0.2)"
+
+                    core_s = 9 if ctype != "Empty" else 4
+                    glow_s = 18 if ctype != "Empty" else 0
+                    halo_s = 28 if ctype != "Empty" else 0
+
+                # Highlight selected node by styling
+                if (x, y, z) == (sel_x, sel_y, sel_z):
+                    core_s += 6
+                    glow_s += 12
+                    halo_s += 18
+                    if not is_firing:
+                        core_c = "#FFFFFF"
+
+                colors_core.append(core_c)
+                sizes_core.append(core_s)
+
+                colors_glow.append(glow_c)
+                sizes_glow.append(glow_s)
+
+                colors_halo.append(halo_c)
+                sizes_halo.append(halo_s)
+
+                texts.append(f"Node [{x+1}, {y+1}, {z+1}]<br>Loại: {ctype}<br>Điện lượng: {charge:.2f}/{threshold:.2f}")
+
+    # Trace 1: Emissive Core Layer
+    trace_core = go.Scatter3d(
+        x=x_nodes, y=y_nodes, z=z_nodes,
+        mode="markers",
+        marker=dict(
+            size=sizes_core,
+            color=colors_core,
+            opacity=1.0,
+            line=dict(color='#000000', width=1)
+        ),
+        text=texts,
+        hoverinfo="text",
+        name="Neural Core"
+    )
+
+    # Trace 2: Mid Volumetric Glow Layer
+    trace_glow = go.Scatter3d(
+        x=x_nodes, y=y_nodes, z=z_nodes,
+        mode="markers",
+        marker=dict(
+            size=sizes_glow,
+            color=colors_glow,
+            opacity=0.45,
+        ),
+        hoverinfo="none",
+        showlegend=False,
+        name="Inner Glow"
+    )
+
+    # Trace 3: Wide Atmospheric Bloom Layer
+    trace_halo = go.Scatter3d(
+        x=x_nodes, y=y_nodes, z=z_nodes,
+        mode="markers",
+        marker=dict(
+            size=sizes_halo,
+            color=colors_halo,
+            opacity=0.15,
+        ),
+        hoverinfo="none",
+        showlegend=False,
+        name="Outer Bloom"
+    )
+
+    # Synapse Lines (Axons)
+    edge_x = []
+    edge_y = []
+    edge_z = []
+    edge_colors = []
+
+    dir_deltas = {
+        "Up": [(0, 1, 0)],
+        "Down": [(0, -1, 0)],
+        "Left": [(-1, 0, 0)],
+        "Right": [(1, 0, 0)],
+        "Front": [(0, 0, 1)],
+        "Back": [(0, 0, -1)],
+        "All": [
+            (0, 1, 0), (0, -1, 0),
+            (-1, 0, 0), (1, 0, 0),
+            (0, 0, 1), (0, 0, -1)
+        ]
+    }
+
+    for x in range(GRID_SIZE):
+        for y in range(GRID_SIZE):
+            for z in range(GRID_SIZE):
+                cell = grid[x][y][z]
+                if cell["type"] == "Empty":
+                    continue
+                allowed_deltas = dir_deltas.get(cell.get("direction", "All"), dir_deltas["All"])
+                for dx, dy, dz in allowed_deltas:
+                    nx, ny, nz = x + dx, y + dy, z + dz
+                    if 0 <= nx < GRID_SIZE and 0 <= ny < GRID_SIZE and 0 <= nz < GRID_SIZE:
+                        if grid[nx][ny][nz]["type"] != "Empty":
+                            edge_x.extend([x, nx, None])
+                            edge_y.extend([y, ny, None])
+                            edge_z.extend([z, nz, None])
+
+    # Plotly 3D synap lines
+    trace_edges = go.Scatter3d(
+        x=edge_x, y=edge_y, z=edge_z,
+        mode="lines",
+        line=dict(color="rgba(0, 240, 255, 0.4)", width=2),
+        hoverinfo="none",
+        name="Synap Channels"
+    )
+
+    fig = go.Figure(data=[trace_halo, trace_glow, trace_edges, trace_core])
+    fig.update_layout(
+        scene=dict(
+            xaxis=dict(title="Trục X (Left-Right)", backgroundcolor="black", gridcolor="#22252A", showbackground=True),
+            yaxis=dict(title="Trục Y (Down-Up)", backgroundcolor="black", gridcolor="#22252A", showbackground=True),
+            zaxis=dict(title="Trục Z (Back-Front)", backgroundcolor="black", gridcolor="#22252A", showbackground=True),
+            aspectmode="manual",
+            aspectratio=dict(x=1, y=1, z=1)
+        ),
+        margin=dict(l=0, r=0, b=0, t=0),
+        paper_bgcolor="black",
+        plot_bgcolor="black"
+    )
+    return fig
+
+# WebGPU Sci-fi Holographic HUD Style Injection
+st.markdown("""
+<style>
+    /* Dark Sci-fi / Cyberpunk Biotech HUD */
+    .stApp {
+        background-color: #030508 !important;
+        color: #00F0FF !important;
+        font-family: 'Courier New', Courier, monospace !important;
+    }
+
+    /* Neon glow container cards */
+    div.stButton > button {
+        background: linear-gradient(135deg, #020b12 0%, #081a26 100%) !important;
+        border: 1px solid #00F0FF !important;
+        color: #00F0FF !important;
+        box-shadow: 0px 0px 8px rgba(0, 240, 255, 0.3) !important;
+        font-weight: bold !important;
+        text-transform: uppercase !important;
+        letter-spacing: 1px !important;
+        border-radius: 4px !important;
+        transition: all 0.3s ease !important;
+    }
+
+    div.stButton > button:hover {
+        background: #00F0FF !important;
+        color: #000000 !important;
+        box-shadow: 0px 0px 20px #00F0FF !important;
+        transform: translateY(-2px) !important;
+    }
+
+    /* Headers with neon underlines */
+    h1, h2, h3, h4, h5, h6 {
+        color: #FFFFFF !important;
+        text-shadow: 0px 0px 10px rgba(0, 240, 255, 0.7) !important;
+        border-bottom: 1px solid rgba(0, 240, 255, 0.3) !important;
+        padding-bottom: 5px !important;
+    }
+
+    /* Telemetry Panel board styles */
+    .telemetry-board {
+        background-color: rgba(2, 8, 14, 0.85);
+        border: 1px dashed #00F0FF;
+        border-radius: 8px;
+        padding: 15px;
+        margin: 10px 0px;
+        box-shadow: inset 0px 0px 15px rgba(0, 240, 255, 0.15), 0px 0px 10px rgba(0, 240, 255, 0.1);
+    }
+
+    /* Code serialize & logs inputs styled as tech terminals */
+    textarea, input {
+        background-color: #010408 !important;
+        border: 1px solid #FF007F !important;
+        color: #FF007F !important;
+        font-family: 'Courier New', Courier, monospace !important;
+        box-shadow: 0px 0px 6px rgba(255, 0, 127, 0.2) !important;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# Title & Info
+st.title("⚡ WEBGPU NEURO-EMULATOR ENGINE 3D")
+st.write("Hệ thống giả lập mạng nơ-ron sinh học 3D thời gian thực, biên dịch trực tiếp bằng công nghệ hiển thị **WebGPU Emulation Mode**.")
+
+with st.expander("🆕 [WEBGPU DIAGNOSTICS] Nhật Ký Cập Nhật Phiên Bản 6.0.0", expanded=False):
     st.markdown("""
-    **🚀 Phiên bản 6.0.0 (Bản nâng cấp mô phỏng không gian 3D tối hậu):**
+    **🚀 Phiên bản 6.0.0 (Bản nâng cấp mô phỏng không gian 3D WebGPU tối hậu):**
+    *   **Hiển thị WebGPU Bloom Shader lặp (Three-Pass Bloom):** Node nơ-ron hỏa phát được phủ 3 lớp lõi phát quang, quầng sáng nhiệt tích và quầng khuếch tán không khí mô phỏng chính xác công nghệ đồ họa thế hệ mới.
     *   **Lưới Nơ-ron Không Gian 3D (4x4x4 - 64 Nodes):** Nâng cấp toàn diện từ lưới 2D tĩnh sang mạng lưới 3D tương tác. Cho phép xoay, thu phóng 3 chiều thông qua Plotly linh hoạt.
     *   **Ba Chỉ Số Gameplay Mới (CSI, PDI, VPI):**
         *   *Cognitive Sync Index (CSI):* Đo lường sự đồng bộ xung điện toàn bộ não bộ 3D.
@@ -1431,18 +1465,18 @@ with tab1:
     # Visual Spark details if active
     visual_spark = st.session_state.get("visual_spark", None)
     if upgrades.get("occipital_lobe", 0) >= 1 and visual_spark:
-        st.info(f"👁️ **Kích thích thị giác:** Vị trí [{visual_spark['pos'][0]+1}, {visual_spark['pos'][1]+1}, {visual_spark['pos'][2]+1}] | Trục hướng: **{visual_spark['dir']}**")
+        st.sidebar.info(f"👁️ **Kích thích thị giác:** Vị trí [{visual_spark['pos'][0]+1}, {visual_spark['pos'][1]+1}, {visual_spark['pos'][2]+1}] | Trục hướng: **{visual_spark['dir']}**")
 
     # Spatial Gate details if active
     spatial_gate = st.session_state.get("spatial_gate", None)
     if upgrades.get("parietal_lobe", 0) >= 1 and spatial_gate:
-        st.info(f"🧭 **Luồng định vị không gian:** Vị trí Gating [{spatial_gate[0]+1}, {spatial_gate[1]+1}, {spatial_gate[2]+1}]!")
+        st.sidebar.info(f"🧭 **Luồng định vị không gian:** Vị trí Gating [{spatial_gate[0]+1}, {spatial_gate[1]+1}, {spatial_gate[2]+1}]!")
 
     # Auditory frequency if active
     if upgrades.get("temporal_lobe", 0) >= 1 and "auditory_freq" in st.session_state:
         freq = st.session_state.auditory_freq
         resonance = "🎵 **CỘNG HƯỞNG (3x Memory)!**" if (400 <= freq <= 500) else "🎵 Bình thường"
-        st.info(f"🔊 **Tần số âm thanh:** {freq} Hz ({resonance})")
+        st.sidebar.info(f"🔊 **Tần số âm thanh:** {freq} Hz ({resonance})")
 
     # Display game status summary cards
     sc_cols = st.columns(4)
@@ -1451,17 +1485,20 @@ with tab1:
     sc_cols[2].metric("🔋 Glucose & Oxy", f"{chems['energy']:.1f}%", help="Mức năng lượng cơ bản của não bộ. Giảm khi có nhiều tế bào thần kinh hoạt động.")
     sc_cols[3].metric("🔄 Trạng Thái Tiến Hóa", stats["circadian_cycle"], help="Hệ thống chu kỳ sinh học ngày đêm (Day/Night) liên tục.")
 
-    # 3D Specific Indices telemetry columns
+    # Glowing WebGPU Core Engine Telemetry diagnostic board
+    st.markdown('<div class="telemetry-board">', unsafe_allow_html=True)
+    st.markdown("##### 🚀 WEBGPU DIAGNOSTICS & TELEMETRY BOARD")
     index_cols = st.columns(3)
     index_cols[0].metric("🌐 CSI (Cognitive Sync)", f"{st.session_state.get('csi', 0.0):.1f}%", help="Cognitive Sync Index: Đo lường mức độ đồng bộ kích phát xung điện toàn vỏ não 3D.")
     index_cols[1].metric("🧬 PDI (Plasticity Density)", f"{st.session_state.get('pdi', 0.0):.1f}%", help="Plasticity Density Index: Mật độ thích ứng thích nghi liên kết nơ-ron (biến đổi ngưỡng).")
     index_cols[2].metric("🩸 VPI (Vascular Perfusion)", f"{st.session_state.get('vpi', 80.0):.1f}%", help="Vascular Perfusion Index: Hiệu năng tưới máu và cung cấp dưỡng chất huyết quản vỏ não.")
+    st.markdown('</div>', unsafe_allow_html=True)
 
     # Main columns for 3D Visualizer and Editor Panel
     game_cols = st.columns([5, 4])
 
     with game_cols[0]:
-        st.markdown("#### ⚡ Bản Đồ Điện Thế Nơ-ron 3D (Plotly Visualizer)")
+        st.markdown("#### ⚡ WebGPU-Shader Emulation Pipeline (3D View)")
         st.caption("Mạng lưới 3D tương tác 4x4x4 (64 nodes). Sử dụng chuột để xoay, thu phóng và xem điện thế.")
 
         # Plotly 3D visualizer call
@@ -1490,7 +1527,7 @@ with tab1:
         # Save & Load Circuit Codes Panel
         st.markdown("---")
         st.markdown("##### 💾 Lưu & Tải Sơ Đồ Mạch Thần Kinh (Circuit Share Codes)")
-        st.caption("Sao chép mã chia sẻ mạch nơ-ron hiện tại hoặc nhập mã của người khác để xây dựng nhanh!")
+        st.caption("Mã chia sẻ mạch nơ-ron hiện tại hoặc nhập mã của người khác để xây dựng nhanh!")
 
         share_cols = st.columns([3, 1])
         with share_cols[0]:
@@ -2162,9 +2199,6 @@ with tab1:
     st.markdown("#### 📋 Nhật Ký Hoạt Động Não Bộ (Brain Activity Log)")
     log_text = "\n".join(st.session_state.game_log[::-1])
     st.text_area("Thời gian thực (Mới nhất ở trên):", value=log_text, height=180, disabled=True)
-
-# Visualizing 3D Interactive Plotly Brain Utility
-
 
 # ----------------- TAB 2: VBOT1 WEB CHAT & SUMMARIZE -----------------
 with tab2:
