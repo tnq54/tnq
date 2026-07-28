@@ -1,7 +1,7 @@
 
 Collecting usage statistics. To deactivate, set browser.gatherUsageStats to false.
 
-2026-07-28 04:34:41.298 Uvicorn server started on :::7860
+2026-07-28 08:04:55.963 Uvicorn server started on :::7860
 
   You can now view your Streamlit app in your browser.
 
@@ -9,7 +9,7 @@ Collecting usage statistics. To deactivate, set browser.gatherUsageStats to fals
   Network URL: http://192.168.0.2:7860
   External URL: http://34.27.142.64:7860
 
-2026-07-28 04:40:09.582 Please replace `use_container_width` with `width`.
+2026-07-28 08:13:11.333 Please replace `use_container_width` with `width`.
 
 `use_container_width` will be removed after 2025-12-31.
 
