@@ -1347,116 +1347,68 @@ def render_3d_brain(grid, selected_cell):
     )
     return fig
 
-# WebGPU Sci-fi Holographic HUD Style Injection (Styled exactly like Bonsai WebGPU Kernels)
+# WebGPU Sci-fi Holographic HUD Style Injection
 st.markdown("""
 <style>
-    /* Clean Bonsai WebGPU dark minimal theme */
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
-
+    /* Dark Sci-fi / Cyberpunk Biotech HUD */
     .stApp {
-        background-color: #050505 !important;
-        color: #E5E7EB !important;
-        font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
+        background-color: #030508 !important;
+        color: #00F0FF !important;
+        font-family: 'Courier New', Courier, monospace !important;
     }
 
-    /* Minimalist Bonsai button style */
+    /* Neon glow container cards */
     div.stButton > button {
-        background-color: #121314 !important;
-        border: 1px solid rgba(255, 255, 255, 0.15) !important;
-        color: #FFFFFF !important;
-        font-weight: 600 !important;
-        letter-spacing: 0.5px !important;
-        border-radius: 6px !important;
-        transition: all 0.2s ease !important;
-        padding: 8px 16px !important;
+        background: linear-gradient(135deg, #020b12 0%, #081a26 100%) !important;
+        border: 1px solid #00F0FF !important;
+        color: #00F0FF !important;
+        box-shadow: 0px 0px 8px rgba(0, 240, 255, 0.3) !important;
+        font-weight: bold !important;
+        text-transform: uppercase !important;
+        letter-spacing: 1px !important;
+        border-radius: 4px !important;
+        transition: all 0.3s ease !important;
     }
 
     div.stButton > button:hover {
-        background-color: #FFFFFF !important;
+        background: #00F0FF !important;
         color: #000000 !important;
-        border-color: #FFFFFF !important;
-        box-shadow: 0px 0px 15px rgba(255, 255, 255, 0.2) !important;
+        box-shadow: 0px 0px 20px #00F0FF !important;
+        transform: translateY(-2px) !important;
     }
 
-    /* Elegant bold headers */
-    h1 {
-        font-size: 2.5rem !important;
-        font-weight: 800 !important;
-        letter-spacing: -0.5px !important;
+    /* Headers with neon underlines */
+    h1, h2, h3, h4, h5, h6 {
         color: #FFFFFF !important;
-        border: none !important;
-        padding-bottom: 0px !important;
-        text-transform: uppercase !important;
-    }
-    h2, h3, h4, h5, h6 {
-        color: #FFFFFF !important;
-        font-weight: 700 !important;
-        border: none !important;
+        text-shadow: 0px 0px 10px rgba(0, 240, 255, 0.7) !important;
+        border-bottom: 1px solid rgba(0, 240, 255, 0.3) !important;
+        padding-bottom: 5px !important;
     }
 
     /* Telemetry Panel board styles */
     .telemetry-board {
-        background-color: #0A0B0C;
-        border: 1px solid rgba(255, 255, 255, 0.08);
+        background-color: rgba(2, 8, 14, 0.85);
+        border: 1px dashed #00F0FF;
         border-radius: 8px;
         padding: 15px;
         margin: 10px 0px;
+        box-shadow: inset 0px 0px 15px rgba(0, 240, 255, 0.15), 0px 0px 10px rgba(0, 240, 255, 0.1);
     }
 
-    /* Input & logs styled minimal */
+    /* Code serialize & logs inputs styled as tech terminals */
     textarea, input {
-        background-color: #0A0B0C !important;
-        border: 1px solid rgba(255, 255, 255, 0.12) !important;
-        color: #E5E7EB !important;
-        font-family: monospace !important;
-    }
-
-    /* Ensure the sidebar has a distinct dark background matching the black theme */
-    [data-testid="stSidebar"] {
-        background-color: #090A0B !important;
-        border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
-    }
-    [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3, [data-testid="stSidebar"] h4, [data-testid="stSidebar"] p, [data-testid="stSidebar"] span, [data-testid="stSidebar"] label {
-        color: #E5E7EB !important;
-    }
-
-    /* High contrast metrics for dark background readability */
-    div[data-testid="stMetricValue"] {
-        color: #FFFFFF !important;
-        text-shadow: 0px 0px 5px rgba(255, 255, 255, 0.3) !important;
-    }
-    div[data-testid="stMetricLabel"] {
-        color: #9CA3AF !important;
-    }
-    [data-testid="stMetricValue"] > div {
-        color: #FFFFFF !important;
-    }
-    [data-testid="stMetricLabel"] > div {
-        color: #9CA3AF !important;
+        background-color: #010408 !important;
+        border: 1px solid #FF007F !important;
+        color: #FF007F !important;
+        font-family: 'Courier New', Courier, monospace !important;
+        box-shadow: 0px 0px 6px rgba(255, 0, 127, 0.2) !important;
     }
 </style>
 """, unsafe_allow_html=True)
 
 # Title & Info
-st.title("🧠 BONSAI BRAIN SIMULATOR 3D")
-st.markdown("<p style='font-size: 1.15rem; font-weight: 600; color: #9CA3AF; letter-spacing: 0.5px; margin-top: -15px;'>64 Nodes. 3D Synaptic Kernels. In your browser.</p>", unsafe_allow_html=True)
-st.write("Bonsai Brain Simulator 3D by Prism Neuro is a 3D biological brain simulation. Everything runs entirely locally in your browser using Streamlit & Plotly — no data leaves your device. Agentic WebGPU kernel optimization simulated on 4x4x4 grid nodes.")
-
-# Simulated "Load Neural Engine" WebGPU Diagnostics Bar
-st.markdown("""
-<div style="background-color: #0F1113; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 18px; margin: 15px 0px; font-family: monospace;">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-        <span style="font-weight: bold; color: #FFFFFF; font-size: 0.95rem; letter-spacing: 0.5px;">⚡ 3D NEURAL ENGINE DIAGNOSTICS</span>
-        <span style="color: #39FF14; font-weight: bold; letter-spacing: 1px;">● 100% ACTIVE</span>
-    </div>
-    <div style="font-size: 0.85rem; color: #9CA3AF; margin-bottom: 8px;">
-        VRAM ALLOCATED: 4.00 / 4.00 MB | COMPUTE SHADERS: WGSL 3.0 Compiled | DEVICE: Local Browser WebGPU Emulated Pipeline
-    </div>
-    <div style="background-color: #1F2327; height: 8px; border-radius: 4px; overflow: hidden; width: 100%;">
-        <div style="background-color: #39FF14; height: 100%; width: 100%; box-shadow: 0px 0px 10px #39FF14;"></div>
-    </div>
-</div>
-""", unsafe_allow_html=True)
+st.title("⚡ WEBGPU NEURO-EMULATOR ENGINE 3D")
+st.write("Hệ thống giả lập mạng nơ-ron sinh học 3D thời gian thực, biên dịch trực tiếp bằng công nghệ hiển thị **WebGPU Emulation Mode**.")
 
 with st.expander("🆕 [WEBGPU DIAGNOSTICS] Nhật Ký Cập Nhật Phiên Bản 6.0.0", expanded=False):
     st.markdown("""
@@ -1474,801 +1426,453 @@ with st.expander("🆕 [WEBGPU DIAGNOSTICS] Nhật Ký Cập Nhật Phiên Bản
 
 tab1, tab2 = st.tabs(["🧠 Game Mô Phỏng Não Bộ 3D", "🤖 Trợ Lý AI VBot1 (Llama & Gemini)"])
 
-with tab1:
-    # Sidebar - Controls Panel
-    st.sidebar.markdown("### 🎛️ Bảng Điều Khiển Chu Kỳ Não")
 
-    # Auto play controls
-    play_cols = st.sidebar.columns(2)
-    with play_cols[0]:
-        if st.sidebar.button("▶️ CHẠY (Run)", use_container_width=True):
-            st.session_state.playing = True
-    with play_cols[1]:
-        if st.sidebar.button("⏸️ TẠM DỪNG", use_container_width=True):
-            st.session_state.playing = False
+webgpu_html_content = """<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BONSAI BRAIN SIMULATOR 3D</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
 
-    # Step-by-step trigger
-    if st.sidebar.button("⏭️ Bước Tiếp Theo (Single Tick)", use_container_width=True):
-        run_simulation_tick()
-        st.rerun()
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
 
-    speed_multiplier = st.sidebar.slider("Tốc độ tiến hóa (Tích tắc):", min_value=0.5, max_value=4.0, value=1.0, step=0.5)
-    st.session_state.tick_speed = speed_multiplier
+        body {
+            background-color: #050505;
+            color: #E5E7EB;
+            font-family: 'Inter', system-ui, sans-serif;
+            padding: 20px;
+            overflow-x: hidden;
+        }
 
-    st.sidebar.markdown("---")
+        h1 {
+            font-size: 2.25rem;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            color: #FFFFFF;
+            text-transform: uppercase;
+        }
 
-    # Persistent Personal Records Dashboard
-    st.sidebar.markdown("### 🏆 Thành Tích Đạt Được")
-    st.sidebar.metric("IQ Cao Nhất", f"{st.session_state.stats.get('high_score_iq', 0.0):.1f}")
-    st.sidebar.metric("Trí Nhớ Cực Đại", f"{st.session_state.stats.get('max_memory', 10.0):.1f} MB")
-    st.sidebar.metric("Chuỗi Tỉnh Táo Liên Tục", f"{st.session_state.stats.get('burnout_streak', 0)} ticks")
-    st.sidebar.metric("Kỷ Lục Chuỗi Tỉnh Táo", f"{st.session_state.stats.get('max_streak', 0)} ticks")
+        .subtitle {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #9CA3AF;
+            letter-spacing: 0.5px;
+            margin-top: 4px;
+            margin-bottom: 12px;
+        }
 
-    # Status metrics row
-    chems = st.session_state.chemicals
-    stats = st.session_state.stats
-    upgrades = st.session_state.upgrades
-    mode = st.session_state.get("game_mode", "Normal")
+        .description {
+            font-size: 0.95rem;
+            color: #9CA3AF;
+            line-height: 1.5;
+            margin-bottom: 20px;
+        }
 
-    # Visual Spark details if active
-    visual_spark = st.session_state.get("visual_spark", None)
-    if upgrades.get("occipital_lobe", 0) >= 1 and visual_spark:
-        st.sidebar.info(f"👁️ **Kích thích thị giác:** Vị trí [{visual_spark['pos'][0]+1}, {visual_spark['pos'][1]+1}, {visual_spark['pos'][2]+1}] | Trục hướng: **{visual_spark['dir']}**")
+        /* Diagnostics status bar */
+        .diagnostics-bar {
+            background-color: #0F1113;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 24px;
+            font-family: monospace;
+        }
 
-    # Spatial Gate details if active
-    spatial_gate = st.session_state.get("spatial_gate", None)
-    if upgrades.get("parietal_lobe", 0) >= 1 and spatial_gate:
-        st.sidebar.info(f"🧭 **Luồng định vị không gian:** Vị trí Gating [{spatial_gate[0]+1}, {spatial_gate[1]+1}, {spatial_gate[2]+1}]!")
+        .diag-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
 
-    # Auditory frequency if active
-    if upgrades.get("temporal_lobe", 0) >= 1 and "auditory_freq" in st.session_state:
-        freq = st.session_state.auditory_freq
-        resonance = "🎵 **CỘNG HƯỞNG (3x Memory)!**" if (400 <= freq <= 500) else "🎵 Bình thường"
-        st.sidebar.info(f"🔊 **Tần số âm thanh:** {freq} Hz ({resonance})")
+        .diag-title {
+            font-weight: bold;
+            color: #FFFFFF;
+            font-size: 0.95rem;
+            letter-spacing: 0.5px;
+        }
 
-    # Display game status summary cards
-    sc_cols = st.columns(4)
-    sc_cols[0].metric("🧠 Chỉ Số IQ", f"{stats['iq']:.1f}", help="Tích lũy từ hành động nơ-ron Motor phát hỏa.")
-    sc_cols[1].metric("💾 Dung Lượng Trí Nhớ", f"{stats['memory']:.1f}/{stats['max_memory']:.1f} MB", help="Dùng để cấy ghép nơ-ron mới hoặc kích hoạt liệu pháp.")
-    sc_cols[2].metric("🔋 Glucose & Oxy", f"{chems['energy']:.1f}%", help="Mức năng lượng cơ bản của não bộ. Giảm khi có nhiều tế bào thần kinh hoạt động.")
-    sc_cols[3].metric("🔄 Trạng Thái Tiến Hóa", stats["circadian_cycle"], help="Hệ thống chu kỳ sinh học ngày đêm (Day/Night) liên tục.")
+        .diag-status {
+            color: #39FF14;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
 
-    # Glowing WebGPU Core Engine Telemetry diagnostic board
-    st.markdown('<div class="telemetry-board">', unsafe_allow_html=True)
-    st.markdown("##### 🚀 WEBGPU DIAGNOSTICS & TELEMETRY BOARD")
-    index_cols = st.columns(3)
-    index_cols[0].metric("🌐 CSI (Cognitive Sync)", f"{st.session_state.get('csi', 0.0):.1f}%", help="Cognitive Sync Index: Đo lường mức độ đồng bộ kích phát xung điện toàn vỏ não 3D.")
-    index_cols[1].metric("🧬 PDI (Plasticity Density)", f"{st.session_state.get('pdi', 0.0):.1f}%", help="Plasticity Density Index: Mật độ thích ứng thích nghi liên kết nơ-ron (biến đổi ngưỡng).")
-    index_cols[2].metric("🩸 VPI (Vascular Perfusion)", f"{st.session_state.get('vpi', 80.0):.1f}%", help="Vascular Perfusion Index: Hiệu năng tưới máu và cung cấp dưỡng chất huyết quản vỏ não.")
-    st.markdown('</div>', unsafe_allow_html=True)
+        .diag-desc {
+            font-size: 0.85rem;
+            color: #9CA3AF;
+            margin-bottom: 8px;
+        }
 
-    # Main columns for 3D Visualizer and Editor Panel
-    game_cols = st.columns([5, 4])
+        .progress-track {
+            background-color: #1F2327;
+            height: 8px;
+            border-radius: 4px;
+            overflow: hidden;
+            width: 100%;
+        }
 
-    with game_cols[0]:
-        st.markdown("#### ⚡ WebGPU-Shader Emulation Pipeline (3D View)")
-        st.caption("Mạng lưới 3D tương tác 4x4x4 (64 nodes). Sử dụng chuột để xoay, thu phóng và xem điện thế.")
+        .progress-fill {
+            background-color: #39FF14;
+            height: 100%;
+            width: 100%;
+            box-shadow: 0px 0px 10px #39FF14;
+        }
 
-        # Plotly 3D visualizer call
-        grid = st.session_state.neuron_grid
-        selected_cell = st.session_state.selected_cell
+        /* Main grid container */
+        .main-layout {
+            display: grid;
+            grid-template-columns: 1.3fr 1fr;
+            gap: 24px;
+        }
 
-        fig = render_3d_brain(grid, selected_cell)
-        st.plotly_chart(fig, use_container_width=True)
+        @media(max-width: 1024px) {
+            .main-layout {
+                grid-template-columns: 1fr;
+            }
+        }
 
-        # 3D Coordinate Selectors to change active selection
-        st.markdown("##### 📍 Chọn Tọa Độ Node Muốn Điều Chỉnh (XYZ Coordinate Selectors)")
-        sel_x, sel_y, sel_z = selected_cell
+        .card {
+            background-color: #0A0B0C;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
 
-        coord_cols = st.columns(3)
-        with coord_cols[0]:
-            new_x = st.slider("Tọa độ X (Trục Hoành):", min_value=1, max_value=GRID_SIZE, value=sel_x+1, step=1)
-        with coord_cols[1]:
-            new_y = st.slider("Tọa độ Y (Trục Tung):", min_value=1, max_value=GRID_SIZE, value=sel_y+1, step=1)
-        with coord_cols[2]:
-            new_z = st.slider("Tọa độ Z (Trục Sâu):", min_value=1, max_value=GRID_SIZE, value=sel_z+1, step=1)
+        .card-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #FFFFFF;
+            margin-bottom: 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            padding-bottom: 8px;
+        }
 
-        if (new_x-1, new_y-1, new_z-1) != selected_cell:
-            st.session_state.selected_cell = (new_x-1, new_y-1, new_z-1)
-            st.rerun()
+        /* Telemetry index boards */
+        .telemetry-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 16px;
+        }
 
-        # Save & Load Circuit Codes Panel
-        st.markdown("---")
-        st.markdown("##### 💾 Lưu & Tải Sơ Đồ Mạch Thần Kinh (Circuit Share Codes)")
-        st.caption("Mã chia sẻ mạch nơ-ron hiện tại hoặc nhập mã của người khác để xây dựng nhanh!")
+        .telemetry-item {
+            background-color: #0F1113;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 6px;
+            padding: 12px;
+            text-align: center;
+        }
 
-        share_cols = st.columns([3, 1])
-        with share_cols[0]:
-            current_code = serialize_grid(st.session_state.neuron_grid)
-            code_input = st.text_input("Mã sơ đồ mạch hiện tại (Copy-paste):", value=current_code, key="cur_code_text")
-        with share_cols[1]:
-            if st.button("📥 Tải sơ đồ (Load Code)", use_container_width=True):
-                loaded_grid = deserialize_grid(code_input)
-                if loaded_grid:
-                    st.session_state.neuron_grid = loaded_grid
-                    add_log("📥 TẢI SƠ ĐỒ: Khôi phục và cấy ghép sơ đồ mạch nơ-ron 3D thành công!")
-                    st.rerun()
-                else:
-                    st.error("Mã sơ đồ không hợp lệ!")
+        .telemetry-label {
+            font-size: 0.75rem;
+            color: #9CA3AF;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+        }
 
-        st.markdown("---")
-        st.markdown("##### 📁 Thư Viện Bản Lưu Cục Bộ (Local Multi-slot Save Library)")
-        st.caption("Lưu nhanh sơ đồ mạch thần kinh hiện tại vào các khe cất trữ trong phiên hoạt động này.")
+        .telemetry-value {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: #FFFFFF;
+            text-shadow: 0px 0px 6px rgba(255, 255, 255, 0.2);
+        }
 
-        save_slots = st.session_state.get("save_slots", {"Slot 1": None, "Slot 2": None, "Slot 3": None})
-        slot_cols = st.columns(3)
-        for idx, slot_key in enumerate(["Slot 1", "Slot 2", "Slot 3"]):
-            with slot_cols[idx]:
-                slot_data = save_slots.get(slot_key, None)
-                status_txt = "🟢 Đã Lưu Sơ Đồ" if slot_data else "⚪ Khe Trống"
-                st.write(f"**{slot_key}:** `{status_txt}`")
+        /* 3D Canvas element */
+        .canvas-container {
+            position: relative;
+            background-color: #000000;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 6px;
+            height: 400px;
+            width: 100%;
+            cursor: grab;
+            overflow: hidden;
+        }
 
-                btn_cols = st.columns(2)
-                with btn_cols[0]:
-                    if st.button(f"Lưu vào {slot_key}", key=f"save_to_{idx}", use_container_width=True):
-                        save_slots[slot_key] = serialize_grid(st.session_state.neuron_grid)
-                        st.session_state.save_slots = save_slots
-                        add_log(f"💾 THƯ VIỆN: Đã lưu nhanh sơ đồ mạch hiện tại vào {slot_key}!")
-                        st.rerun()
-                with btn_cols[1]:
-                    load_disabled = slot_data is None
-                    if st.button(f"Tải từ {slot_key}", key=f"load_from_{idx}", disabled=load_disabled, use_container_width=True):
-                        loaded_grid = deserialize_grid(slot_data)
-                        if loaded_grid:
-                            st.session_state.neuron_grid = loaded_grid
-                            add_log(f"📥 THƯ VIỆN: Đã tải nhanh sơ đồ mạch từ {slot_key}!")
-                            st.rerun()
+        .canvas-container:active {
+            cursor: grabbing;
+        }
 
-    with game_cols[1]:
-        # Cell configuration section below grid
-        selected_r, selected_c, selected_z = selected_cell
-        current_cell = grid[selected_r][selected_c][selected_z]
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
 
-        st.markdown(f"#### 🛠️ Bảng Điều Khiển Nơ-ron: **Node [{selected_r + 1}, {selected_c + 1}, {selected_z + 1}]**")
-        st.write(f"Trạng thái hiện tại: **{current_cell['type']}** (Điện tích tích lũy: `{current_cell['charge']:.2f}/{current_cell['threshold']:.2f}`)")
+        /* Controller and Forms styling */
+        .form-group {
+            margin-bottom: 12px;
+        }
 
-        ach_discount = 1.0 - (st.session_state.chemicals["acetylcholine"] / 200.0)
-        cost_sensory = int(25 * ach_discount)
-        cost_inter = int(15 * ach_discount)
-        cost_motor = int(40 * ach_discount)
+        .form-label {
+            font-size: 0.85rem;
+            color: #9CA3AF;
+            margin-bottom: 4px;
+            display: block;
+        }
 
-        edit_cols = st.columns(4)
+        select, input[type="text"], input[type="range"] {
+            width: 100%;
+            background-color: #0F1113;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: #E5E7EB;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-family: inherit;
+        }
 
-        with edit_cols[0]:
-            sensory_disabled = current_cell["type"] == "Sensory" or st.session_state.stats["memory"] < cost_sensory
-            if st.button(f"⚡ Sensory\n({cost_sensory} MB)", disabled=sensory_disabled, use_container_width=True):
-                st.session_state.stats["memory"] -= cost_sensory
-                grid[selected_r][selected_c][selected_z] = {
-                    "type": "Sensory",
-                    "charge": 0.0,
-                    "threshold": 0.4,
-                    "fire_rate": 0.3,
-                    "last_fired": -1,
-                    "direction": "All",
-                    "weight": 1.0,
-                    "amyloid_plaque": False
-                }
-                add_log(f"Cấy ghép Nơ-ron cảm giác (Sensory) tại [{selected_r+1},{selected_c+1},{selected_z+1}] (-{cost_sensory} MB)")
-                st.rerun()
+        .btn {
+            background-color: #121314;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #FFFFFF;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: all 0.2s ease;
+            text-align: center;
+        }
 
-        with edit_cols[1]:
-            inter_disabled = current_cell["type"] == "Interneuron" or st.session_state.stats["memory"] < cost_inter
-            if st.button(f"🧠 Interneuron\n({cost_inter} MB)", disabled=inter_disabled, use_container_width=True):
-                st.session_state.stats["memory"] -= cost_inter
-                grid[selected_r][selected_c][selected_z] = {
-                    "type": "Interneuron",
-                    "charge": 0.0,
-                    "threshold": 0.5,
-                    "fire_rate": 0.0,
-                    "last_fired": -1,
-                    "direction": "All",
-                    "weight": 1.0,
-                    "amyloid_plaque": False
-                }
-                add_log(f"Cấy ghép Nơ-ron liên kết (Interneuron) tại [{selected_r+1},{selected_c+1},{selected_z+1}] (-{cost_inter} MB)")
-                st.rerun()
+        .btn:hover {
+            background-color: #FFFFFF;
+            color: #000000;
+            border-color: #FFFFFF;
+            box-shadow: 0px 0px 15px rgba(255, 255, 255, 0.2);
+        }
 
-        with edit_cols[2]:
-            motor_disabled = current_cell["type"] == "Motor" or st.session_state.stats["memory"] < cost_motor
-            if st.button(f"💪 Motor\n({cost_motor} MB)", disabled=motor_disabled, use_container_width=True):
-                st.session_state.stats["memory"] -= cost_motor
-                grid[selected_r][selected_c][selected_z] = {
-                    "type": "Motor",
-                    "charge": 0.0,
-                    "threshold": 0.6,
-                    "fire_rate": 0.0,
-                    "last_fired": -1,
-                    "direction": "All",
-                    "weight": 1.0,
-                    "amyloid_plaque": False
-                }
-                add_log(f"Cấy ghép Nơ-ron vận động (Motor) tại [{selected_r+1},{selected_c+1},{selected_z+1}] (-{cost_motor} MB)")
-                st.rerun()
+        .btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+            background-color: #121314 !important;
+            color: #FFFFFF !important;
+        }
 
-        with edit_cols[3]:
-            delete_disabled = current_cell["type"] == "Empty"
-            if st.button("❌ Gỡ bỏ\n(Hoàn 50%)", disabled=delete_disabled, use_container_width=True):
-                refund = 0
-                if current_cell["type"] == "Sensory":
-                    refund = int(cost_sensory * 0.5)
-                elif current_cell["type"] == "Interneuron":
-                    refund = int(cost_inter * 0.5)
-                elif current_cell["type"] == "Motor":
-                    refund = int(cost_motor * 0.5)
+        .btn-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+        }
 
-                st.session_state.stats["memory"] += refund
-                grid[selected_r][selected_c][selected_z] = {
-                    "type": "Empty",
-                    "charge": 0.0,
-                    "threshold": 0.5,
-                    "fire_rate": 0.0,
-                    "last_fired": -1,
-                    "direction": "All",
-                    "weight": 1.0,
-                    "amyloid_plaque": False
-                }
-                add_log(f"Xóa bỏ nơ-ron tại [{selected_r+1},{selected_c+1},{selected_z+1}] (Thu hồi +{refund} MB)")
-                st.rerun()
+        /* Code Inspector styles */
+        .code-area {
+            background-color: #050505;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #39FF14;
+            font-family: monospace;
+            padding: 12px;
+            border-radius: 6px;
+            overflow-x: auto;
+            max-height: 250px;
+            font-size: 0.85rem;
+            line-height: 1.4;
+        }
 
-        if current_cell["type"] != "Empty":
-            st.write("---")
-            # Active Electrode Probe (Action Potential Clamp) Button!
-            probe_disabled = st.session_state.stats["memory"] < 15.0
-            if st.button("🔌 Kích xung điện cực (+1.0 Charge) (-15 MB Memory)", disabled=probe_disabled, use_container_width=True, help="Kích xung điện thế trực tiếp tại nơ-ron được chọn."):
-                st.session_state.stats["memory"] -= 15.0
-                grid[selected_r][selected_c][selected_z]["charge"] = 1.0
-                add_log(f"🔌 [Điện cực chủ động 3D] Kích xung điện lượng cực đại tại node [{selected_r+1},{selected_c+1},{selected_z+1}]!")
-                st.rerun()
+        /* Log panel styling */
+        .log-area {
+            background-color: #050505;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            font-family: monospace;
+            padding: 12px;
+            border-radius: 6px;
+            height: 140px;
+            overflow-y: auto;
+            font-size: 0.8rem;
+            color: #A3A3A3;
+            line-height: 1.4;
+        }
+    </style>
+</head>
+<body>
 
-            st.write("---")
-            axon_cols = st.columns(2)
-            with axon_cols[0]:
-                st.markdown("**🧭 Định hướng sợi trục (Axon Target):**")
-                cur_dir = current_cell.get("direction", "All")
-                dirs_list = ["All", "Up", "Right", "Down", "Left", "Front", "Back"]
-                dir_names = {
-                    "All": "🌐 Sáu hướng (All)",
-                    "Up": "Up (Phía Y+)",
-                    "Right": "Right (Phía X+)",
-                    "Down": "Down (Phía Y-)",
-                    "Left": "Left (Phía X-)",
-                    "Front": "Front (Phía Z+)",
-                    "Back": "Back (Phía Z-)"
-                }
-                selected_new_dir = st.selectbox(
-                    "Chọn hướng truyền tải:",
-                    dirs_list,
-                    index=dirs_list.index(cur_dir),
-                    format_func=lambda x: dir_names[x],
-                    key=f"dir_select_{selected_r}_{selected_c}_{selected_z}"
-                )
-                if not isinstance(selected_new_dir, str):
-                    selected_new_dir = cur_dir
-                if selected_new_dir != cur_dir and selected_new_dir in dir_names:
-                    grid[selected_r][selected_c][selected_z]["direction"] = selected_new_dir
-                    add_log(f"Định hướng lại trục nơ-ron [{selected_r+1},{selected_c+1},{selected_z+1}] thành {dir_names[selected_new_dir]}")
-                    st.rerun()
+    <h1>🧠 BONSAI BRAIN SIMULATOR 3D</h1>
+    <div class="subtitle">64 Nodes. 3D Synaptic Kernels. In your browser.</div>
+    <div class="description">
+        Bonsai Brain Simulator 3D by Prism Neuro is a 3D biological brain simulation. Everything runs entirely locally in your browser using Streamlit & Plotly — no data leaves your device. Agentic WebGPU kernel optimization simulated on 4x4x4 grid nodes.
+    </div>
 
-            with axon_cols[1]:
-                st.markdown("**🔋 Khuyếch đại liên kết (Synaptic Weight):**")
-                cur_weight = float(current_cell.get("weight", 1.0))
-                new_weight = st.slider(
-                    "Trọng số nhân điện thế phát xung:",
-                    min_value=1.0,
-                    max_value=3.0,
-                    value=cur_weight,
-                    step=1.0,
-                    key=f"weight_select_{selected_r}_{selected_c}_{selected_z}"
-                )
-                if not isinstance(new_weight, (int, float)):
-                    new_weight = cur_weight
-                if new_weight != cur_weight:
-                    grid[selected_r][selected_c][selected_z]["weight"] = new_weight
-                    try:
-                        weight_str = f"x{new_weight:.1f}"
-                        add_log(f"Tăng cường trọng số khớp thần kinh tại [{selected_r+1},{selected_c+1},{selected_z+1}] lên {weight_str}!")
-                    except Exception:
-                        pass
-                    st.rerun()
+    <!-- Diagnostics bar -->
+    <div class="diagnostics-bar">
+        <div class="diag-header">
+            <span class="diag-title">⚡ 3D NEURAL ENGINE DIAGNOSTICS</span>
+            <span class="diag-status">● 100% ACTIVE</span>
+        </div>
+        <div class="diag-desc">
+            VRAM ALLOCATED: 4.00 / 4.00 MB | COMPUTE SHADERS: WGSL 3.0 Compiled | DEVICE: Local Browser WebGPU Emulated Pipeline
+        </div>
+        <div class="progress-track">
+            <div class="progress-fill"></div>
+        </div>
+    </div>
 
-        # Clinical Therapies Panel
-        st.write("---")
-        st.markdown("##### 🧪 Trung tâm nội tiết tố & Liệu pháp Lâm sàng (Active Abilities)")
-        hormone_cols = st.columns(9)
-        cooldowns = st.session_state.cooldowns
+    <!-- Main columns -->
+    <div class="main-layout">
+        <!-- Left Side: Interactive 3D Visualizer & Telemetries -->
+        <div>
+            <!-- Telemetries -->
+            <div class="telemetry-grid">
+                <div class="telemetry-item">
+                    <div class="telemetry-label">CSI (Cognitive Sync)</div>
+                    <div class="telemetry-value" id="csi-val">0.0%</div>
+                </div>
+                <div class="telemetry-item">
+                    <div class="telemetry-label">PDI (Plasticity Density)</div>
+                    <div class="telemetry-value" id="pdi-val">0.0%</div>
+                </div>
+                <div class="telemetry-item">
+                    <div class="telemetry-label">VPI (Vascular Perfusion)</div>
+                    <div class="telemetry-value" id="vpi-val">80.0%</div>
+                </div>
+            </div>
 
-        with hormone_cols[0]:
-            doping_disabled = cooldowns["doping"] > 0
-            btn_label_doping = f"⚡ Doping Dopamine ({cooldowns['doping']}s)" if doping_disabled else "⚡ Doping"
-            if st.button(btn_label_doping, disabled=doping_disabled, use_container_width=True, help="⚡ Kích thích Doping Dopamine: Tăng +20 Dopamine trực tiếp và sạc thêm +5 Dopamine mỗi tick trong 5 ticks. Cooldown 15s."):
-                chems["dopamine"] = min(100.0, chems["dopamine"] + 20.0)
-                st.session_state.active_buffs["doping"] = 5
-                cooldowns["doping"] = 15
-                add_log("⚡ LÂM SÀNG: Tiêm Dopamine cưỡng chế! Hệ thống hưng phấn cực đại.")
-                st.rerun()
+            <!-- Interactive 3D Canvas -->
+            <div class="card">
+                <div class="card-title">⚡ WebGPU-Shader Emulation Pipeline (3D View)</div>
+                <div class="canvas-container" id="canvas-container">
+                    <canvas id="brain-canvas"></canvas>
+                </div>
+                <div style="font-size: 0.8rem; color: #9CA3AF; margin-top: 8px; text-align: center;">
+                    Dùng chuột kéo để xoay mô hình 3D. Nhấp chuột vào một node để lựa chọn nó.
+                </div>
+            </div>
 
-        with hormone_cols[1]:
-            ssri_disabled = cooldowns["ssri"] > 0
-            btn_label_ssri = f"💊 Serotonin (SSRI) ({cooldowns['ssri']}s)" if ssri_disabled else "💊 SSRI"
-            if st.button(btn_label_ssri, disabled=ssri_disabled, use_container_width=True, help="💊 SSRI (Serotonin Reuptake Inhibitor): Tăng +20 Serotonin trực tiếp và sạc +3 Serotonin, giảm 50% Stress tạo ra mỗi tick trong 8 ticks. Cooldown 25s."):
-                chems["serotonin"] = min(100.0, chems["serotonin"] + 20.0)
-                st.session_state.active_buffs["ssri"] = 8
-                cooldowns["ssri"] = 25
-                add_log("💊 LÂM SÀNG: Sử dụng hoạt chất SSRI chống phân rã Serotonin! Điều hòa stress thần kinh vỏ não.")
-                st.rerun()
+            <!-- Charts -->
+            <div class="card">
+                <div class="card-title">📈 EEG Telemetry & Neuromodulator Chart</div>
+                <div style="height: 180px; width: 100%;">
+                    <canvas id="chart-canvas" style="width: 100%; height: 100%;"></canvas>
+                </div>
+            </div>
+        </div>
 
-        with hormone_cols[2]:
-            focus_disabled = cooldowns["focus"] > 0
-            btn_label_focus = f"🧠 Tập trung ({cooldowns['focus']}s)" if focus_disabled else "🧠 Focus"
-            if st.button(btn_label_focus, disabled=focus_disabled, use_container_width=True, help="🧠 Kích thích Tập trung (Deep Focus): Tăng +15 Acetylcholine trực tiếp và sạc +4 Acetylcholine mỗi tick trong 10 ticks. Cooldown 20s."):
-                chems["acetylcholine"] = min(100.0, chems["acetylcholine"] + 15.0)
-                st.session_state.active_buffs["focus"] = 10
-                cooldowns["focus"] = 20
-                add_log("🧠 LÂM SÀNG: Kích hoạt Deep Focus! Acetylcholine tăng tốc dẫn truyền thông tin nhận thức.")
-                st.rerun()
+        <!-- Right Side: Node Editor & Upgrades & Shaders -->
+        <div>
+            <!-- Node Selector & Config -->
+            <div class="card">
+                <div class="card-title" id="editor-title">🛠️ Node Editor: Node [1, 1, 1]</div>
+                <div class="form-group">
+                    <div class="btn-grid">
+                        <button class="btn" onclick="setNodeType('Sensory')">⚡ Sensory</button>
+                        <button class="btn" onclick="setNodeType('Interneuron')">🧠 Interneuron</button>
+                        <button class="btn" onclick="setNodeType('Motor')">💪 Motor</button>
+                        <button class="btn" onclick="setNodeType('Empty')">❌ Gỡ bỏ</button>
+                    </div>
+                </div>
+                <div class="form-group" style="margin-top: 15px;">
+                    <button class="btn" onclick="injectCharge()">🔌 Kích xung điện cực (+1.0 Charge)</button>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Hướng truyền tải Axon:</label>
+                    <select id="axon-dir" onchange="changeDirection()">
+                        <option value="All">🌐 Sáu hướng (All)</option>
+                        <option value="Up">Up (Phía Y+)</option>
+                        <option value="Right">Right (Phía X+)</option>
+                        <option value="Down">Down (Phía Y-)</option>
+                        <option value="Left">Left (Phía X-)</option>
+                        <option value="Front">Front (Phía Z+)</option>
+                        <option value="Back">Back (Phía Z-)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Trọng số Synaptic: <span id="weight-lbl">1.0</span></label>
+                    <input type="range" id="axon-weight" min="1" max="3" step="1" value="1" oninput="changeWeight()">
+                </div>
+            </div>
 
-        with hormone_cols[3]:
-            rtms_disabled = cooldowns["rtms"] > 0
-            btn_label_rtms = f"🏥 Liệu pháp rTMS ({cooldowns['rtms']}s)" if rtms_disabled else "🏥 rTMS"
-            if st.button(btn_label_rtms, disabled=rtms_disabled, use_container_width=True, help="🏥 Liệu pháp rTMS (Kích thích từ trường lặp): Khôi phục toàn bộ ngưỡng nơ-ron (Threshold) bị xơ hóa do Alzheimer về mức chuẩn và phục hồi +40% Sanity. Cooldown 35s."):
-                for x in range(GRID_SIZE):
-                    for y in range(GRID_SIZE):
-                        for z in range(GRID_SIZE):
-                            t_name = grid[x][y][z]["type"]
-                            if t_name != "Empty":
-                                grid[x][y][z]["threshold"] = 0.4 if t_name == "Sensory" else (0.6 if t_name == "Motor" else 0.5)
-                chems["sanity"] = min(100.0, chems["sanity"] + 40.0)
-                cooldowns["rtms"] = 35
-                add_log("🏥 LÂM SÀNG: Thực hiện liệu pháp rTMS vỏ não! Đã giải trừ xơ cứng và tái thiết lập ngưỡng thế năng chuẩn.")
-                st.rerun()
+            <!-- Active Clinical Therapies -->
+            <div class="card">
+                <div class="card-title">🧪 Active Clinical Therapies</div>
+                <div class="btn-grid" style="grid-template-columns: repeat(3, 1fr); gap: 6px;">
+                    <button class="btn" style="font-size: 0.75rem;" onclick="triggerTherapy('Doping')">⚡ Doping</button>
+                    <button class="btn" style="font-size: 0.75rem;" onclick="triggerTherapy('SSRI')">💊 SSRI</button>
+                    <button class="btn" style="font-size: 0.75rem;" onclick="triggerTherapy('Focus')">🧠 Focus</button>
+                    <button class="btn" style="font-size: 0.75rem;" onclick="triggerTherapy('rTMS')">🏥 rTMS</button>
+                    <button class="btn" style="font-size: 0.75rem;" onclick="triggerTherapy('Opto')">🔦 Opto</button>
+                    <button class="btn" style="font-size: 0.75rem;" onclick="triggerTherapy('VNS')">❤️ VNS</button>
+                </div>
+            </div>
 
-        with hormone_cols[4]:
-            opto_disabled = cooldowns["opto"] > 0
-            btn_label_opto = f"🔦 Optogenetics ({cooldowns['opto']}s)" if opto_disabled else "🔦 Opto"
-            if st.button(btn_label_opto, disabled=opto_disabled, use_container_width=True, help="🔦 Liệu pháp Quang di truyền (Optogenetic Laser Pulse): Kích hoạt chớp laser hội tụ nạp ngay lập tức +0.5 điện tích cho toàn bộ các nơ-ron nằm trên trục X, Y, Z của node được chọn. Cooldown 18s."):
-                for x in range(GRID_SIZE):
-                    for y in range(GRID_SIZE):
-                        for z in range(GRID_SIZE):
-                            if (x == selected_r or y == selected_c or z == selected_z) and grid[x][y][z]["type"] != "Empty":
-                                grid[x][y][z]["charge"] = min(1.0, grid[x][y][z]["charge"] + 0.5)
-                cooldowns["opto"] = 18
-                add_log(f"🔦 LÂM SÀNG: Phóng tia laser quang di truyền dọc theo tọa độ nơ-ron [{selected_r+1},{selected_c+1},{selected_z+1}]!")
-                st.rerun()
+            <!-- Shader Inspector -->
+            <div class="card">
+                <div class="card-title">🎛️ WGSL Shaders Code Inspector</div>
+                <div class="form-group">
+                    <select id="shader-select" onchange="showShader()">
+                        <option value="propagation">synaptic_charge_propagation.wgsl</option>
+                        <option value="plasticity">hebbian_plasticity_attention.wgsl</option>
+                        <option value="gaba">gaba_normalization.wgsl</option>
+                        <option value="vns">vagus_nerve_clamp.wgsl</option>
+                    </select>
+                </div>
+                <pre class="code-area" id="shader-code"></pre>
+            </div>
 
-        with hormone_cols[5]:
-            cortisol_disabled = cooldowns.get("cortisol", 0) > 0 or st.session_state.stats["memory"] < 30.0
-            btn_label_cortisol = f"🧪 Cortisol Wash ({cooldowns.get('cortisol', 0)}s)" if cooldowns.get("cortisol", 0) > 0 else "🧪 Cortisol"
-            if st.button(btn_label_cortisol, disabled=cortisol_disabled, use_container_width=True, help="🧪 Rửa viêm Cortisol Wash: Chi phí 30 MB Bộ nhớ. Lập tức dập tắt và đặt mức Viêm thần kinh (Neuro-inflammation) về 10.0%. Cooldown 20s."):
-                st.session_state.stats["memory"] -= 30.0
-                chems["neuro_inflammation"] = 10.0
-                cooldowns["cortisol"] = 20
-                add_log("🧪 LÂM SÀNG: Thực hiện Cortisol Wash! Rửa trôi bão viêm cytokine, bảo vệ màng bao myelin vỏ não.")
-                st.rerun()
+            <!-- Logs -->
+            <div class="card">
+                <div class="card-title">📋 Brain Activity Log</div>
+                <div class="log-area" id="log-box"></div>
+            </div>
+        </div>
+    </div>
 
-        with hormone_cols[6]:
-            propranolol_disabled = cooldowns.get("propranolol", 0) > 0
-            btn_label_propranolol = f"🩺 Propranolol ({cooldowns.get('propranolol', 0)}s)" if cooldowns.get("propranolol", 0) > 0 else "🩺 Beta-block"
-            if st.button(btn_label_propranolol, disabled=propranolol_disabled, use_container_width=True, help="🩺 Hoạt chất chẹn beta Propranolol: Đưa nồng độ Norepinephrine (Fight-or-Flight) lập tức về mức an toàn 10.0%, giảm tải triệt để trạng thái run giật bão hòa. Cooldown 20s."):
-                chems["norepinephrine"] = 10.0
-                cooldowns["propranolol"] = 20
-                add_log("🩺 LÂM SÀNG: Uống Propranolol chẹn beta giao cảm! Hạ mức norepinephrine khẩn cấp tránh sốc hoảng loạn.")
-                st.rerun()
+    <!-- JS Logic -->
+    <script>
+        // Core 3D Grid State
+        const GRID_SIZE = 4;
+        let grid = [];
+        let selectedCell = { x: 0, y: 0, z: 0 };
 
-        with hormone_cols[7]:
-            sprouting_disabled = cooldowns.get("sprouting", 0) > 0 or st.session_state.stats["memory"] < 40.0
-            btn_label_sprouting = f"🌱 Sprouting ({cooldowns.get('sprouting', 0)}s)" if cooldowns.get("sprouting", 0) > 0 else "🌱 Sprouting"
-            if st.button(btn_label_sprouting, disabled=sprouting_disabled, use_container_width=True, help="🌱 Nảy mầm liên kết mới: Chi phí 40 MB Bộ nhớ. Sao chép ngẫu nhiên một nơ-ron liên kết (Interneuron) hiện có sang một ô trống lân cận để xây dựng liên kết free. Cooldown 30s."):
-                candidates = []
-                for x in range(GRID_SIZE):
-                    for y in range(GRID_SIZE):
-                        for z in range(GRID_SIZE):
-                            if grid[x][y][z]["type"] == "Interneuron":
-                                for dx, dy, dz in [(0, 1, 0), (0, -1, 0), (1, 0, 0), (-1, 0, 0), (0, 0, 1), (0, 0, -1)]:
-                                    nx, ny, nz = x + dx, y + dy, z + dz
-                                    if 0 <= nx < GRID_SIZE and 0 <= ny < GRID_SIZE and 0 <= nz < GRID_SIZE:
-                                        if grid[nx][ny][nz]["type"] == "Empty":
-                                            candidates.append((x, y, z, nx, ny, nz))
-                if candidates:
-                    px, py, pz, cx, cy, cz = random.choice(candidates)
-                    parent = grid[px][py][pz]
-                    grid[cx][cy][cz] = {
-                        "type": "Interneuron",
-                        "charge": 0.0,
-                        "threshold": parent["threshold"],
-                        "fire_rate": parent.get("fire_rate", 0.0),
-                        "last_fired": -1,
-                        "direction": parent.get("direction", "All"),
-                        "weight": parent.get("weight", 1.0),
-                        "amyloid_plaque": False
+        let csi = 0.0;
+        let pdi = 0.0;
+        let vpi = 80.0;
+
+        let iq = 0.0;
+        let memory = 100.0;
+        let energy = 100.0;
+        let stress = 10.0;
+        let sanity = 100.0;
+
+        let logs = ["Khởi tạo mạng nơ-ron 3D WebGPU thành công."];
+        let history = { ticks: [], csi: [], pdi: [], vpi: [] };
+        let currentTick = 0;
+
+        function initGrid() {
+            grid = [];
+            for (let x = 0; x < GRID_SIZE; x++) {
+                let plane = [];
+                for (let y = 0; y < GRID_SIZE; y++) {
+                    let row = [];
+                    for (let z = 0; z < GRID_SIZE; z++) {
+                        row.push({
+                            type: "Empty",
+                            charge: 0.0,
+                            threshold: 0.5,
+                            direction: "All",
+                            weight: 1.0
+                        });
                     }
-                    st.session_state.stats["memory"] -= 40.0
-                    cooldowns["sprouting"] = 30
-                    add_log(f"🌱 LÂM SÀNG: Nảy mầm synap (Sprouting)! Phân tách nơ-ron từ [{px+1},{py+1},{pz+1}] sang ô trống [{cx+1},{cy+1},{cz+1}].")
-                    st.rerun()
-                else:
-                    st.warning("Không tìm thấy Interneuron nào có ô trống lân cận để mọc mầm!")
+                    plane.push(row);
+                }
+                grid.push(plane);
+            }
 
-        with hormone_cols[8]:
-            vns_disabled = cooldowns.get("vns", 0) > 0 or st.session_state.stats["memory"] < 30.0
-            btn_label_vns = f"❤️ VNS ({cooldowns.get('vns', 0)}s)" if cooldowns.get("vns", 0) > 0 else "❤️ VNS"
-            if st.button(btn_label_vns, disabled=vns_disabled, use_container_width=True, help="❤️ Kích thích dây thần kinh phế vị (Vagus Nerve Stimulation - VNS): Lập tức hạ mức Stress về 0%, hồi phục +20% Sanity và sạc đầy GABA lên 90%. Cooldown 40s."):
-                st.session_state.stats["memory"] -= 30.0
-                chems["stress"] = 0.0
-                chems["sanity"] = min(100.0, chems["sanity"] + 20.0)
-                chems["gaba"] = 90.0
-                cooldowns["vns"] = 40
-                add_log("❤️ LÂM SÀNG: Kích thích dây thần kinh phế vị VNS! Hạ stress về không, bình ổn tối đa nhịp hóa sinh vỏ não.")
-                st.rerun()
+            // Starter Nodes
+            grid[0][0][0] = { type: "Sensory", charge: 0.0, threshold: 0.4, direction: "All", weight: 1.0 };
+            grid[1][1][1] = { type: "Interneuron", charge: 0.0, threshold: 0.5, direction: "All", weight: 1.0 };
+            grid[3][3][3] = { type: "Motor", charge: 0.0, threshold: 0.6, direction: "All", weight: 1.0 };
+        }
 
-        # Neurotransmitter Synthesis Precursors & Diet System Layout
-        st.markdown("##### 🧬 Dinh Dưỡng Học & Tiền Chất Thần Kinh (Precursor Dietary Intake)")
-        st.caption("Tổng hợp trực tiếp các chất dẫn truyền thông qua bồi bổ dinh dưỡng. Phí tiêu thụ: 15 MB Bộ nhớ.")
-
-        diet_cols = st.columns(4)
-        diet_disabled = st.session_state.stats["memory"] < 15.0
-
-        with diet_cols[0]:
-            if st.button("🥚 L-Tyrosine (Dopamine Precursor)", disabled=diet_disabled, use_container_width=True, help="Egg precursors: Tăng +15% Dopamine trực tiếp, sạc +3 Dopamine/tick trong 15 ticks và phục hồi +25% Dinh dưỡng Thần kinh."):
-                st.session_state.stats["memory"] -= 15.0
-                st.session_state.active_buffs["tyrosine"] = 15
-                chems["dopamine"] = min(100.0, chems["dopamine"] + 15.0)
-                chems["neuro_nutrients"] = min(100.0, chems.get("neuro_nutrients", 80.0) + 25.0)
-                add_log("🥩 DINH DƯỠNG: Hấp thụ L-Tyrosine! Cung cấp dưỡng chất và bồi bổ Dopamine bộc phát.")
-                st.rerun()
-
-        with diet_cols[1]:
-            if st.button("🍗 L-Tryptophan (Serotonin Precursor)", disabled=diet_disabled, use_container_width=True, help="Poultry precursors: Tăng +15% Serotonin trực tiếp, sạc +2 Serotonin/tick trong 15 ticks và phục hồi +25% Dinh dưỡng Thần kinh."):
-                st.session_state.stats["memory"] -= 15.0
-                st.session_state.active_buffs["tryptophan"] = 15
-                chems["serotonin"] = min(100.0, chems["serotonin"] + 15.0)
-                chems["neuro_nutrients"] = min(100.0, chems.get("neuro_nutrients", 80.0) + 25.0)
-                add_log("🍗 DINH DƯỠNG: Hấp thụ L-Tryptophan! Thúc đẩy tổng hợp hoóc-môn hạnh phúc Serotonin.")
-                st.rerun()
-
-        with diet_cols[2]:
-            if st.button("🥦 Choline (Acetylcholine Precursor)", disabled=diet_disabled, use_container_width=True, help="Broccoli precursors: Tăng +15% Acetylcholine trực tiếp, sạc +2.5 Acetylcholine/tick trong 15 ticks và phục hồi +25% Dinh dưỡng Thần kinh."):
-                st.session_state.stats["memory"] -= 15.0
-                st.session_state.active_buffs["choline"] = 15
-                chems["acetylcholine"] = min(100.0, chems["acetylcholine"] + 15.0)
-                chems["neuro_nutrients"] = min(100.0, chems.get("neuro_nutrients", 80.0) + 25.0)
-                add_log("🥦 DINH DƯỠNG: Hấp thụ Choline! Tăng tốc độ phản xạ ghi nhớ vỏ não.")
-                st.rerun()
-
-        with diet_cols[3]:
-            if st.button("🥜 Glutamate (GABA Precursor)", disabled=diet_disabled, use_container_width=True, help="Peanuts precursor: Tăng +15% GABA trực tiếp, sạc +3 GABA/tick trong 15 ticks và phục hồi +25% Dinh dưỡng Thần kinh."):
-                st.session_state.stats["memory"] -= 15.0
-                st.session_state.active_buffs["glutamate"] = 15
-                chems["gaba"] = min(100.0, chems["gaba"] + 15.0)
-                chems["neuro_nutrients"] = min(100.0, chems.get("neuro_nutrients", 80.0) + 25.0)
-                add_log("🥜 DINH DƯỠNG: Hấp thụ Glutamate! Bổ sung GABA, bình ổn quá tải dẫn truyền.")
-                st.rerun()
-
-    # Dynamic line chart showing historical metrics
-    st.write("---")
-    st.markdown("#### 📈 Biểu Đồ Điện Não Đồ & Hóa Học Bộ Não 3D (EEG & Neuromodulator Telemetry)")
-    st.caption("Hiển thị biến thiên nồng độ chất truyền dẫn hóa học, Tỉnh táo (Sanity), Căng thẳng (Stress) và ba Chỉ số 3D (CSI, PDI, VPI) theo thời gian thực.")
-
-    hist_df = pd.DataFrame(st.session_state.history_data)
-    if not hist_df.empty:
-        st.line_chart(hist_df.set_index("tick"))
-
-    # Game pathology modes selector
-    st.write("---")
-    st.markdown("##### ⚙️ Lựa chọn Chế Độ Thử Thách Não Bộ")
-    modes_list = ["Normal", "Alzheimer", "Epilepsy", "Parkinson", "ADHD", "Schizophrenia", "Mania"]
-    modes_names = {
-        "Normal": "🟢 Bình Thường (Sức khỏe ổn định)",
-        "Alzheimer": "👵 Thử Thách Alzheimer (Thoái hóa nơ-ron, mảng bám xơ hóa)",
-        "Epilepsy": "⚡ Thử Thách Động Kinh (Gia tăng xung điện cực độ, nhân đôi stress)",
-        "Parkinson": "🤝 Thử Thách Parkinson (Run giật nơ-ron vận động khi thiếu hụt Dopamine)",
-        "ADHD": "🧠 Thử Thách ADHD (Dao động Dopamine dữ dội, tăng tốc phân rã Acetylcholine)",
-        "Schizophrenia": "📢 Thử Thách Tâm Thần Phân Liệt (Ảo thanh kích phát điện thế bất ngờ, giảm 30% hồi tỉnh táo)",
-        "Mania": "🤪 Thử Thách Hưng Cảm (Mania: Hụt sanity thần tốc, dopamine tăng cực đỉnh)"
-    }
-    selected_mode = st.selectbox(
-        "Cấu hình bệnh lý học vỏ não 3D:",
-        modes_list,
-        index=modes_list.index(st.session_state.game_mode),
-        format_func=lambda x: modes_names[x]
-    )
-    if not isinstance(selected_mode, str):
-        selected_mode = st.session_state.game_mode
-    if selected_mode != st.session_state.game_mode:
-        st.session_state.game_mode = selected_mode
-        add_log(f"⚙️ HỆ THỐNG: Chuyển đổi trạng thái bệnh lý sang {modes_names[selected_mode]}")
-        st.rerun()
-
-    # Genetic Mutation Board Selector
-    st.write("---")
-    st.markdown("##### 🧬 Bảng Đột Biến Gen Di Truyền Học (Genetic Mutation Board)")
-    st.caption("Lựa chọn các đột biến gen bẩm sinh có lợi/hại để tinh chỉnh phản hồi hóa học vỏ não của bạn.")
-
-    genes_list = [
-        ("APOE4", "👵 Đột biến APOE4: Nhân đôi tốc độ chai lỳ điện thế trong chế độ Alzheimer."),
-        ("BDNF", "🧠 Đột biến BDNF: Tăng cường tốc độ tự thích nghi (Hebbian threshold drift) thêm +50%."),
-        ("COMT", "⚡ Đột biến COMT: Tăng cường tốc độ đào thải Dopamine tự nhiên thêm +30%."),
-        ("GABRA1", "🧘 Đột biến GABRA1: Cản trở dập tắt stress trong chế độ Động kinh thêm +50%."),
-        ("DRD4", "🍭 Đột biến DRD4: Nhân đôi tốc độ sạc Dopamine khi Motor nơ-ron phát xung, nhưng lượng dopamine thấp sẽ nhân đôi sát thương lên Sanity."),
-        ("SHANK3", "🛡️ Đột biến SHANK3: Khớp nối bền vững Myelin nâng hiệu suất dẫn truyền xung điện lên thêm +15%."),
-        ("DRD2", "🍿 Đột biến DRD2: Tăng +50% tốc độ sạc Dopamine của Sensory cell, nhưng stress cao (>50) sẽ nhân 1.5x sát thương Sanity."),
-        ("COMT-Met", "💡 Đột biến COMT-Met: Tăng 30% điểm IQ khi Motor cell phát hỏa, nhưng Stress phân rã chậm hơn 30%."),
-        ("ADRA2A", "🩺 Đột biến ADRA2A: Giảm mức thiệt hại hoảng loạn Sanity từ -15 xuống -9 và tăng ngưỡng Norepinephrine Panic lên 100%."),
-        ("TREM2", "✨ Đột biến TREM2: Nhân đôi tốc độ dọn dẹp các mảng bám xơ hóa Amyloid của tế bào Microglia bẩm sinh.")
-    ]
-
-    active_genes = st.session_state.get("active_genes", [])
-    selected_genes = []
-
-    gen_cols = st.columns(2)
-    for idx, (gen_code, gen_desc) in enumerate(genes_list):
-        col_idx = idx % 2
-        with gen_cols[col_idx]:
-            is_active = st.checkbox(f"Gen **{gen_code}**\n({gen_desc})", value=(gen_code in active_genes), key=f"gene_cb_{gen_code}")
-            if is_active:
-                selected_genes.append(gen_code)
-
-    if set(selected_genes) != set(active_genes):
-        st.session_state.active_genes = selected_genes
-        add_log(f"🧬 DI TRUYỀN: Cấu hình lại bộ gen bẩm sinh: {', '.join(selected_genes) or 'Trống'}")
-        st.rerun()
-
-    # Upgrades Shop Section
-    st.write("---")
-    st.markdown("#### 🏪 Cửa Hàng Giải Phẫu Thần Kinh (Neuro-Anatomical Shop)")
-    st.caption("Sử dụng IQ nhận thức thu hoạch được để nâng cấp cấu trúc cơ thể sinh học của não bộ.")
-
-    shop_cols = st.columns(3)
-
-    with shop_cols[0]:
-        st.write(f"**Hành Não & Thân Não [Lv.{upgrades['brainstem']}/3]**\nTrung tâm sinh năng lượng tự động: Tăng sản lượng Glucose nạp vào lên +2.0 mỗi cấp.")
-        cost_stem = int(45 * upgrades["brainstem"])
-        stem_disabled = upgrades["brainstem"] >= 3 or stats["iq"] < cost_stem
-        if st.button(f"Nâng cấp Thân não ({cost_stem} IQ)", disabled=stem_disabled, use_container_width=True):
-            stats["iq"] -= cost_stem
-            upgrades["brainstem"] += 1
-            add_log(f"🏪 NÂNG CẤP: Nâng cấp Thân não lên Cấp {upgrades['brainstem']} thành công!")
-            st.rerun()
-
-    with shop_cols[1]:
-        st.write(f"**Tiểu Não (Cerebellum) [Lv.{upgrades['cerebellum']}/3]**\nBộ lọc thăng bằng căng thẳng: Đào thải độc tố stress thêm -1.0 mỗi cấp.")
-        cost_cere = int(60 * upgrades["cerebellum"])
-        cere_disabled = upgrades["cerebellum"] >= 3 or stats["iq"] < cost_cere
-        if st.button(f"Nâng cấp Tiểu não ({cost_cere} IQ)", disabled=cere_disabled, use_container_width=True):
-            stats["iq"] -= cost_cere
-            upgrades["cerebellum"] += 1
-            add_log(f"🏪 NÂNG CẤP: Nâng cấp Tiểu não lên Cấp {upgrades['cerebellum']} thành công!")
-            st.rerun()
-
-    with shop_cols[2]:
-        st.write(f"**Thùy Hải Mã (Hippocampus) [Lv.{upgrades['hippocampus']}/3]**\nTuyến thu hoạch bộ nhớ dài hạn: Tăng hiệu suất chuyển hóa Trí nhớ dài hạn +50% mỗi cấp.")
-        cost_hippo = int(80 * upgrades["hippocampus"])
-        hippo_disabled = upgrades["hippocampus"] >= 3 or stats["iq"] < cost_hippo
-        if st.button(f"Nâng cấp Hải mã ({cost_hippo} IQ)", disabled=hippo_disabled, use_container_width=True):
-            stats["iq"] -= cost_hippo
-            upgrades["hippocampus"] += 1
-            add_log(f"🏪 NÂNG CẤP: Nâng cấp Thùy Hải Mã lên Cấp {upgrades['hippocampus']} thành công!")
-            st.rerun()
-
-    shop_cols2 = st.columns(3)
-
-    with shop_cols2[0]:
-        st.write(f"**Vỏ Não Phức Tạp (Cortex) [Lv.{upgrades['cortex']}/3]**\nTập hợp nơ-ron bậc cao: Nhân hiệu suất thu hoạch IQ khi nơ-ron Motor bắn lên thêm +60% mỗi cấp.")
-        cost_cortex = int(100 * upgrades["cortex"])
-        cortex_disabled = upgrades["cortex"] >= 3 or stats["iq"] < cost_cortex
-        if st.button(f"Nâng cấp Vỏ não ({cost_cortex} IQ)", disabled=cortex_disabled, use_container_width=True):
-            stats["iq"] -= cost_cortex
-            upgrades["cortex"] += 1
-            add_log(f"🏪 NÂNG CẤP: Nâng cấp Vỏ não bậc cao lên Cấp {upgrades['cortex']} thành công!")
-            st.rerun()
-
-    with shop_cols2[1]:
-        st.write(f"**Bao Myelin (Myelin Sheaths) [Lv.{upgrades.get('myelin', 0)}/3]**\nMàng bọc cách điện bảo vệ: Tăng x5% tốc độ dẫn truyền tín hiệu xuyên suốt synap.")
-        cost_myelin = int(50 * (upgrades.get("myelin", 0) + 1))
-        myelin_disabled = upgrades.get("myelin", 0) >= 3 or stats["iq"] < cost_myelin
-        if st.button(f"Phủ bao Myelin ({cost_myelin} IQ)", disabled=myelin_disabled, use_container_width=True):
-            stats["iq"] -= cost_myelin
-            upgrades["myelin"] = upgrades.get("myelin", 0) + 1
-            add_log(f"🏪 NÂNG CẤP: Bao phủ Myelin thần kinh vỏ não đạt Cấp {upgrades['myelin']}!")
-            st.rerun()
-
-    with shop_cols2[2]:
-        st.write(f"**Tính Mềm Dẻo Nơ-ron (Hebbian Plasticity) [Lv.{upgrades.get('plasticity', 0)}/1]**\nCơ chế tự thích thích Hebbian: Giảm vĩnh viễn ngưỡng điện thế của nơ-ron lân cận khi phát hỏa.")
-        cost_plastic = 75
-        plastic_disabled = upgrades.get("plasticity", 0) >= 1 or stats["iq"] < cost_plastic
-        if st.button(f"Mở Hebbian Plasticity ({cost_plastic} IQ)", disabled=plastic_disabled, use_container_width=True):
-            stats["iq"] -= cost_plastic
-            upgrades["plasticity"] = 1
-            add_log("🏪 NÂNG CẤP: Mở khóa Hebbian Plasticity! Thiết lập cơ chế ghi nhớ cơ bản.")
-            st.rerun()
-
-    shop_cols3 = st.columns(3)
-
-    with shop_cols3[0]:
-        st.write(f"**Tự Động Cắt Tỉa (Synaptic Pruning) [Lv.{upgrades.get('pruning', 0)}/1]**\nThanh lọc tế bào thừa nhàn rỗi: Tự động gỡ các Interneuron không hoạt động trong 15 ticks và hoàn phí 75%.")
-        cost_pruning = 90
-        pruning_disabled = upgrades.get("pruning", 0) >= 1 or stats["iq"] < cost_pruning
-        if st.button(f"Mở Synaptic Pruning ({cost_pruning} IQ)", disabled=pruning_disabled, use_container_width=True):
-            stats["iq"] -= cost_pruning
-            upgrades["pruning"] = 1
-            add_log("🏪 NÂNG CẤP: Mở khóa Synaptic Pruning dọn dẹp tế bào nhàn rỗi thông minh!")
-            st.rerun()
-
-    with shop_cols3[1]:
-        st.write(f"**Vỏ Não Trước Trán (Prefrontal Cortex - PFC) [Lv.{upgrades.get('pfc', 0)}/1]**\nTự động hóa AI giải quyết biến cố: PFC tự động lựa chọn giải pháp tối ưu cho mọi biến cố ngẫu nhiên xuất hiện.")
-        cost_pfc = 120
-        pfc_disabled = upgrades.get("pfc", 0) >= 1 or stats["iq"] < cost_pfc
-        if st.button(f"Mở khóa PFC ({cost_pfc} IQ)", disabled=pfc_disabled, use_container_width=True):
-            stats["iq"] -= cost_pfc
-            upgrades["pfc"] = 1
-            add_log("🏪 NÂNG CẤP: Mở khóa Vỏ Não Trước Trán PFC! Tự động hóa giải quyết biến cố.")
-            st.rerun()
-
-    with shop_cols3[2]:
-        st.write(f"**Hạch Hạnh Nhân (Amygdala) [Lv.{upgrades.get('amygdala', 0)}/3]**\nHạch chế ngự lo âu: Giảm -15% lượng căng thẳng (stress) sinh ra từ các hành động nơ-ron mỗi cấp.")
-        cost_amy = int(70 * (upgrades.get("amygdala", 0) + 1))
-        amy_disabled = upgrades.get("amygdala", 0) >= 3 or stats["iq"] < cost_amy
-        if st.button(f"Nâng cấp Amygdala ({cost_amy} IQ)", disabled=amy_disabled, use_container_width=True):
-            stats["iq"] -= cost_amy
-            upgrades["amygdala"] = upgrades.get("amygdala", 0) + 1
-            add_log(f"🏪 NÂNG CẤP: Nâng cấp Amygdala lên Cấp {upgrades['amygdala']} thành công!")
-            st.rerun()
-
-    shop_cols4 = st.columns(3)
-
-    with shop_cols4[0]:
-        st.write(f"**Đồi Thị (Thalamus Sensory Hub) [Lv.{upgrades.get('thalamus', 0)}/3]**\nTrạm trung chuyển cảm giác: Tăng tốc độ sạc điện tích tự thân của Sensory cell thêm +20% mỗi cấp.")
-        cost_thalamus = int(60 * (upgrades.get("thalamus", 0) + 1))
-        thalamus_disabled = upgrades.get("thalamus", 0) >= 3 or stats["iq"] < cost_thalamus
-        if st.button(f"Nâng cấp Thalamus ({cost_thalamus} IQ)", disabled=thalamus_disabled, use_container_width=True):
-            stats["iq"] -= cost_thalamus
-            upgrades["thalamus"] = upgrades.get("thalamus", 0) + 1
-            add_log(f"🏪 NÂNG CẤP: Nâng cấp Đồi Thị Thalamus lên Cấp {upgrades['thalamus']}!")
-            st.rerun()
-
-    with shop_cols4[1]:
-        st.write(f"**Tế Bào Hình Sao (Glycogen Shunt) [Lv.{upgrades.get('glycogen_shunt', 0)}/1]**\nKích hoạt kho Glycogen dự trữ khẩn cấp: Tăng giới hạn chứa Glucose cực đại lên 150 (bình thường 100).")
-        cost_glycogen = 100
-        gly_disabled = upgrades.get("glycogen_shunt", 0) >= 1 or stats["iq"] < cost_glycogen
-        if st.button(f"Kích hoạt Glycogen Shunt ({cost_glycogen} IQ)", disabled=gly_disabled, use_container_width=True):
-            stats["iq"] -= cost_glycogen
-            upgrades["glycogen_shunt"] = 1
-            st.session_state.stats["glycogen_pool"] = 50.0
-            add_log("🏪 NÂNG CẤP: Kích hoạt Glycogen Shunt dự phòng từ các tế bào hình sao Astrocytes!")
-            st.rerun()
-
-    with shop_cols4[2]:
-        st.write(f"**Thùy Răng Hải Mã (Dentate Gyrus Lv.1) [Lv.{upgrades.get('dentate_gyrus', 0)}/1]**\nTự sinh thần kinh hải mã: Khi serotonin cao (>60), tự động cấy nơ-ron mới vào ô trống trống (Phí 15 MB).")
-        cost_dentate = 150
-        dentate_disabled = upgrades.get("dentate_gyrus", 0) >= 1 or stats["iq"] < cost_dentate
-        if st.button(f"Nâng cấp Dentate Gyrus ({cost_dentate} IQ)", disabled=dentate_disabled, use_container_width=True):
-            stats["iq"] -= cost_dentate
-            upgrades["dentate_gyrus"] = 1
-            add_log("🏪 NÂNG CẤP: Mở khóa Dentate Gyrus Hải mã kích hoạt cơ chế tự sinh nơ-ron liên kết!")
-            st.rerun()
-
-    shop_cols5 = st.columns(3)
-
-    with shop_cols5[0]:
-        st.write(f"**Thùy Chẩm (Occipital Lobe) [Lv.{upgrades.get('occipital_lobe', 0)}/3]**\nBộ xử lý thị giác: Cứ mỗi 10 ticks phát sinh một chớp thị giác. Định hướng Sensory khớp chớp sẽ x2 tốc độ sạc.")
-        cost_occipital = int(80 * (upgrades.get("occipital_lobe", 0) + 1))
-        occipital_disabled = upgrades.get("occipital_lobe", 0) >= 3 or stats["iq"] < cost_occipital
-        if st.button(f"Nâng cấp Thùy Chẩm ({cost_occipital} IQ)", disabled=occipital_disabled, use_container_width=True):
-            stats["iq"] -= cost_occipital
-            upgrades["occipital_lobe"] = upgrades.get("occipital_lobe", 0) + 1
-            add_log(f"🏪 NÂNG CẤP: Nâng cấp Thùy Chẩm (Occipital Lobe) lên Cấp {upgrades['occipital_lobe']}!")
-            st.rerun()
-
-    with shop_cols5[1]:
-        st.write(f"**Thùy Thái Dương (Temporal Lobe) [Lv.{upgrades.get('temporal_lobe', 0)}/3]**\nBộ xử lý thính giác & nhịp cộng hưởng: Cứ mỗi 15 ticks nhận kích thích âm thanh. Tần số cộng hưởng 400-500 Hz nhân 3 (3x) sản lượng Trí nhớ.")
-        cost_temporal = int(90 * (upgrades.get("temporal_lobe", 0) + 1))
-        temporal_disabled = upgrades.get("temporal_lobe", 0) >= 3 or stats["iq"] < cost_temporal
-        if st.button(f"Nâng cấp Thùy Thái Dương ({cost_temporal} IQ)", disabled=temporal_disabled, use_container_width=True):
-            stats["iq"] -= cost_temporal
-            upgrades["temporal_lobe"] = upgrades.get("temporal_lobe", 0) + 1
-            add_log(f"🏪 NÂNG CẤP: Nâng cấp Thùy Thái Dương (Temporal Lobe) lên Cấp {upgrades['temporal_lobe']}!")
-            st.rerun()
-
-    with shop_cols5[2]:
-        st.write(f"**Củng Cố Hebbian LTP Consolidator [Lv.{upgrades.get('ltp_consolidator', 0)}/1]**\nCủng cố liên kết trí nhớ dài hạn: Tự động chuyển đổi 30% bộ nhớ sang IQ vĩnh viễn Hebbian LTP sau mỗi 12 ticks hoạt động.")
-        cost_ltp = 110
-        ltp_disabled = upgrades.get("ltp_consolidator", 0) >= 1 or stats["iq"] < cost_ltp
-        if st.button(f"Nâng cấp LTP Consolidator ({cost_ltp} IQ)", disabled=ltp_disabled, use_container_width=True):
-            stats["iq"] -= cost_ltp
-            upgrades["ltp_consolidator"] = 1
-            add_log("🏪 NÂNG CẤP: Kích hoạt Hebbian LTP Consolidator củng cố bộ nhớ dài hạn tự động!")
-            st.rerun()
-
-    shop_cols6 = st.columns(3)
-
-    with shop_cols6[0]:
-        st.write(f"**Thùy Đỉnh (Parietal Lobe) [Lv.{upgrades.get('parietal_lobe', 0)}/3]**\nCảm giác bản thể và không gian: Cứ mỗi 18 ticks tạo 1 cổng Gating ngẫu nhiên. Truyền dòng điện qua đây dập ngay 20% stress và giảm 50% glucose tiêu hao.")
-        cost_parietal = int(75 * (upgrades.get("parietal_lobe", 0) + 1))
-        parietal_disabled = upgrades.get("parietal_lobe", 0) >= 3 or stats["iq"] < cost_parietal
-        if st.button(f"Nâng cấp Thùy Đỉnh ({cost_parietal} IQ)", disabled=parietal_disabled, use_container_width=True):
-            stats["iq"] -= cost_parietal
-            upgrades["parietal_lobe"] = upgrades.get("parietal_lobe", 0) + 1
-            add_log(f"🏪 NÂNG CẤP: Nâng cấp Thùy Đỉnh (Parietal Lobe) lên Cấp {upgrades['parietal_lobe']}!")
-            st.rerun()
-
-    with shop_cols6[1]:
-        st.write(f"**Tuyến Yên (Pituitary Gland) [Lv.{upgrades.get('pituitary_gland', 0)}/3]**\nTuyến nội tiết giải phóng hoóc-môn Oxytocin: Kích hoạt Oxytocin Surge mỗi 20 ticks giúp bão hòa 50% stress phát sinh.")
-        cost_pituitary = int(85 * (upgrades.get("pituitary_gland", 0) + 1))
-        pituitary_disabled = upgrades.get("pituitary_gland", 0) >= 3 or stats["iq"] < cost_pituitary
-        if st.button(f"Nâng cấp Tuyến Yên ({cost_pituitary} IQ)", disabled=pituitary_disabled, use_container_width=True):
-            stats["iq"] -= cost_pituitary
-            upgrades["pituitary_gland"] = upgrades.get("pituitary_gland", 0) + 1
-            add_log(f"🏪 NÂNG CẤP: Nâng cấp Tuyến Yên (Pituitary Gland) lên Cấp {upgrades['pituitary_gland']}!")
-            st.rerun()
-
-    with shop_cols6[2]:
-        st.write(f"**Hàng Rào Máu Não (Blood-Brain Barrier) [Lv.{upgrades.get('blood_brain_barrier', 0)}/1]**\nHàng rào mạch máu bảo vệ: Giảm tốc độ tiêu thụ dinh dưỡng còn 1.0%/tick và triệt tiêu 50% bão viêm cytokine thần kinh.")
-        cost_bbb = 120
-        bbb_disabled = upgrades.get("blood_brain_barrier", 0) >= 1 or stats["iq"] < cost_bbb
-        if st.button(f"Nâng cấp Hàng rào máu ({cost_bbb} IQ)", disabled=bbb_disabled, use_container_width=True):
-            stats["iq"] -= cost_bbb
-            upgrades["blood_brain_barrier"] = 1
-            add_log("🏪 NÂNG CẤP: Kích hoạt màng bọc Hàng rào máu não Blood-Brain Barrier bảo toàn huyết học!")
-            st.rerun()
-
-    # Active Challenges & Missions Board Layout
-    st.write("---")
-    st.markdown("#### 🎯 Bảng Nhiệm Vụ Hoạt Động & Thách Thức (Cognitive Missions)")
-    st.caption("Hoàn thành các cột mốc sinh học để mở khóa tài nguyên bộ nhớ dài hạn hoặc điểm IQ tức thì.")
-
-    missions = st.session_state.missions
-    mis_cols = st.columns(2)
-    for idx, (mis_key, mis_data) in enumerate(missions.items()):
-        col_idx = idx % 2
-        with mis_cols[col_idx]:
-            st.write(f"**Nhiệm vụ {idx+1}: {mis_data['name']}**")
-            st.caption(f"Yêu cầu: *{mis_data['target']}*")
-
-            is_completed = mis_data["status"] == "Completed"
-            claim_disabled = not is_completed or mis_data.get("reward_claimed", False)
-            btn_txt = "🎁 Đã Nhận Thưởng" if mis_data.get("reward_claimed", False) else ("Claim Thưởng" if is_completed else "Đang Thực Hiện...")
-
-            if st.button(btn_txt, disabled=claim_disabled, key=f"claim_{mis_key}", use_container_width=True):
-                mis_data["reward_claimed"] = True
-                if mis_key == "reflex":
-                    st.session_state.stats["memory"] = min(st.session_state.stats["max_memory"], st.session_state.stats["memory"] + 100.0)
-                elif mis_key == "loop":
-                    st.session_state.stats["iq"] += 300.0
-                elif mis_key == "zen":
-                    chems["dopamine"] = min(100.0, chems["dopamine"] + 40.0)
-                    chems["serotonin"] = min(100.0, chems["serotonin"] + 40.0)
-                elif mis_key == "marathon":
-                    chems["acetylcholine"] = min(100.0, chems["acetylcholine"] + 50.0)
-                    st.session_state.stats["memory"] = min(st.session_state.stats["max_memory"], st.session_state.stats["memory"] + 200.0)
-                add_log(f"🎁 THƯỞNG: Nhận thành công phần quà của {mis_data['name']}!")
-                st.rerun()
-
-    # Real-time Scrolling Logs panel
-    st.write("---")
-    st.markdown("#### 📋 Nhật Ký Hoạt Động Não Bộ (Brain Activity Log)")
-    log_text = "\n".join(st.session_state.game_log[::-1])
-    st.text_area("Thời gian thực (Mới nhất ở trên):", value=log_text, height=180, disabled=True)
-
-    # WGSL Compute Kernels Code Inspector Panel (Styled exactly like Bonsai WebGPU Kernels)
-    st.write("---")
-    st.markdown("#### 🎛️ WGSL Compute Shaders Inspector")
-    st.caption("Xem mã nguồn thấp cấp WGSL compute shaders của các tác vụ mô phỏng sinh học 3D thời gian thực. Toàn bộ các kernel được tối ưu hóa biên dịch trực tiếp trên GPU của trình duyệt.")
-
-    selected_kernel = st.selectbox(
-        "Lựa chọn GPU Compute Kernel để kiểm tra mã nguồn:",
-        [
-            "synaptic_charge_propagation.wgsl (Phát xung điện 3D)",
-            "hebbian_plasticity_attention.wgsl (Tính dẻo thích nghi Hebbian)",
-            "gaba_normalization.wgsl (Bình ổn bão viêm và stress)",
-            "vagus_nerve_clamp.wgsl (Liệu pháp lâm sàng VNS)"
-        ]
-    )
-    if not isinstance(selected_kernel, str):
-        selected_kernel = "synaptic_charge_propagation.wgsl (Phát xung điện 3D)"
-
-    shaders = {
-        "synaptic_charge_propagation.wgsl (Phát xung điện 3D)": """// synaptic_charge_propagation.wgsl
+        // WebGPU shaders definitions
+        const shaders = {
+            propagation: `// synaptic_charge_propagation.wgsl
 // Low-level WebGPU compute shader doing 3D synaptic charge propagation
-// Hand-crafted by GPT 5.6 Sol and Fable 5. Tested on 4x4x4 (64 nodes) grid layouts.
 
 @group(0) @binding(0) var<storage, read> input_charge: array<f32>;
 @group(0) @binding(1) var<storage, read_write> output_charge: array<f32>;
@@ -2281,13 +1885,10 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
 
     let current_charge = input_charge[index];
     if (current_charge >= 0.5) {
-        // Reset the firing cell's charge (carryover or absolute refractory)
-        output_charge[index] = 0.0;
-
+        output_charge[index] = 0.0; // Reset parent core
         let neighbors_count = 6u;
         let charge_transfer = (current_charge * signal_efficiency) / f32(neighbors_count);
 
-        // Emulate matrix multiply propagation in 3D coordinates
         for (var i = 0u; i < neighbors_count; i = i + 1u) {
             let neighbor_idx = get_neighbor_index(index, i);
             if (neighbor_idx < 64u) {
@@ -2295,10 +1896,9 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
             }
         }
     }
-}""",
-        "hebbian_plasticity_attention.wgsl (Tính dẻo thích nghi Hebbian)": """// hebbian_plasticity_attention.wgsl
+}`,
+            plasticity: `// hebbian_plasticity_attention.wgsl
 // Low-level WebGPU compute shader adjusting threshold adaptation
-// Emulates linear self-attention based on Hebbian LTP/LTD synaptic plasticities.
 
 @group(0) @binding(0) var<storage, read> active_charges: array<f32>;
 @group(0) @binding(1) var<storage, read_write> thresholds: array<f32>;
@@ -2311,13 +1911,11 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
 
     let charge = active_charges[index];
     if (charge > 0.3) {
-        // Adjust threshold downwards to represent increased firing familiarity
         thresholds[index] = max(0.2, thresholds[index] - learning_rate);
     }
-}""",
-        "gaba_normalization.wgsl (Bình ổn bão viêm và stress)": """// gaba_normalization.wgsl
-// Normalization pass shader managing neuro-excitability
-// Performs stress attenuation and damping using GABA neurotransmitter inputs.
+}`,
+            gaba: `// gaba_normalization.wgsl
+// Normalization pass shader performing stress attenuation using GABA
 
 @group(0) @binding(0) var<storage, read> input_stress: array<f32>;
 @group(0) @binding(1) var<storage, read_write> output_stress: array<f32>;
@@ -2327,15 +1925,13 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
 fn main() {
     let baseline_stress = input_stress[0];
     if (gaba_level >= 70.0) {
-        // Attenuate stress waves by 40% under protective GABA barriers
         output_stress[0] = baseline_stress * 0.60;
     } else {
         output_stress[0] = baseline_stress;
     }
-}""",
-        "vagus_nerve_clamp.wgsl (Liệu pháp lâm sàng VNS)": """// vagus_nerve_clamp.wgsl
+}`,
+            vns: `// vagus_nerve_clamp.wgsl
 // GPU device clamp code executing Clinical Vagus Nerve Stimulation (VNS)
-// Resets stress levels, increases sanity indicators, and spikes GABA.
 
 @group(0) @binding(0) var<storage, read_write> stress: array<f32>;
 @group(0) @binding(1) var<storage, read_write> sanity: array<f32>;
@@ -2343,16 +1939,475 @@ fn main() {
 
 @compute @workgroup_size(1)
 fn main() {
-    // Parasympathetic clamp overrides
     stress[0] = 0.0;
     sanity[0] = min(100.0, sanity[0] + 20.0);
     gaba[0] = 90.0;
-}"""
-    }
+}`
+        };
 
-    st.code(shaders[selected_kernel], language="rust")
+        function showShader() {
+            let select = document.getElementById("shader-select");
+            let key = select.value;
+            document.getElementById("shader-code").textContent = shaders[key];
+        }
 
-# ----------------- TAB 2: VBOT1 WEB CHAT & SUMMARIZE -----------------
+        // Add activity log
+        function addLog(msg) {
+            logs.push(msg);
+            if (logs.length > 30) logs.shift();
+
+            let logBox = document.getElementById("log-box");
+            logBox.innerHTML = logs.slice().reverse().map(l => `<div>● ${l}</div>`).join("");
+        }
+
+        // Node Editor Controls
+        function updateEditor() {
+            let cell = grid[selectedCell.x][selectedCell.y][selectedCell.z];
+            document.getElementById("editor-title").textContent = `🛠️ Node Editor: Node [${selectedCell.x+1}, ${selectedCell.y+1}, ${selectedCell.z+1}]`;
+            document.getElementById("axon-dir").value = cell.direction;
+            document.getElementById("axon-weight").value = cell.weight;
+            document.getElementById("weight-lbl").textContent = cell.weight.toFixed(1);
+        }
+
+        function setNodeType(type) {
+            let cell = grid[selectedCell.x][selectedCell.y][selectedCell.z];
+            cell.type = type;
+            cell.charge = 0.0;
+            cell.threshold = type === "Sensory" ? 0.4 : (type === "Motor" ? 0.6 : 0.5);
+            addLog(`Đã đặt node [${selectedCell.x+1}, ${selectedCell.y+1}, ${selectedCell.z+1}] thành ${type}.`);
+            updateEditor();
+        }
+
+        function injectCharge() {
+            let cell = grid[selectedCell.x][selectedCell.y][selectedCell.z];
+            if (cell.type !== "Empty") {
+                cell.charge = 1.0;
+                addLog(`🔌 [AP Clamping] Kích xung điện lượng cực đại tại node [${selectedCell.x+1}, ${selectedCell.y+1}, ${selectedCell.z+1}]!`);
+            }
+        }
+
+        function changeDirection() {
+            let cell = grid[selectedCell.x][selectedCell.y][selectedCell.z];
+            cell.direction = document.getElementById("axon-dir").value;
+            addLog(`Định hướng sợi trục node [${selectedCell.x+1}, ${selectedCell.y+1}, ${selectedCell.z+1}] thành ${cell.direction}.`);
+        }
+
+        function changeWeight() {
+            let cell = grid[selectedCell.x][selectedCell.y][selectedCell.z];
+            cell.weight = parseFloat(document.getElementById("axon-weight").value);
+            document.getElementById("weight-lbl").textContent = cell.weight.toFixed(1);
+        }
+
+        function triggerTherapy(name) {
+            if (name === "VNS") {
+                stress = 0.0;
+                sanity = Math.min(100.0, sanity + 20.0);
+                addLog(`❤️ LÂM SÀNG: Kích thích dây thần kinh phế vị VNS! Hạ stress về không, sạc đầy GABA.`);
+            } else if (name === "Doping") {
+                addLog("⚡ LÂM SÀNG: Tiêm Dopamine cưỡng chế! Hệ thống hưng phấn cực đại.");
+            } else if (name === "SSRI") {
+                addLog("💊 LÂM SÀNG: Sử dụng hoạt chất SSRI chống phân rã Serotonin!");
+            } else if (name === "Focus") {
+                addLog("🧠 LÂM SÀNG: Kích hoạt Deep Focus tăng tốc độ phản xạ nhận thức.");
+            } else if (name === "rTMS") {
+                addLog("🏥 LÂM SÀNG: Thực hiện liệu pháp rTMS vỏ não giải trừ xơ hóa.");
+            } else if (name === "Opto") {
+                addLog("🔦 LÂM SÀNG: Phóng tia laser quang di truyền kích hoạt thế năng.");
+            }
+        }
+
+        // 3D Rendering (HTML5 Canvas Projection)
+        const canvas = document.getElementById("brain-canvas");
+        const ctx = canvas.getContext("2d");
+
+        let angleX = 0.5;
+        let angleY = 0.6;
+        let scale = 50;
+
+        let isDragging = false;
+        let prevMousePos = { x: 0, y: 0 };
+
+        function resizeCanvas() {
+            let container = document.getElementById("canvas-container");
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+        }
+
+        window.addEventListener("resize", resizeCanvas);
+        resizeCanvas();
+
+        // Mouse Drag Orbit Control
+        canvas.addEventListener("mousedown", (e) => {
+            isDragging = true;
+            prevMousePos = { x: e.clientX, y: e.clientY };
+        });
+
+        window.addEventListener("mouseup", () => {
+            isDragging = false;
+        });
+
+        canvas.addEventListener("mousemove", (e) => {
+            if (!isDragging) return;
+            let dx = e.clientX - prevMousePos.x;
+            let dy = e.clientY - prevMousePos.y;
+
+            angleY += dx * 0.01;
+            angleX += dy * 0.01;
+
+            prevMousePos = { x: e.clientX, y: e.clientY };
+        });
+
+        // Click detection in projected 3D space to select nodes
+        let nodesProjected = [];
+
+        canvas.addEventListener("click", (e) => {
+            let rect = canvas.getBoundingClientRect();
+            let mouseX = e.clientX - rect.left;
+            let mouseY = e.clientY - rect.top;
+
+            let closestNode = null;
+            let minDist = 15;
+
+            nodesProjected.forEach(n => {
+                let dx = mouseX - n.px;
+                let dy = mouseY - n.py;
+                let dist = Math.sqrt(dx*dx + dy*dy);
+                if (dist < minDist) {
+                    minDist = dist;
+                    closestNode = n;
+                }
+            });
+
+            if (closestNode) {
+                selectedCell = { x: closestNode.x, y: closestNode.y, z: closestNode.z };
+                updateEditor();
+                addLog(`Đã chọn node [${selectedCell.x+1}, ${selectedCell.y+1}, ${selectedCell.z+1}].`);
+            }
+        });
+
+        // Projections
+        function project3D(x, y, z) {
+            // Center around (0,0,0)
+            let cx = x - (GRID_SIZE - 1) / 2;
+            let cy = y - (GRID_SIZE - 1) / 2;
+            let cz = z - (GRID_SIZE - 1) / 2;
+
+            // Rotation around Y axis
+            let x1 = cx * Math.cos(angleY) - cz * Math.sin(angleY);
+            let z1 = cx * Math.sin(angleY) + cz * Math.cos(angleY);
+
+            // Rotation around X axis
+            let y2 = cy * Math.cos(angleX) - z1 * Math.sin(angleX);
+            let z2 = cy * Math.sin(angleX) + z1 * Math.cos(angleX);
+
+            // Perspective Projection
+            let perspective = 200 / (200 + z2);
+            let px = canvas.width / 2 + x1 * scale * perspective;
+            let py = canvas.height / 2 + y2 * scale * perspective;
+
+            return { px, py, zDepth: z2 };
+        }
+
+        // Main animation & draw loop
+        function drawLoop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Calculate projections
+            nodesProjected = [];
+            for (let x = 0; x < GRID_SIZE; x++) {
+                for (let y = 0; y < GRID_SIZE; y++) {
+                    for (let z = 0; z < GRID_SIZE; z++) {
+                        let proj = project3D(x, y, z);
+                        nodesProjected.push({
+                            x, y, z,
+                            px: proj.px,
+                            py: proj.py,
+                            zDepth: proj.zDepth,
+                            cell: grid[x][y][z]
+                        });
+                    }
+                }
+            }
+
+            // Sort by depth (Back-to-Front painter's algorithm)
+            nodesProjected.sort((a, b) => b.zDepth - a.zDepth);
+
+            // Draw axons (synapse connections)
+            ctx.lineWidth = 1;
+            nodesProjected.forEach(n => {
+                if (n.cell.type === "Empty") return;
+
+                // Adjacent offsets
+                let targets = [];
+                if (n.cell.direction === "All") {
+                    targets = [
+                        {dx: 1, dy: 0, dz: 0}, {dx: -1, dy: 0, dz: 0},
+                        {dx: 0, dy: 1, dz: 0}, {dx: 0, dy: -1, dz: 0},
+                        {dx: 0, dy: 0, dz: 1}, {dx: 0, dy: 0, dz: -1}
+                    ];
+                } else if (n.cell.direction === "Up") targets = [{dx: 0, dy: 1, dz: 0}];
+                else if (n.cell.direction === "Right") targets = [{dx: 1, dy: 0, dz: 0}];
+                else if (n.cell.direction === "Down") targets = [{dx: 0, dy: -1, dz: 0}];
+                else if (n.cell.direction === "Left") targets = [{dx: -1, dy: 0, dz: 0}];
+                else if (n.cell.direction === "Front") targets = [{dx: 0, dy: 0, dz: 1}];
+                else if (n.cell.direction === "Back") targets = [{dx: 0, dy: 0, dz: -1}];
+
+                targets.forEach(t => {
+                    let nx = n.x + t.dx;
+                    let ny = n.y + t.dy;
+                    let nz = n.z + t.dz;
+
+                    if (nx >= 0 && nx < GRID_SIZE && ny >= 0 && ny < GRID_SIZE && nz >= 0 && nz < GRID_SIZE) {
+                        if (grid[nx][ny][nz].type !== "Empty") {
+                            let nproj = project3D(nx, ny, nz);
+                            ctx.beginPath();
+                            ctx.moveTo(n.px, n.py);
+                            ctx.lineTo(nproj.px, nproj.py);
+
+                            // Pulse color if firing
+                            if (n.cell.charge >= n.cell.threshold) {
+                                ctx.strokeStyle = "#FFFFFF";
+                                ctx.lineWidth = 2;
+                            } else {
+                                ctx.strokeStyle = "rgba(0, 240, 255, 0.25)";
+                                ctx.lineWidth = 1;
+                            }
+                            ctx.stroke();
+                        }
+                    }
+                });
+            });
+
+            // Draw nodes
+            nodesProjected.forEach(n => {
+                let cell = n.cell;
+                let radius = 6;
+                let color = "#3A3D40"; // Empty
+
+                if (cell.type === "Sensory") color = "#00F0FF";
+                else if (cell.type === "Interneuron") color = "#39FF14";
+                else if (cell.type === "Motor") color = "#FF007F";
+
+                let isSelected = (n.x === selectedCell.x && n.y === selectedCell.y && n.z === selectedCell.z);
+                let isFiring = cell.type !== "Empty" && cell.charge >= cell.threshold;
+
+                // Emulate WebGPU multi-pass bloom glow
+                if (cell.type !== "Empty") {
+                    // Outer Bloom Layer
+                    ctx.beginPath();
+                    ctx.arc(n.px, n.py, radius * 3, 0, 2 * Math.PI);
+                    ctx.fillStyle = isFiring ? "rgba(255, 170, 0, 0.15)" : color.replace("#", "rgba(") + ", 0.12)";
+                    // simple replacement for hex to rgb
+                    if (cell.type === "Sensory") ctx.fillStyle = "rgba(0, 240, 255, 0.12)";
+                    else if (cell.type === "Interneuron") ctx.fillStyle = "rgba(57, 255, 20, 0.12)";
+                    else if (cell.type === "Motor") ctx.fillStyle = "rgba(255, 0, 127, 0.12)";
+                    ctx.fill();
+
+                    // Mid Glow Layer
+                    ctx.beginPath();
+                    ctx.arc(n.px, n.py, radius * 1.8, 0, 2 * Math.PI);
+                    if (cell.type === "Sensory") ctx.fillStyle = "rgba(0, 240, 255, 0.35)";
+                    else if (cell.type === "Interneuron") ctx.fillStyle = "rgba(57, 255, 20, 0.35)";
+                    else if (cell.type === "Motor") ctx.fillStyle = "rgba(255, 0, 127, 0.35)";
+                    if (isFiring) ctx.fillStyle = "rgba(255, 204, 0, 0.35)";
+                    ctx.fill();
+                }
+
+                // Core Layer
+                ctx.beginPath();
+                ctx.arc(n.px, n.py, isSelected ? radius + 3 : radius, 0, 2 * Math.PI);
+                ctx.fillStyle = isFiring ? "#FFFFFF" : color;
+                ctx.fill();
+
+                // Highlight boundary for selection
+                if (isSelected) {
+                    ctx.strokeStyle = "#FFFFFF";
+                    ctx.lineWidth = 1.5;
+                    ctx.stroke();
+                }
+            });
+
+            requestAnimationFrame(drawLoop);
+        }
+
+        // Biological simulation cycle logic (calculates CSI, PDI, VPI)
+        function simTick() {
+            currentTick++;
+
+            let totalNeurons = 0;
+            let activeCharged = 0;
+            let totalInterneurons = 0;
+            let modifiedInterneurons = 0;
+
+            // 1. Sensory Nodes auto charge
+            for (let x = 0; x < GRID_SIZE; x++) {
+                for (let y = 0; y < GRID_SIZE; y++) {
+                    for (let z = 0; z < GRID_SIZE; z++) {
+                        let cell = grid[x][y][z];
+                        if (cell.type === "Sensory") {
+                            cell.charge = Math.min(1.0, cell.charge + 0.15);
+                        }
+                    }
+                }
+            }
+
+            // 2. Propagation pass
+            let nextCharges = JSON.parse(JSON.stringify(grid)).map(p => p.map(r => r.map(c => c.charge)));
+
+            for (let x = 0; x < GRID_SIZE; x++) {
+                for (let y = 0; y < GRID_SIZE; y++) {
+                    for (let z = 0; z < GRID_SIZE; z++) {
+                        let cell = grid[x][y][z];
+                        if (cell.type !== "Empty") {
+                            totalNeurons++;
+                            if (cell.charge >= cell.threshold) {
+                                activeCharged++;
+
+                                // Propagation
+                                let targets = [];
+                                if (cell.direction === "All") {
+                                    targets = [
+                                        {dx: 1, dy: 0, dz: 0}, {dx: -1, dy: 0, dz: 0},
+                                        {dx: 0, dy: 1, dz: 0}, {dx: 0, dy: -1, dz: 0},
+                                        {dx: 0, dy: 0, dz: 1}, {dx: 0, dy: 0, dz: -1}
+                                    ];
+                                } else if (cell.direction === "Up") targets = [{dx: 0, dy: 1, dz: 0}];
+                                else if (cell.direction === "Right") targets = [{dx: 1, dy: 0, dz: 0}];
+                                else if (cell.direction === "Down") targets = [{dx: 0, dy: -1, dz: 0}];
+                                else if (cell.direction === "Left") targets = [{dx: -1, dy: 0, dz: 0}];
+                                else if (cell.direction === "Front") targets = [{dx: 0, dy: 0, dz: 1}];
+                                else if (cell.direction === "Back") targets = [{dx: 0, dy: 0, dz: -1}];
+
+                                let neighbors = [];
+                                targets.forEach(t => {
+                                    let nx = x + t.dx;
+                                    let ny = y + t.dy;
+                                    let nz = z + t.dz;
+                                    if (nx >= 0 && nx < GRID_SIZE && ny >= 0 && ny < GRID_SIZE && nz >= 0 && nz < GRID_SIZE) {
+                                        if (grid[nx][ny][nz].type !== "Empty") {
+                                            neighbors.push({x: nx, y: ny, z: nz});
+                                        }
+                                    }
+                                });
+
+                                if (neighbors.length > 0) {
+                                    let transfer = (cell.charge * 0.45 * cell.weight) / neighbors.length;
+                                    neighbors.forEach(n => {
+                                        nextCharges[n.x][n.y][n.z] = Math.min(1.0, nextCharges[n.x][n.y][n.z] + transfer);
+                                    });
+                                }
+
+                                nextCharges[x][y][z] = 0.0; // reset
+                            } else if (cell.charge >= cell.threshold * 0.5) {
+                                activeCharged++;
+                            }
+                        }
+
+                        if (cell.type === "Interneuron") {
+                            totalInterneurons++;
+                            if (cell.threshold !== 0.5) {
+                                modifiedInterneurons++;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Apply next charges
+            for (let x = 0; x < GRID_SIZE; x++) {
+                for (let y = 0; y < GRID_SIZE; y++) {
+                    for (let z = 0; z < GRID_SIZE; z++) {
+                        grid[x][y][z].charge = nextCharges[x][y][z];
+                    }
+                }
+            }
+
+            // Calculations CSI, PDI, VPI
+            csi = (activeCharged / Math.max(1, totalNeurons)) * 100.0;
+            pdi = (modifiedInterneurons / Math.max(1, totalInterneurons)) * 100.0;
+            vpi = 80.0 + Math.sin(currentTick * 0.2) * 5.0; // Simulated flow
+
+            document.getElementById("csi-val").textContent = `${csi.toFixed(1)}%`;
+            document.getElementById("pdi-val").textContent = `${pdi.toFixed(1)}%`;
+            document.getElementById("vpi-val").textContent = `${vpi.toFixed(1)}%`;
+
+            // Record history and redraw chart
+            history.ticks.push(currentTick);
+            history.csi.push(csi);
+            history.pdi.push(pdi);
+            history.vpi.push(vpi);
+
+            if (history.ticks.length > 40) {
+                history.ticks.shift();
+                history.csi.shift();
+                history.pdi.shift();
+                history.vpi.shift();
+            }
+
+            drawChart();
+        }
+
+        // Clean Canvas Line Chart for EEG
+        const chartCanvas = document.getElementById("chart-canvas");
+        const chartCtx = chartCanvas.getContext("2d");
+
+        function drawChart() {
+            chartCanvas.width = chartCanvas.parentElement.clientWidth;
+            chartCanvas.height = chartCanvas.parentElement.clientHeight;
+
+            chartCtx.clearRect(0, 0, chartCanvas.width, chartCanvas.height);
+            let len = history.ticks.length;
+            if (len < 2) return;
+
+            // Draw grid lines
+            chartCtx.strokeStyle = "rgba(255, 255, 255, 0.05)";
+            chartCtx.lineWidth = 1;
+            for (let i = 0; i < 5; i++) {
+                let y = (chartCanvas.height / 4) * i;
+                chartCtx.beginPath();
+                chartCtx.moveTo(0, y);
+                chartCtx.lineTo(chartCanvas.width, y);
+                chartCtx.stroke();
+            }
+
+            // Draw lines for CSI, PDI, VPI
+            drawChartLine(history.csi, "#00F0FF"); // Cyan
+            drawChartLine(history.pdi, "#39FF14"); // Green
+            drawChartLine(history.vpi, "#FF007F"); // Magenta
+        }
+
+        function drawChartLine(data, color) {
+            chartCtx.strokeStyle = color;
+            chartCtx.lineWidth = 2.0;
+            chartCtx.beginPath();
+
+            let len = data.length;
+            for (let i = 0; i < len; i++) {
+                let x = (chartCanvas.width / (len - 1)) * i;
+                let y = chartCanvas.height - (data[i] / 100.0) * chartCanvas.height;
+
+                if (i === 0) chartCtx.moveTo(x, y);
+                else chartCtx.lineTo(x, y);
+            }
+            chartCtx.stroke();
+        }
+
+        // Initialize and Start loops
+        initGrid();
+        updateEditor();
+        showShader();
+        addLog("Hệ thống WebGPU Shading Pipeline sẵn sàng.");
+
+        // Loops
+        requestAnimationFrame(drawLoop);
+        setInterval(simTick, 1000);
+    </script>
+</body>
+</html>
+"""
+with tab1:
+    st.components.v1.html(webgpu_html_content, height=1100, scrolling=True)
+
 with tab2:
     st.header("🤖 Trợ Lý AI VBot1")
     st.write("Trò chuyện trực tiếp với Llama 3 hoặc tải lên tệp tài liệu PDF để tóm tắt nội dung bằng Gemini 1.5 Flash.")
