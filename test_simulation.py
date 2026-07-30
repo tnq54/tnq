@@ -282,3 +282,12 @@ def test_pathological_modes_3d():
     # 3. Fire stress is doubled (1.5 * 2.0 = 3.0 stress).
     # Stress delta = 3.0 - 2.5 (clearance) = 0.5
     assert abs(app.st.session_state.chemicals["stress"] - 0.5) < 1e-5
+
+
+def test_evolution_stages_3d():
+    assert app.get_evolution_stage(50.0) == "Đơn bào (Single-Cell)"
+    assert app.get_evolution_stage(200.0) == "Đa bào (Multi-Cell)"
+    assert app.get_evolution_stage(800.0) == "Sứa biển (Coelenterate)"
+    assert app.get_evolution_stage(2500.0) == "Bò sát (Instinct)"
+    assert app.get_evolution_stage(8000.0) == "Thú cổ (Emotional)"
+    assert app.get_evolution_stage(15000.0) == "Người tinh khôn (Logical)"

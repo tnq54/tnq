@@ -383,7 +383,7 @@ def init_game_state():
             "iq": 0.0,
             "memory": 10.0,
             "ticks": 0,
-            "evolution_stage": "Bò sát",
+            "evolution_stage": "Đơn bào (Single-Cell)",
             "burnout_count": 0,
             "burnout_streak": 0,
             "max_streak": 0,
@@ -422,7 +422,7 @@ def init_game_state():
             "Slot 3": None
         }
 
-        st.session_state.game_log = ["Khởi tạo bộ não 3D WebGPU thành công. Trạng thái tiến hóa: Hành não Bò sát."]
+        st.session_state.game_log = ["Khởi tạo bộ não 3D WebGPU thành công. Trạng thái tiến hóa: Đơn bào (Single-Cell)."]
         st.session_state.playing = False
         st.session_state.tick_speed = 1.0
         st.session_state.selected_cell = (0, 0, 0) # 3D Coordinate
@@ -441,14 +441,18 @@ def init_game_state():
         }
 
 def get_evolution_stage(iq):
-    if iq < 150:
-        return "Bò sát (Instinct)"
-    elif iq < 750:
-        return "Thú cổ (Emotional)"
+    if iq < 100:
+        return "Đơn bào (Single-Cell)"
+    elif iq < 300:
+        return "Đa bào (Multi-Cell)"
+    elif iq < 1000:
+        return "Sứa biển (Coelenterate)"
     elif iq < 3000:
-        return "Người tinh khôn (Logical)"
+        return "Bò sát (Instinct)"
+    elif iq < 10000:
+        return "Thú cổ (Emotional)"
     else:
-        return "Siêu trí tuệ lượng tử (Transcendence)"
+        return "Người tinh khôn (Logical)"
 
 def trigger_random_event():
     events = [
