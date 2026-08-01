@@ -336,7 +336,6 @@ def test_cellular_mitosis_and_mutation():
         assert offspring["type"] != "Empty"
 
         # Check that metabolic costs are spent (-10 energy, -5 nutrients)
-        # Note: net energy includes normal tick metabolic generation and costs
         assert app.st.session_state.chemicals["energy"] < 90.0
         assert app.st.session_state.chemicals["neuro_nutrients"] < 90.0
     finally:
