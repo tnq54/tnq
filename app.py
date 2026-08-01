@@ -341,6 +341,7 @@ def init_game_state():
         # Advanced Game Modes
         st.session_state.game_mode = "Normal"
         st.session_state.active_genes = []
+        st.session_state.cellular_evolution = True
 
         # Active ongoing buffs (seconds)
         st.session_state.active_buffs = {
@@ -941,6 +942,60 @@ def run_simulation_tick():
                         "amyloid_plaque": False
                     }
                     add_log(f"🌱 [Hải Mã Neurogenesis 3D] Thùy răng (Dentate Gyrus) tự động sản sinh tế bào liên kết mới tại [{sp_x+1},{sp_y+1},{sp_z+1}]! (-15 MB Memory)")
+
+    # 3D Cellular Mitosis and Mutation Simulator
+    if st.session_state.get("cellular_evolution", True):
+        # We only divide if total energy > 50% and nutrients > 50%
+        if chems["energy"] > 50.0 and chems.get("neuro_nutrients", 80.0) > 50.0:
+            # Look for active cells to divide
+            active_dividers = []
+            for x in range(GRID_SIZE):
+                for y in range(GRID_SIZE):
+                    for z in range(GRID_SIZE):
+                        cell = grid[x][y][z]
+                        if cell["type"] != "Empty":
+                            # Check for adjacent empty spots
+                            for dx, dy, dz in [(0, 1, 0), (0, -1, 0), (1, 0, 0), (-1, 0, 0), (0, 0, 1), (0, 0, -1)]:
+                                nx, ny, nz = x + dx, y + dy, z + dz
+                                if 0 <= nx < GRID_SIZE and 0 <= ny < GRID_SIZE and 0 <= nz < GRID_SIZE:
+                                    if grid[nx][ny][nz]["type"] == "Empty":
+                                        active_dividers.append((x, y, z, nx, ny, nz))
+
+            # 10% chance of division per tick
+            if active_dividers and random.random() < 0.10:
+                px, py, pz, cx, cy, cz = random.choice(active_dividers)
+                parent = grid[px][py][pz]
+
+                # Copy parent state
+                child_type = parent["type"]
+                child_direction = parent.get("direction", "All")
+                child_weight = parent.get("weight", 1.0)
+
+                # 30% mutation chance
+                is_mutated = False
+                if random.random() < 0.30:
+                    child_type = random.choice(["Sensory", "Interneuron", "Motor"])
+                    child_direction = random.choice(["All", "Up", "Right", "Down", "Left", "Front", "Back"])
+                    child_weight = random.choice([1.0, 2.0, 3.0])
+                    is_mutated = True
+
+                grid[cx][cy][cz] = {
+                    "type": child_type,
+                    "charge": 0.0,
+                    "threshold": 0.4 if child_type == "Sensory" else (0.6 if child_type == "Motor" else 0.5),
+                    "fire_rate": 0.25 if child_type == "Sensory" else 0.0,
+                    "last_fired": -1,
+                    "direction": child_direction,
+                    "weight": child_weight,
+                    "amyloid_plaque": False
+                }
+
+                # Metabolic costs
+                chems["energy"] = max(0.0, chems["energy"] - 10.0)
+                chems["neuro_nutrients"] = max(0.0, chems.get("neuro_nutrients", 80.0) - 5.0)
+
+                mutation_text = " (Đột biến!)" if is_mutated else ""
+                add_log(f"🧬 [Mitosis] Tế bào {parent['type']} [{px+1},{py+1},{pz+1}] phân chia! Con: {child_type} [{cx+1},{cy+1},{cz+1}]{mutation_text} (-10% Năng lượng)")
 
     if mode == "Schizophrenia" and ticks % 8 == 0:
         non_empty = []
@@ -1759,6 +1814,18 @@ webgpu_html_content = """<!DOCTYPE html>
 
         <!-- Right Side: Node Editor & Upgrades & Shaders -->
         <div>
+            <!-- Cellular Evolution Control -->
+            <div class="card">
+                <div class="card-title">🧬 Cellular Evolution Engine</div>
+                <div class="form-group" style="display: flex; align-items: center; justify-content: space-between;">
+                    <label class="form-label" style="margin-bottom: 0;">Automated Mitosis & Mutation:</label>
+                    <input type="checkbox" id="cellular-evo-toggle" checked style="width: 24px; height: 24px; cursor: pointer;">
+                </div>
+                <div style="font-size: 0.8rem; color: #9CA3AF; margin-top: 6px;">
+                    When enabled, active cells (Energy > 50% & Nutrients > 50%) have a 10% chance per tick to divide (mitosis) into empty adjacent coordinates. 30% mutation chance specialized type offspring!
+                </div>
+            </div>
+
             <!-- Node Selector & Config -->
             <div class="card">
                 <div class="card-title" id="editor-title">🛠️ Node Editor: Node [1, 1, 1]</div>
@@ -2323,6 +2390,73 @@ fn main() {
                     for (let z = 0; z < GRID_SIZE; z++) {
                         grid[x][y][z].charge = nextCharges[x][y][z];
                     }
+                }
+            }
+
+            // 3D Cellular Mitosis and Mutation Simulator
+            let evoEnabled = document.getElementById("cellular-evo-toggle").checked;
+            if (evoEnabled && energy > 50.0 && vpi > 50.0) {
+                let activeDividers = [];
+                for (let x = 0; x < GRID_SIZE; x++) {
+                    for (let y = 0; y < GRID_SIZE; y++) {
+                        for (let z = 0; z < GRID_SIZE; z++) {
+                            let cell = grid[x][y][z];
+                            if (cell.type !== "Empty") {
+                                // Check neighbors
+                                let neighbors = [
+                                    {dx: 1, dy: 0, dz: 0}, {dx: -1, dy: 0, dz: 0},
+                                    {dx: 0, dy: 1, dz: 0}, {dx: 0, dy: -1, dz: 0},
+                                    {dx: 0, dy: 0, dz: 1}, {dx: 0, dy: 0, dz: -1}
+                                ];
+                                neighbors.forEach(t => {
+                                    let nx = x + t.dx;
+                                    let ny = y + t.dy;
+                                    let nz = z + t.dz;
+                                    if (nx >= 0 && nx < GRID_SIZE && ny >= 0 && ny < GRID_SIZE && nz >= 0 && nz < GRID_SIZE) {
+                                        if (grid[nx][ny][nz].type === "Empty") {
+                                            activeDividers.push({px: x, py: y, pz: z, cx: nx, cy: ny, cz: nz});
+                                        }
+                                    }
+                                });
+                            }
+                        }
+                    }
+                }
+
+                // 10% chance per tick
+                if (activeDividers.length > 0 && Math.random() < 0.10) {
+                    let division = activeDividers[Math.floor(Math.random() * activeDividers.length)];
+                    let parent = grid[division.px][division.py][division.pz];
+
+                    let childType = parent.type;
+                    let childDirection = parent.direction || "All";
+                    let childWeight = parent.weight || 1.0;
+
+                    let isMutated = false;
+                    if (Math.random() < 0.30) {
+                        let types = ["Sensory", "Interneuron", "Motor"];
+                        childType = types[Math.floor(Math.random() * types.length)];
+
+                        let dirs = ["All", "Up", "Right", "Down", "Left", "Front", "Back"];
+                        childDirection = dirs[Math.floor(Math.random() * dirs.length)];
+
+                        childWeight = Math.floor(Math.random() * 3) + 1.0;
+                        isMutated = true;
+                    }
+
+                    grid[division.cx][division.cy][division.cz] = {
+                        type: childType,
+                        charge: 0.0,
+                        threshold: childType === "Sensory" ? 0.4 : (childType === "Motor" ? 0.6 : 0.5),
+                        direction: childDirection,
+                        weight: childWeight
+                    };
+
+                    energy = Math.max(0.0, energy - 10.0);
+                    vpi = Math.max(0.0, vpi - 5.0);
+
+                    let mutationText = isMutated ? " (Đột biến!)" : "";
+                    addLog(`🧬 [Mitosis] Tế bào ${parent.type} [${division.px+1},${division.py+1},${division.pz+1}] phân chia! Con: ${childType} [${division.cx+1},${division.cy+1},${division.cz+1}]${mutationText} (-10% Năng lượng)`);
                 }
             }
 

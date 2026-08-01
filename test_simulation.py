@@ -291,3 +291,54 @@ def test_evolution_stages_3d():
     assert app.get_evolution_stage(2500.0) == "Bò sát (Instinct)"
     assert app.get_evolution_stage(8000.0) == "Thú cổ (Emotional)"
     assert app.get_evolution_stage(15000.0) == "Người tinh khôn (Logical)"
+
+
+def test_cellular_mitosis_and_mutation():
+    app.st.session_state = MockSessionState()
+    app.st.session_state["bot_thread"] = True
+    app.init_game_state()
+
+    # 1. Enable cellular evolution and set high energy / nutrients
+    app.st.session_state.cellular_evolution = True
+    app.st.session_state.chemicals["energy"] = 90.0
+    app.st.session_state.chemicals["neuro_nutrients"] = 90.0
+
+    # Clear grid
+    for x in range(4):
+        for y in range(4):
+            for z in range(4):
+                app.st.session_state.neuron_grid[x][y][z] = {"type": "Empty", "charge": 0.0, "threshold": 0.5, "weight": 1.0, "direction": "All", "amyloid_plaque": False}
+
+    # Place 1 parent Interneuron
+    app.st.session_state.neuron_grid[1][1][1] = {
+        "type": "Interneuron",
+        "charge": 0.0,
+        "threshold": 0.5,
+        "weight": 1.0,
+        "direction": "All",
+        "amyloid_plaque": False
+    }
+
+    # Mock random to force division (choice 1) and guarantee mutation check (choice 2)
+    import random
+    original_random = random.random
+    original_choice = random.choice
+
+    # Let's mock random to return 0.05 to trigger 10% chance division
+    random.random = lambda: 0.05
+    random.choice = lambda seq: seq[0]
+
+    try:
+        app.run_simulation_tick()
+
+        # Check that offspring is placed at adjacent [1][2][1] (first empty offset chosen by Mock choice)
+        offspring = app.st.session_state.neuron_grid[1][2][1]
+        assert offspring["type"] != "Empty"
+
+        # Check that metabolic costs are spent (-10 energy, -5 nutrients)
+        # Note: net energy includes normal tick metabolic generation and costs
+        assert app.st.session_state.chemicals["energy"] < 90.0
+        assert app.st.session_state.chemicals["neuro_nutrients"] < 90.0
+    finally:
+        random.random = original_random
+        random.choice = original_choice

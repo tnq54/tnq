@@ -326,6 +326,18 @@
 
         <!-- Right Side: Node Editor & Upgrades & Shaders -->
         <div>
+            <!-- Cellular Evolution Control -->
+            <div class="card">
+                <div class="card-title">🧬 Cellular Evolution Engine</div>
+                <div class="form-group" style="display: flex; align-items: center; justify-content: space-between;">
+                    <label class="form-label" style="margin-bottom: 0;">Automated Mitosis & Mutation:</label>
+                    <input type="checkbox" id="cellular-evo-toggle" checked style="width: 24px; height: 24px; cursor: pointer;">
+                </div>
+                <div style="font-size: 0.8rem; color: #9CA3AF; margin-top: 6px;">
+                    When enabled, active cells (Energy > 50% & Nutrients > 50%) have a 10% chance per tick to divide (mitosis) into empty adjacent coordinates. 30% mutation chance specialized type offspring!
+                </div>
+            </div>
+
             <!-- Node Selector & Config -->
             <div class="card">
                 <div class="card-title" id="editor-title">🛠️ Node Editor: Node [1, 1, 1]</div>
@@ -872,6 +884,73 @@ fn main() {
                     for (let z = 0; z < GRID_SIZE; z++) {
                         grid[x][y][z].charge = nextCharges[x][y][z];
                     }
+                }
+            }
+
+            // 3D Cellular Mitosis and Mutation Simulator
+            let evoEnabled = document.getElementById("cellular-evo-toggle").checked;
+            if (evoEnabled && energy > 50.0 && vpi > 50.0) {
+                let activeDividers = [];
+                for (let x = 0; x < GRID_SIZE; x++) {
+                    for (let y = 0; y < GRID_SIZE; y++) {
+                        for (let z = 0; z < GRID_SIZE; z++) {
+                            let cell = grid[x][y][z];
+                            if (cell.type !== "Empty") {
+                                // Check neighbors
+                                let neighbors = [
+                                    {dx: 1, dy: 0, dz: 0}, {dx: -1, dy: 0, dz: 0},
+                                    {dx: 0, dy: 1, dz: 0}, {dx: 0, dy: -1, dz: 0},
+                                    {dx: 0, dy: 0, dz: 1}, {dx: 0, dy: 0, dz: -1}
+                                ];
+                                neighbors.forEach(t => {
+                                    let nx = x + t.dx;
+                                    let ny = y + t.dy;
+                                    let nz = z + t.dz;
+                                    if (nx >= 0 && nx < GRID_SIZE && ny >= 0 && ny < GRID_SIZE && nz >= 0 && nz < GRID_SIZE) {
+                                        if (grid[nx][ny][nz].type === "Empty") {
+                                            activeDividers.push({px: x, py: y, pz: z, cx: nx, cy: ny, cz: nz});
+                                        }
+                                    }
+                                });
+                            }
+                        }
+                    }
+                }
+
+                // 10% chance per tick
+                if (activeDividers.length > 0 && Math.random() < 0.10) {
+                    let division = activeDividers[Math.floor(Math.random() * activeDividers.length)];
+                    let parent = grid[division.px][division.py][division.pz];
+
+                    let childType = parent.type;
+                    let childDirection = parent.direction || "All";
+                    let childWeight = parent.weight || 1.0;
+
+                    let isMutated = false;
+                    if (Math.random() < 0.30) {
+                        let types = ["Sensory", "Interneuron", "Motor"];
+                        childType = types[Math.floor(Math.random() * types.length)];
+
+                        let dirs = ["All", "Up", "Right", "Down", "Left", "Front", "Back"];
+                        childDirection = dirs[Math.floor(Math.random() * dirs.length)];
+
+                        childWeight = Math.floor(Math.random() * 3) + 1.0;
+                        isMutated = true;
+                    }
+
+                    grid[division.cx][division.cy][division.cz] = {
+                        type: childType,
+                        charge: 0.0,
+                        threshold: childType === "Sensory" ? 0.4 : (childType === "Motor" ? 0.6 : 0.5),
+                        direction: childDirection,
+                        weight: childWeight
+                    };
+
+                    energy = Math.max(0.0, energy - 10.0);
+                    vpi = Math.max(0.0, vpi - 5.0);
+
+                    let mutationText = isMutated ? " (Đột biến!)" : "";
+                    addLog(`🧬 [Mitosis] Tế bào \${parent.type} [\${division.px+1},\${division.py+1},\${division.pz+1}] phân chia! Con: \${childType} [\${division.cx+1},\${division.cy+1},\${division.cz+1}]\${mutationText} (-10% Năng lượng)`);
                 }
             }
 
