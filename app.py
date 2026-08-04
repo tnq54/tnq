@@ -2252,91 +2252,24 @@ fn main() {
 
                 // Emulate WebGPU multi-pass bloom glow
                 if (cell.type !== "Empty") {
-                    // Outer Bloom Layer with color shifting based on evolutionary stage of the brain
-                    let halo_color = "rgba(0, 240, 255, 0.12)";
-                    let inner_color = "rgba(0, 240, 255, 0.35)";
-
-                    if (iq >= 10000.0) {
-                        halo_color = "rgba(255, 215, 0, 0.18)"; // Glowing Golden Halo for advanced evolution!
-                        inner_color = "rgba(255, 215, 0, 0.45)";
-                    } else if (cell.type === "Sensory") {
-                        halo_color = "rgba(0, 240, 255, 0.12)";
-                        inner_color = "rgba(0, 240, 255, 0.35)";
-                    } else if (cell.type === "Interneuron") {
-                        halo_color = "rgba(57, 255, 20, 0.12)";
-                        inner_color = "rgba(57, 255, 20, 0.35)";
-                    } else if (cell.type === "Motor") {
-                        halo_color = "rgba(255, 0, 127, 0.12)";
-                        inner_color = "rgba(255, 0, 127, 0.35)";
-                    }
-
+                    // Outer Bloom Layer
                     ctx.beginPath();
                     ctx.arc(n.px, n.py, radius * 3, 0, 2 * Math.PI);
-                    ctx.fillStyle = isFiring ? "rgba(255, 170, 0, 0.15)" : halo_color;
+                    ctx.fillStyle = isFiring ? "rgba(255, 170, 0, 0.15)" : color.replace("#", "rgba(") + ", 0.12)";
+                    // simple replacement for hex to rgb
+                    if (cell.type === "Sensory") ctx.fillStyle = "rgba(0, 240, 255, 0.12)";
+                    else if (cell.type === "Interneuron") ctx.fillStyle = "rgba(57, 255, 20, 0.12)";
+                    else if (cell.type === "Motor") ctx.fillStyle = "rgba(255, 0, 127, 0.12)";
                     ctx.fill();
 
+                    // Mid Glow Layer
                     ctx.beginPath();
                     ctx.arc(n.px, n.py, radius * 1.8, 0, 2 * Math.PI);
-                    ctx.fillStyle = isFiring ? "rgba(255, 204, 0, 0.35)" : inner_color;
+                    if (cell.type === "Sensory") ctx.fillStyle = "rgba(0, 240, 255, 0.35)";
+                    else if (cell.type === "Interneuron") ctx.fillStyle = "rgba(57, 255, 20, 0.35)";
+                    else if (cell.type === "Motor") ctx.fillStyle = "rgba(255, 0, 127, 0.35)";
+                    if (isFiring) ctx.fillStyle = "rgba(255, 204, 0, 0.35)";
                     ctx.fill();
-                }
-
-                // Draw specialized biological cell structures
-                if (cell.type === "Sensory") {
-                    ctx.strokeStyle = "rgba(0, 240, 255, 0.7)";
-                    ctx.lineWidth = 1;
-                    for (let i = 0; i < 6; i++) {
-                        let angle = (i * Math.PI) / 3;
-                        ctx.beginPath();
-                        ctx.moveTo(n.px, n.py);
-                        ctx.lineTo(n.px + Math.cos(angle) * 12, n.py + Math.sin(angle) * 12);
-                        ctx.stroke();
-                    }
-                } else if (cell.type === "Interneuron") {
-                    ctx.strokeStyle = "rgba(57, 255, 20, 0.6)";
-                    ctx.lineWidth = 1;
-                    for (let i = 0; i < 3; i++) {
-                        let angle = (i * 2 * Math.PI) / 3;
-                        let endX = n.px + Math.cos(angle) * 10;
-                        let endY = n.py + Math.sin(angle) * 10;
-                        ctx.beginPath();
-                        ctx.moveTo(n.px, n.py);
-                        ctx.lineTo(endX, endY);
-                        ctx.stroke();
-
-                        ctx.beginPath();
-                        ctx.moveTo(endX, endY);
-                        ctx.lineTo(endX + Math.cos(angle + 0.5) * 5, endY + Math.sin(angle + 0.5) * 5);
-                        ctx.stroke();
-                    }
-                } else if (cell.type === "Motor") {
-                    ctx.strokeStyle = "rgba(255, 0, 127, 0.7)";
-                    ctx.lineWidth = 1.5;
-                    let angle = Math.PI / 4;
-                    let axEndX = n.px + Math.cos(angle) * 14;
-                    let axEndY = n.py + Math.sin(angle) * 14;
-                    ctx.beginPath();
-                    ctx.moveTo(n.px, n.py);
-                    ctx.lineTo(axEndX, axEndY);
-                    ctx.stroke();
-
-                    ctx.beginPath();
-                    ctx.moveTo(axEndX - Math.sin(angle) * 4, axEndY + Math.cos(angle) * 4);
-                    ctx.lineTo(axEndX + Math.sin(angle) * 4, axEndY - Math.cos(angle) * 4);
-                    ctx.stroke();
-                }
-
-                // Draw action potential electric sparks when firing
-                if (isFiring) {
-                    ctx.strokeStyle = "#FFFFFF";
-                    ctx.lineWidth = 1.5;
-                    for (let i = 0; i < 4; i++) {
-                        let angle = Math.random() * 2 * Math.PI;
-                        ctx.beginPath();
-                        ctx.moveTo(n.px, n.py);
-                        ctx.lineTo(n.px + Math.cos(angle) * 16, n.py + Math.sin(angle) * 16);
-                        ctx.stroke();
-                    }
                 }
 
                 // Core Layer
