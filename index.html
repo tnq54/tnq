@@ -338,7 +338,10 @@
                     </div>
                 </div>
                 <div class="form-group" style="margin-top: 15px;">
-                    <button class="btn" onclick="injectCharge()">🔌 Kích xung điện cực (+1.0 Charge)</button>
+                    <div class="btn-grid">
+                        <button class="btn" onclick="injectCharge()">🔌 Kích xung điện cực (+1.0 Charge)</button>
+                        <button class="btn" onclick="triggerDopamineReward()" style="background-color: #ff007f; border-color: #ff007f; color: #ffffff;">💖 Thưởng Dopamine</button>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label class="form-label">Hướng truyền tải Axon:</label>
@@ -371,6 +374,27 @@
                 </div>
             </div>
 
+            <!-- Pathology & Pharmacology Center -->
+            <div class="card">
+                <div class="card-title">🔬 Pathology & Pharmacology Center</div>
+                <div class="form-group">
+                    <label class="form-label">Mô hình bệnh lý (Toggles):</label>
+                    <div class="btn-grid" style="grid-template-columns: repeat(3, 1fr); gap: 6px;">
+                        <button class="btn" id="path-alz" style="font-size: 0.7rem; padding: 6px;" onclick="togglePathology('Alzheimer')">👵 Alzheimer</button>
+                        <button class="btn" id="path-epi" style="font-size: 0.7rem; padding: 6px;" onclick="togglePathology('Epilepsy')">⚡ Epilepsy</button>
+                        <button class="btn" id="path-sch" style="font-size: 0.7rem; padding: 6px;" onclick="togglePathology('Schizophrenia')">👁️ Schizo</button>
+                    </div>
+                </div>
+                <div class="form-group" style="margin-top: 10px;">
+                    <label class="form-label">Can thiệp Dược lý (Triggers):</label>
+                    <div class="btn-grid" style="grid-template-columns: repeat(3, 1fr); gap: 6px;">
+                        <button class="btn" id="drug-ldopa" style="font-size: 0.7rem; padding: 6px;" onclick="triggerDrug('L-DOPA')">💊 L-DOPA</button>
+                        <button class="btn" id="drug-anticonv" style="font-size: 0.7rem; padding: 6px;" onclick="triggerDrug('Anticonvulsant')">🧬 Anticonv</button>
+                        <button class="btn" id="drug-ssri" style="font-size: 0.7rem; padding: 6px;" onclick="triggerDrug('SSRI')">🧪 SSRI</button>
+                    </div>
+                </div>
+            </div>
+
             <!-- Shader Inspector -->
             <div class="card">
                 <div class="card-title">🎛️ WGSL Shaders Code Inspector</div>
@@ -399,6 +423,14 @@
         const GRID_SIZE = 4;
         let grid = [];
         let selectedCell = { x: 0, y: 0, z: 0 };
+
+        let dopamineRewardLevel = 0.0;
+        let pathologyAlzheimer = false;
+        let pathologyEpilepsy = false;
+        let pathologySchizophrenia = false;
+        let drugLDOPA = false;
+        let drugAnticonvulsant = false;
+        let drugSSRI = false;
 
         let csi = 0.0;
         let pdi = 0.0;
@@ -554,6 +586,98 @@ fn main() {
             if (cell.type !== "Empty") {
                 cell.charge = 1.0;
                 addLog(`🔌 [AP Clamping] Kích xung điện lượng cực đại tại node [${selectedCell.x+1}, ${selectedCell.y+1}, ${selectedCell.z+1}]!`);
+            }
+        }
+
+        function triggerDopamineReward() {
+            let cell = grid[selectedCell.x][selectedCell.y][selectedCell.z];
+            if (cell.type !== "Empty") {
+                dopamineRewardLevel = 1.5; // High reward level
+                cell.lastRewardTime = Date.now();
+                addLog(`💖 [Dopamine Reward] Đã kích hoạt phần thưởng Dopamine tại node [${selectedCell.x+1}, ${selectedCell.y+1}, ${selectedCell.z+1}] để củng cố liên kết Hebbian!`);
+            }
+        }
+
+        function togglePathology(disease) {
+            if (disease === 'Alzheimer') {
+                pathologyAlzheimer = !pathologyAlzheimer;
+                let btn = document.getElementById('path-alz');
+                btn.style.backgroundColor = pathologyAlzheimer ? '#e03a3a' : '';
+                btn.style.borderColor = pathologyAlzheimer ? '#e03a3a' : '';
+                addLog(`👵 [Pathology] ${pathologyAlzheimer ? 'Bắt đầu' : 'Chấm dứt'} mô phỏng Alzheimer (Suy giảm Synapse & thoái hóa liên kết).`);
+            } else if (disease === 'Epilepsy') {
+                pathologyEpilepsy = !pathologyEpilepsy;
+                let btn = document.getElementById('path-epi');
+                btn.style.backgroundColor = pathologyEpilepsy ? '#e03a3a' : '';
+                btn.style.borderColor = pathologyEpilepsy ? '#e03a3a' : '';
+                addLog(`⚡ [Pathology] ${pathologyEpilepsy ? 'Bắt đầu' : 'Chấm dứt'} mô phỏng Động kinh - Epilepsy (Bùng nổ xung lực tự phát lan tỏa).`);
+            } else if (disease === 'Schizophrenia') {
+                pathologySchizophrenia = !pathologySchizophrenia;
+                let btn = document.getElementById('path-sch');
+                btn.style.backgroundColor = pathologySchizophrenia ? '#e03a3a' : '';
+                btn.style.borderColor = pathologySchizophrenia ? '#e03a3a' : '';
+                addLog(`👁️ [Pathology] ${pathologySchizophrenia ? 'Bắt đầu' : 'Chấm dứt'} mô phỏng Tâm thần phân liệt - Schizophrenia (Rối loạn Dopamine diện rộng).`);
+            }
+        }
+
+        function triggerDrug(drug) {
+            if (drug === 'L-DOPA') {
+                drugLDOPA = true;
+                let btn = document.getElementById('drug-ldopa');
+                btn.style.backgroundColor = '#2ecc71';
+                btn.style.borderColor = '#2ecc71';
+                setTimeout(() => {
+                    drugLDOPA = false;
+                    btn.style.backgroundColor = '';
+                    btn.style.borderColor = '';
+                }, 4000);
+
+                sanity = Math.min(100.0, sanity + 20.0);
+                dopamineRewardLevel = 2.0;
+                addLog(`💊 [Pharmacology] Đã tiêm L-DOPA! Tăng cường Dopamine có lợi, khôi phục Sanity (+20%) và ổn định truyền dẫn thần kinh.`);
+            } else if (drug === 'Anticonvulsant') {
+                drugAnticonvulsant = true;
+                let btn = document.getElementById('drug-anticonv');
+                btn.style.backgroundColor = '#2ecc71';
+                btn.style.borderColor = '#2ecc71';
+                setTimeout(() => {
+                    drugAnticonvulsant = false;
+                    btn.style.backgroundColor = '';
+                    btn.style.borderColor = '';
+                }, 4000);
+
+                for (let x = 0; x < GRID_SIZE; x++) {
+                    for (let y = 0; y < GRID_SIZE; y++) {
+                        for (let z = 0; z < GRID_SIZE; z++) {
+                            if (grid[x][y][z].type !== 'Sensory') {
+                                grid[x][y][z].charge = 0.0;
+                            }
+                        }
+                    }
+                }
+                stress = Math.max(0.0, stress - 30.0);
+                addLog(`🧬 [Pharmacology] Đã dùng Anticonvulsant! Triệt tiêu toàn bộ sóng xung điện kích thích lan tỏa bất thường, giảm Stress (-30%).`);
+            } else if (drug === 'SSRI') {
+                drugSSRI = true;
+                let btn = document.getElementById('drug-ssri');
+                btn.style.backgroundColor = '#2ecc71';
+                btn.style.borderColor = '#2ecc71';
+                setTimeout(() => {
+                    drugSSRI = false;
+                    btn.style.backgroundColor = '';
+                    btn.style.borderColor = '';
+                }, 4000);
+
+                sanity = Math.min(100.0, sanity + 30.0);
+                for (let x = 0; x < GRID_SIZE; x++) {
+                    for (let y = 0; y < GRID_SIZE; y++) {
+                        for (let z = 0; z < GRID_SIZE; z++) {
+                            let cell = grid[x][y][z];
+                            if (cell.type === 'Interneuron') cell.threshold = 0.5;
+                        }
+                    }
+                }
+                addLog(`🧪 [Pharmacology] Đã dùng SSRI! Tăng cường tái hấp thu Serotonin, phục hồi Sanity (+30%) và cân bằng ngưỡng phản hồi.`);
             }
         }
 
@@ -791,6 +915,41 @@ fn main() {
         function simTick() {
             currentTick++;
 
+            // --- Simulate Pathological Diseases & Pharmacology ---
+            if (pathologyAlzheimer) {
+                if (!drugLDOPA && Math.random() < 0.15) {
+                    let rx = Math.floor(Math.random() * GRID_SIZE);
+                    let ry = Math.floor(Math.random() * GRID_SIZE);
+                    let rz = Math.floor(Math.random() * GRID_SIZE);
+                    let cell = grid[rx][ry][rz];
+                    if (cell.type !== 'Empty' && cell.weight > 0.5) {
+                        cell.weight = Math.max(0.5, cell.weight - 0.1);
+                        addLog(`👵 [Alzheimer Pruning] Thoái hóa synapse thoái lui trọng số node [${rx+1}, ${ry+1}, ${rz+1}] xuống ${cell.weight.toFixed(1)}.`);
+                    }
+                }
+            }
+            if (pathologyEpilepsy) {
+                if (!drugAnticonvulsant && Math.random() < 0.15) {
+                    let rx = Math.floor(Math.random() * GRID_SIZE);
+                    let ry = Math.floor(Math.random() * GRID_SIZE);
+                    let rz = Math.floor(Math.random() * GRID_SIZE);
+                    let cell = grid[rx][ry][rz];
+                    if (cell.type !== 'Empty') {
+                        cell.charge = 1.0;
+                        addLog(`⚡ [Epileptic Spike] Bùng phát xung đột biến đột ngột tại node [${rx+1}, ${ry+1}, ${rz+1}]!`);
+                    }
+                }
+            }
+            if (pathologySchizophrenia) {
+                if (!drugSSRI && !drugLDOPA) {
+                    sanity = Math.max(0.0, sanity - 0.4);
+                    if (Math.random() < 0.25) {
+                        dopamineRewardLevel = Math.random() * 1.5;
+                        addLog(`👁️ [Schizo Hallucination] Dao động Dopamine hoang tưởng khiến Sanity sụt giảm.`);
+                    }
+                }
+            }
+
             let totalNeurons = 0;
             let activeCharged = 0;
             let totalInterneurons = 0;
@@ -817,6 +976,17 @@ fn main() {
                             totalNeurons++;
                             if (cell.charge >= cell.threshold) {
                                 activeCharged++;
+
+                                // Dopamine-driven Operant Conditioning / Hebbian LTP Reinforcement
+                                if (dopamineRewardLevel > 0.0 || (cell.lastRewardTime && (Date.now() - cell.lastRewardTime < 10000))) {
+                                    let oldW = cell.weight;
+                                    cell.weight = Math.min(3.0, cell.weight + 0.15);
+                                    let oldT = cell.threshold;
+                                    cell.threshold = Math.max(0.15, cell.threshold - 0.05);
+                                    if (cell.weight !== oldW || cell.threshold !== oldT) {
+                                        addLog(`⚡ [LTP Reward] Node [${x+1}, ${y+1}, ${z+1}] củng cố: Trọng số = ${cell.weight.toFixed(2)}, Ngưỡng = ${cell.threshold.toFixed(2)} nhờ Dopamine!`);
+                                    }
+                                }
 
                                 let targets = [];
                                 if (cell.direction === "All") {
@@ -882,6 +1052,10 @@ fn main() {
             document.getElementById("csi-val").textContent = `${csi.toFixed(1)}%`;
             document.getElementById("pdi-val").textContent = `${pdi.toFixed(1)}%`;
             document.getElementById("vpi-val").textContent = `${vpi.toFixed(1)}%`;
+
+            if (dopamineRewardLevel > 0.0) {
+                dopamineRewardLevel = Math.max(0.0, dopamineRewardLevel - 0.25);
+            }
 
             history.ticks.push(currentTick);
             history.csi.push(csi);

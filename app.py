@@ -1826,7 +1826,10 @@ webgpu_html_content = """<!DOCTYPE html>
                     </div>
                 </div>
                 <div class="form-group" style="margin-top: 15px;">
-                    <button class="btn" onclick="injectCharge()">🔌 Kích xung điện cực (+1.0 Charge)</button>
+                    <div class="btn-grid">
+                        <button class="btn" onclick="injectCharge()">🔌 Kích xung điện cực (+1.0 Charge)</button>
+                        <button class="btn" onclick="triggerDopamineReward()" style="background-color: #ff007f; border-color: #ff007f; color: #ffffff;">💖 Thưởng Dopamine</button>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label class="form-label">Hướng truyền tải Axon:</label>
@@ -1859,6 +1862,27 @@ webgpu_html_content = """<!DOCTYPE html>
                 </div>
             </div>
 
+            <!-- Pathology & Pharmacology Center -->
+            <div class="card">
+                <div class="card-title">🔬 Pathology & Pharmacology Center</div>
+                <div class="form-group">
+                    <label class="form-label">Mô hình bệnh lý (Toggles):</label>
+                    <div class="btn-grid" style="grid-template-columns: repeat(3, 1fr); gap: 6px;">
+                        <button class="btn" id="path-alz" style="font-size: 0.7rem; padding: 6px;" onclick="togglePathology('Alzheimer')">👵 Alzheimer</button>
+                        <button class="btn" id="path-epi" style="font-size: 0.7rem; padding: 6px;" onclick="togglePathology('Epilepsy')">⚡ Epilepsy</button>
+                        <button class="btn" id="path-sch" style="font-size: 0.7rem; padding: 6px;" onclick="togglePathology('Schizophrenia')">👁️ Schizo</button>
+                    </div>
+                </div>
+                <div class="form-group" style="margin-top: 10px;">
+                    <label class="form-label">Can thiệp Dược lý (Triggers):</label>
+                    <div class="btn-grid" style="grid-template-columns: repeat(3, 1fr); gap: 6px;">
+                        <button class="btn" id="drug-ldopa" style="font-size: 0.7rem; padding: 6px;" onclick="triggerDrug('L-DOPA')">💊 L-DOPA</button>
+                        <button class="btn" id="drug-anticonv" style="font-size: 0.7rem; padding: 6px;" onclick="triggerDrug('Anticonvulsant')">🧬 Anticonv</button>
+                        <button class="btn" id="drug-ssri" style="font-size: 0.7rem; padding: 6px;" onclick="triggerDrug('SSRI')">🧪 SSRI</button>
+                    </div>
+                </div>
+            </div>
+
             <!-- Shader Inspector -->
             <div class="card">
                 <div class="card-title">🎛️ WGSL Shaders Code Inspector</div>
@@ -1887,6 +1911,14 @@ webgpu_html_content = """<!DOCTYPE html>
         const GRID_SIZE = 4;
         let grid = [];
         let selectedCell = { x: 0, y: 0, z: 0 };
+
+        let dopamineRewardLevel = 0.0;
+        let pathologyAlzheimer = false;
+        let pathologyEpilepsy = false;
+        let pathologySchizophrenia = false;
+        let drugLDOPA = false;
+        let drugAnticonvulsant = false;
+        let drugSSRI = false;
 
         let csi = 0.0;
         let pdi = 0.0;
@@ -2045,6 +2077,98 @@ fn main() {
             }
         }
 
+        function triggerDopamineReward() {
+            let cell = grid[selectedCell.x][selectedCell.y][selectedCell.z];
+            if (cell.type !== "Empty") {
+                dopamineRewardLevel = 1.5; // High reward level
+                cell.lastRewardTime = Date.now();
+                addLog(`💖 [Dopamine Reward] Đã kích hoạt phần thưởng Dopamine tại node [${selectedCell.x+1}, ${selectedCell.y+1}, ${selectedCell.z+1}] để củng cố liên kết Hebbian!`);
+            }
+        }
+
+        function togglePathology(disease) {
+            if (disease === 'Alzheimer') {
+                pathologyAlzheimer = !pathologyAlzheimer;
+                let btn = document.getElementById('path-alz');
+                btn.style.backgroundColor = pathologyAlzheimer ? '#e03a3a' : '';
+                btn.style.borderColor = pathologyAlzheimer ? '#e03a3a' : '';
+                addLog(`👵 [Pathology] ${pathologyAlzheimer ? 'Bắt đầu' : 'Chấm dứt'} mô phỏng Alzheimer (Suy giảm Synapse & thoái hóa liên kết).`);
+            } else if (disease === 'Epilepsy') {
+                pathologyEpilepsy = !pathologyEpilepsy;
+                let btn = document.getElementById('path-epi');
+                btn.style.backgroundColor = pathologyEpilepsy ? '#e03a3a' : '';
+                btn.style.borderColor = pathologyEpilepsy ? '#e03a3a' : '';
+                addLog(`⚡ [Pathology] ${pathologyEpilepsy ? 'Bắt đầu' : 'Chấm dứt'} mô phỏng Động kinh - Epilepsy (Bùng nổ xung lực tự phát lan tỏa).`);
+            } else if (disease === 'Schizophrenia') {
+                pathologySchizophrenia = !pathologySchizophrenia;
+                let btn = document.getElementById('path-sch');
+                btn.style.backgroundColor = pathologySchizophrenia ? '#e03a3a' : '';
+                btn.style.borderColor = pathologySchizophrenia ? '#e03a3a' : '';
+                addLog(`👁️ [Pathology] ${pathologySchizophrenia ? 'Bắt đầu' : 'Chấm dứt'} mô phỏng Tâm thần phân liệt - Schizophrenia (Rối loạn Dopamine diện rộng).`);
+            }
+        }
+
+        function triggerDrug(drug) {
+            if (drug === 'L-DOPA') {
+                drugLDOPA = true;
+                let btn = document.getElementById('drug-ldopa');
+                btn.style.backgroundColor = '#2ecc71';
+                btn.style.borderColor = '#2ecc71';
+                setTimeout(() => {
+                    drugLDOPA = false;
+                    btn.style.backgroundColor = '';
+                    btn.style.borderColor = '';
+                }, 4000);
+
+                sanity = Math.min(100.0, sanity + 20.0);
+                dopamineRewardLevel = 2.0;
+                addLog(`💊 [Pharmacology] Đã tiêm L-DOPA! Tăng cường Dopamine có lợi, khôi phục Sanity (+20%) và ổn định truyền dẫn thần kinh.`);
+            } else if (drug === 'Anticonvulsant') {
+                drugAnticonvulsant = true;
+                let btn = document.getElementById('drug-anticonv');
+                btn.style.backgroundColor = '#2ecc71';
+                btn.style.borderColor = '#2ecc71';
+                setTimeout(() => {
+                    drugAnticonvulsant = false;
+                    btn.style.backgroundColor = '';
+                    btn.style.borderColor = '';
+                }, 4000);
+
+                for (let x = 0; x < GRID_SIZE; x++) {
+                    for (let y = 0; y < GRID_SIZE; y++) {
+                        for (let z = 0; z < GRID_SIZE; z++) {
+                            if (grid[x][y][z].type !== 'Sensory') {
+                                grid[x][y][z].charge = 0.0;
+                            }
+                        }
+                    }
+                }
+                stress = Math.max(0.0, stress - 30.0);
+                addLog(`🧬 [Pharmacology] Đã dùng Anticonvulsant! Triệt tiêu toàn bộ sóng xung điện kích thích lan tỏa bất thường, giảm Stress (-30%).`);
+            } else if (drug === 'SSRI') {
+                drugSSRI = true;
+                let btn = document.getElementById('drug-ssri');
+                btn.style.backgroundColor = '#2ecc71';
+                btn.style.borderColor = '#2ecc71';
+                setTimeout(() => {
+                    drugSSRI = false;
+                    btn.style.backgroundColor = '';
+                    btn.style.borderColor = '';
+                }, 4000);
+
+                sanity = Math.min(100.0, sanity + 30.0);
+                for (let x = 0; x < GRID_SIZE; x++) {
+                    for (let y = 0; y < GRID_SIZE; y++) {
+                        for (let z = 0; z < GRID_SIZE; z++) {
+                            let cell = grid[x][y][z];
+                            if (cell.type === 'Interneuron') cell.threshold = 0.5;
+                        }
+                    }
+                }
+                addLog(`🧪 [Pharmacology] Đã dùng SSRI! Tăng cường tái hấp thu Serotonin, phục hồi Sanity (+30%) và cân bằng ngưỡng phản hồi.`);
+            }
+        }
+
         function changeDirection() {
             let cell = grid[selectedCell.x][selectedCell.y][selectedCell.z];
             cell.direction = document.getElementById("axon-dir").value;
@@ -2146,20 +2270,16 @@ fn main() {
 
         // Projections
         function project3D(x, y, z) {
-            // Center around (0,0,0)
             let cx = x - (GRID_SIZE - 1) / 2;
             let cy = y - (GRID_SIZE - 1) / 2;
             let cz = z - (GRID_SIZE - 1) / 2;
 
-            // Rotation around Y axis
             let x1 = cx * Math.cos(angleY) - cz * Math.sin(angleY);
             let z1 = cx * Math.sin(angleY) + cz * Math.cos(angleY);
 
-            // Rotation around X axis
             let y2 = cy * Math.cos(angleX) - z1 * Math.sin(angleX);
             let z2 = cy * Math.sin(angleX) + z1 * Math.cos(angleX);
 
-            // Perspective Projection
             let perspective = 200 / (200 + z2);
             let px = canvas.width / 2 + x1 * scale * perspective;
             let py = canvas.height / 2 + y2 * scale * perspective;
@@ -2171,7 +2291,6 @@ fn main() {
         function drawLoop() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Calculate projections
             nodesProjected = [];
             for (let x = 0; x < GRID_SIZE; x++) {
                 for (let y = 0; y < GRID_SIZE; y++) {
@@ -2188,7 +2307,6 @@ fn main() {
                 }
             }
 
-            // Sort by depth (Back-to-Front painter's algorithm)
             nodesProjected.sort((a, b) => b.zDepth - a.zDepth);
 
             // Draw axons (synapse connections)
@@ -2196,7 +2314,6 @@ fn main() {
             nodesProjected.forEach(n => {
                 if (n.cell.type === "Empty") return;
 
-                // Adjacent offsets
                 let targets = [];
                 if (n.cell.direction === "All") {
                     targets = [
@@ -2223,7 +2340,6 @@ fn main() {
                             ctx.moveTo(n.px, n.py);
                             ctx.lineTo(nproj.px, nproj.py);
 
-                            // Pulse color if firing
                             if (n.cell.charge >= n.cell.threshold) {
                                 ctx.strokeStyle = "#FFFFFF";
                                 ctx.lineWidth = 2;
@@ -2241,7 +2357,7 @@ fn main() {
             nodesProjected.forEach(n => {
                 let cell = n.cell;
                 let radius = 6;
-                let color = "#3A3D40"; // Empty
+                let color = "#3A3D40";
 
                 if (cell.type === "Sensory") color = "#00F0FF";
                 else if (cell.type === "Interneuron") color = "#39FF14";
@@ -2250,19 +2366,15 @@ fn main() {
                 let isSelected = (n.x === selectedCell.x && n.y === selectedCell.y && n.z === selectedCell.z);
                 let isFiring = cell.type !== "Empty" && cell.charge >= cell.threshold;
 
-                // Emulate WebGPU multi-pass bloom glow
                 if (cell.type !== "Empty") {
-                    // Outer Bloom Layer
                     ctx.beginPath();
                     ctx.arc(n.px, n.py, radius * 3, 0, 2 * Math.PI);
                     ctx.fillStyle = isFiring ? "rgba(255, 170, 0, 0.15)" : color.replace("#", "rgba(") + ", 0.12)";
-                    // simple replacement for hex to rgb
                     if (cell.type === "Sensory") ctx.fillStyle = "rgba(0, 240, 255, 0.12)";
                     else if (cell.type === "Interneuron") ctx.fillStyle = "rgba(57, 255, 20, 0.12)";
                     else if (cell.type === "Motor") ctx.fillStyle = "rgba(255, 0, 127, 0.12)";
                     ctx.fill();
 
-                    // Mid Glow Layer
                     ctx.beginPath();
                     ctx.arc(n.px, n.py, radius * 1.8, 0, 2 * Math.PI);
                     if (cell.type === "Sensory") ctx.fillStyle = "rgba(0, 240, 255, 0.35)";
@@ -2272,13 +2384,11 @@ fn main() {
                     ctx.fill();
                 }
 
-                // Core Layer
                 ctx.beginPath();
                 ctx.arc(n.px, n.py, isSelected ? radius + 3 : radius, 0, 2 * Math.PI);
                 ctx.fillStyle = isFiring ? "#FFFFFF" : color;
                 ctx.fill();
 
-                // Highlight boundary for selection
                 if (isSelected) {
                     ctx.strokeStyle = "#FFFFFF";
                     ctx.lineWidth = 1.5;
@@ -2289,16 +2399,50 @@ fn main() {
             requestAnimationFrame(drawLoop);
         }
 
-        // Biological simulation cycle logic (calculates CSI, PDI, VPI)
+        // Biological simulation cycle logic
         function simTick() {
             currentTick++;
+
+            // --- Simulate Pathological Diseases & Pharmacology ---
+            if (pathologyAlzheimer) {
+                if (!drugLDOPA && Math.random() < 0.15) {
+                    let rx = Math.floor(Math.random() * GRID_SIZE);
+                    let ry = Math.floor(Math.random() * GRID_SIZE);
+                    let rz = Math.floor(Math.random() * GRID_SIZE);
+                    let cell = grid[rx][ry][rz];
+                    if (cell.type !== 'Empty' && cell.weight > 0.5) {
+                        cell.weight = Math.max(0.5, cell.weight - 0.1);
+                        addLog(`👵 [Alzheimer Pruning] Thoái hóa synapse thoái lui trọng số node [${rx+1}, ${ry+1}, ${rz+1}] xuống ${cell.weight.toFixed(1)}.`);
+                    }
+                }
+            }
+            if (pathologyEpilepsy) {
+                if (!drugAnticonvulsant && Math.random() < 0.15) {
+                    let rx = Math.floor(Math.random() * GRID_SIZE);
+                    let ry = Math.floor(Math.random() * GRID_SIZE);
+                    let rz = Math.floor(Math.random() * GRID_SIZE);
+                    let cell = grid[rx][ry][rz];
+                    if (cell.type !== 'Empty') {
+                        cell.charge = 1.0;
+                        addLog(`⚡ [Epileptic Spike] Bùng phát xung đột biến đột ngột tại node [${rx+1}, ${ry+1}, ${rz+1}]!`);
+                    }
+                }
+            }
+            if (pathologySchizophrenia) {
+                if (!drugSSRI && !drugLDOPA) {
+                    sanity = Math.max(0.0, sanity - 0.4);
+                    if (Math.random() < 0.25) {
+                        dopamineRewardLevel = Math.random() * 1.5;
+                        addLog(`👁️ [Schizo Hallucination] Dao động Dopamine hoang tưởng khiến Sanity sụt giảm.`);
+                    }
+                }
+            }
 
             let totalNeurons = 0;
             let activeCharged = 0;
             let totalInterneurons = 0;
             let modifiedInterneurons = 0;
 
-            // 1. Sensory Nodes auto charge
             for (let x = 0; x < GRID_SIZE; x++) {
                 for (let y = 0; y < GRID_SIZE; y++) {
                     for (let z = 0; z < GRID_SIZE; z++) {
@@ -2310,7 +2454,6 @@ fn main() {
                 }
             }
 
-            // 2. Propagation pass
             let nextCharges = JSON.parse(JSON.stringify(grid)).map(p => p.map(r => r.map(c => c.charge)));
 
             for (let x = 0; x < GRID_SIZE; x++) {
@@ -2322,7 +2465,17 @@ fn main() {
                             if (cell.charge >= cell.threshold) {
                                 activeCharged++;
 
-                                // Propagation
+                                // Dopamine-driven Operant Conditioning / Hebbian LTP Reinforcement
+                                if (dopamineRewardLevel > 0.0 || (cell.lastRewardTime && (Date.now() - cell.lastRewardTime < 10000))) {
+                                    let oldW = cell.weight;
+                                    cell.weight = Math.min(3.0, cell.weight + 0.15);
+                                    let oldT = cell.threshold;
+                                    cell.threshold = Math.max(0.15, cell.threshold - 0.05);
+                                    if (cell.weight !== oldW || cell.threshold !== oldT) {
+                                        addLog(`⚡ [LTP Reward] Node [${x+1}, ${y+1}, ${z+1}] củng cố: Trọng số = ${cell.weight.toFixed(2)}, Ngưỡng = ${cell.threshold.toFixed(2)} nhờ Dopamine!`);
+                                    }
+                                }
+
                                 let targets = [];
                                 if (cell.direction === "All") {
                                     targets = [
@@ -2356,7 +2509,7 @@ fn main() {
                                     });
                                 }
 
-                                nextCharges[x][y][z] = 0.0; // reset
+                                nextCharges[x][y][z] = 0.0;
                             } else if (cell.charge >= cell.threshold * 0.5) {
                                 activeCharged++;
                             }
@@ -2372,7 +2525,6 @@ fn main() {
                 }
             }
 
-            // Apply next charges
             for (let x = 0; x < GRID_SIZE; x++) {
                 for (let y = 0; y < GRID_SIZE; y++) {
                     for (let z = 0; z < GRID_SIZE; z++) {
@@ -2381,16 +2533,18 @@ fn main() {
                 }
             }
 
-            // Calculations CSI, PDI, VPI
             csi = (activeCharged / Math.max(1, totalNeurons)) * 100.0;
             pdi = (modifiedInterneurons / Math.max(1, totalInterneurons)) * 100.0;
-            vpi = 80.0 + Math.sin(currentTick * 0.2) * 5.0; // Simulated flow
+            vpi = 80.0 + Math.sin(currentTick * 0.2) * 5.0;
 
             document.getElementById("csi-val").textContent = `${csi.toFixed(1)}%`;
             document.getElementById("pdi-val").textContent = `${pdi.toFixed(1)}%`;
             document.getElementById("vpi-val").textContent = `${vpi.toFixed(1)}%`;
 
-            // Record history and redraw chart
+            if (dopamineRewardLevel > 0.0) {
+                dopamineRewardLevel = Math.max(0.0, dopamineRewardLevel - 0.25);
+            }
+
             history.ticks.push(currentTick);
             history.csi.push(csi);
             history.pdi.push(pdi);
@@ -2418,7 +2572,6 @@ fn main() {
             let len = history.ticks.length;
             if (len < 2) return;
 
-            // Draw grid lines
             chartCtx.strokeStyle = "rgba(255, 255, 255, 0.05)";
             chartCtx.lineWidth = 1;
             for (let i = 0; i < 5; i++) {
@@ -2429,10 +2582,9 @@ fn main() {
                 chartCtx.stroke();
             }
 
-            // Draw lines for CSI, PDI, VPI
-            drawChartLine(history.csi, "#00F0FF"); // Cyan
-            drawChartLine(history.pdi, "#39FF14"); // Green
-            drawChartLine(history.vpi, "#FF007F"); // Magenta
+            drawChartLine(history.csi, "#00F0FF");
+            drawChartLine(history.pdi, "#39FF14");
+            drawChartLine(history.vpi, "#FF007F");
         }
 
         function drawChartLine(data, color) {
@@ -2451,13 +2603,11 @@ fn main() {
             chartCtx.stroke();
         }
 
-        // Initialize and Start loops
         initGrid();
         updateEditor();
         showShader();
         addLog("Hệ thống WebGPU Shading Pipeline sẵn sàng.");
 
-        // Loops
         requestAnimationFrame(drawLoop);
         setInterval(simTick, 1000);
     </script>
