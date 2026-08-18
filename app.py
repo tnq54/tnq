@@ -12,12 +12,21 @@ from telegram.error import NetworkError
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters
 from huggingface_hub import InferenceClient
 
-# Setup logging
+# Setup logging filter to suppress missing ScriptRunContext warnings
+class ScriptRunContextFilter(logging.Filter):
+    def filter(self, record):
+        msg = record.getMessage()
+        return "missing ScriptRunContext" not in msg and "Session state does not function" not in msg
+
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
 )
 logger = logging.getLogger(__name__)
+
+context_filter = ScriptRunContextFilter()
+logging.getLogger("streamlit").addFilter(context_filter)
+logging.getLogger("streamlit.runtime.scriptrunner_utils.script_run_context").addFilter(context_filter)
 
 # Try importing Google GenAI
 try:
