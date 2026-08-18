@@ -5,6 +5,7 @@ import threading
 import asyncio
 import io
 import logging
+import subprocess
 from pypdf import PdfReader
 from telegram import Update
 from telegram.error import NetworkError
@@ -177,8 +178,86 @@ if "bot_thread" not in st.session_state:
     thread.start()
 
 # Streamlit UI
-st.title("VBot1 System Rebuilt")
-st.write("Status: Bot is running in background.")
-st.write("Config:")
-st.write(f"- Llama 3: {'Active' if hf_client else 'Inactive'}")
-st.write(f"- Gemini 1.5 Flash: {'Active' if GOOGLE_API_KEY else 'Inactive'}")
+st.set_page_config(page_title="VBot1 System & LoRA Studio", layout="wide")
+st.title("VBot1 System & LoRA Fine-Tuning Studio")
+
+tab1, tab2 = st.tabs(["🤖 Bot Dashboard", "🎛️ LoRA Training Studio"])
+
+with tab1:
+    st.header("Bot Operations")
+    st.write("Status: Bot is running in background thread.")
+    st.subheader("Configuration")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("Llama 3 (Inference)", "Active" if hf_client else "Inactive")
+    with col2:
+        st.metric("Gemini 1.5 Flash (PDF)", "Active" if GOOGLE_API_KEY else "Inactive")
+
+with tab2:
+    st.header("LoRA Fine-Tuning Studio")
+    st.markdown("Configure and trigger LoRA adapter training for Hugging Face LLMs.")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        base_model = st.text_input("Base Model", value="meta-llama/Meta-Llama-3-8B-Instruct")
+        dataset_name = st.text_input("Dataset Name or Path", value="timdettmers/openassistant-guanaco")
+        dataset_text_field = st.text_input("Dataset Text Field Column", value="text")
+        output_dir = st.text_input("Output Directory", value="./lora_output")
+
+    with col2:
+        lora_r = st.number_input("LoRA Rank (r)", min_value=1, max_value=256, value=16)
+        lora_alpha = st.number_input("LoRA Alpha", min_value=1, max_value=512, value=32)
+        lora_dropout = st.slider("LoRA Dropout", min_value=0.0, max_value=0.5, value=0.05, step=0.01)
+        learning_rate = st.select_slider("Learning Rate", options=[1e-5, 5e-5, 1e-4, 2e-4, 5e-4, 1e-3], value=2e-4)
+        num_epochs = st.number_input("Epochs", min_value=1, max_value=50, value=1)
+        target_modules = st.text_input("Target Modules", value="q_proj,v_proj,k_proj,o_proj")
+
+    st.subheader("Push to Hugging Face Hub (Optional)")
+    push_to_hub = st.checkbox("Push trained adapter to HF Hub")
+    hub_model_id = st.text_input("HF Hub Repository ID (e.g. username/my-lora-adapter)", value="")
+
+    cmd = [
+        "python3", "train_lora.py",
+        f"--base_model={base_model}",
+        f"--dataset_name={dataset_name}",
+        f"--dataset_text_field={dataset_text_field}",
+        f"--lora_r={lora_r}",
+        f"--lora_alpha={lora_alpha}",
+        f"--lora_dropout={lora_dropout}",
+        f"--target_modules={target_modules}",
+        f"--learning_rate={learning_rate}",
+        f"--num_epochs={num_epochs}",
+        f"--output_dir={output_dir}"
+    ]
+
+    if push_to_hub and hub_model_id:
+        cmd.extend(["--push_to_hub", f"--hub_model_id={hub_model_id}"])
+
+    generated_command = " ".join(cmd)
+    st.subheader("Generated CLI Command")
+    st.code(generated_command, language="bash")
+
+    if st.button("🚀 Start LoRA Training"):
+        st.info("Starting LoRA training subprocess...")
+        log_area = st.empty()
+        try:
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1
+            )
+            logs = ""
+            for line in iter(process.stdout.readline, ''):
+                logs += line
+                log_area.code(logs[-2000:], language="text")
+            process.stdout.close()
+            return_code = process.wait()
+            if return_code == 0:
+                st.success("LoRA training finished successfully!")
+            else:
+                st.error(f"Training failed with return code {return_code}")
+        except Exception as e:
+            st.error(f"Error executing training: {e}")
