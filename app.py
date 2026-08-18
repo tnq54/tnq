@@ -1,6 +1,15 @@
-import streamlit as st
-import time
 import os
+import sys
+
+# Direct execution relaunch guard: if executed directly with python app.py, relaunch via streamlit run
+try:
+    import streamlit as st
+    if not st.runtime.exists():
+        os.execv(sys.executable, [sys.executable, "-m", "streamlit", "run", __file__] + sys.argv[1:])
+except Exception:
+    pass
+
+import time
 import threading
 import asyncio
 import io
