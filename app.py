@@ -287,7 +287,19 @@ with tab3:
     col1, col2 = st.columns(2)
 
     with col1:
-        base_model = st.text_input("Base Model", value="meta-llama/Meta-Llama-3-8B-Instruct")
+        model_presets = [
+            "meta-llama/Meta-Llama-3-8B-Instruct",
+            "mistralai/Mistral-7B-Instruct-v0.2",
+            "Qwen/Qwen2.5-7B-Instruct",
+            "google/gemma-2-9b-it",
+            "Custom..."
+        ]
+        selected_model_preset = st.selectbox("Base Model Preset", options=model_presets, index=0)
+        if selected_model_preset == "Custom...":
+            base_model = st.text_input("Custom Base Model Path/ID", value="meta-llama/Meta-Llama-3-8B-Instruct")
+        else:
+            base_model = selected_model_preset
+
         dataset_name = st.text_input("Dataset Name or Path", value="timdettmers/openassistant-guanaco")
         dataset_text_field = st.text_input("Dataset Text Field Column", value="text")
         output_dir = st.text_input("Output Directory", value="./lora_output")
