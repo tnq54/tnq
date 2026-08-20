@@ -43,8 +43,10 @@ logging.getLogger("streamlit.runtime.scriptrunner_utils.script_run_context").add
 # Try importing Google GenAI
 try:
     from google import genai
+    from google.genai import types
 except ImportError:
     genai = None
+    types = None
 
 # Load Environment Variables
 HF_TOKEN = os.environ.get("HF_TOKEN")
@@ -82,7 +84,6 @@ def summarize_with_gemini(text):
 
     try:
         client = genai.Client(api_key=GOOGLE_API_KEY)
-        # Using gemini-1.5-flash as requested (closest valid model to 2.5)
         response = client.models.generate_content(
             model='gemini-1.5-flash',
             contents=f"Summarize this document:\n\n{text[:30000]}"
@@ -92,12 +93,37 @@ def summarize_with_gemini(text):
         logger.error(f"Gemini Error: {e}")
         return f"Error summarizing: {e}"
 
+# Gemini Photo/Image Analysis
+def analyze_photo_with_gemini(image_bytes, mime_type="image/jpeg", prompt="Describe this image in detail and highlight key features."):
+    if not GOOGLE_API_KEY:
+        return "Error: GOOGLE_API_KEY not found."
+    if not genai:
+        return "Error: google-genai library not installed."
+
+    try:
+        client = genai.Client(api_key=GOOGLE_API_KEY)
+        if types and hasattr(types, "Part"):
+            part = types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
+            contents = [prompt, part]
+        else:
+            contents = [prompt, {"mime_type": mime_type, "data": image_bytes}]
+
+        response = client.models.generate_content(
+            model='gemini-1.5-flash',
+            contents=contents
+        )
+        return response.text
+    except Exception as e:
+        logger.error(f"Gemini Photo Error: {e}")
+        return f"Error analyzing photo: {e}"
+
 # Telegram Bot Handlers
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "Welcome to VBot1!\n"
         "- Chat with me (Llama 3).\n"
-        "- Send a PDF to summarize (Gemini 1.5 Flash)."
+        "- Send a PDF to summarize (Gemini 1.5 Flash).\n"
+        "- Send a Photo to analyze (Gemini 1.5 Flash)."
     )
 
 async def chat_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -153,6 +179,30 @@ async def document_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"Document Error: {e}")
         await update.message.reply_text(f"Error processing document: {e}")
 
+async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message.photo:
+        return
+
+    status_msg = await update.message.reply_text("Downloading photo...")
+    try:
+        photo = update.message.photo[-1]
+        file = await context.bot.get_file(photo.file_id)
+        image_bytes = await file.download_as_bytearray()
+
+        await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=status_msg.message_id, text="Analyzing photo with Gemini 1.5 Flash...")
+        caption = update.message.caption or "Describe this image in detail and highlight key features."
+        analysis = analyze_photo_with_gemini(image_bytes, mime_type="image/jpeg", prompt=caption)
+
+        if len(analysis) > 4000:
+            for i in range(0, len(analysis), 4000):
+                await update.message.reply_text(analysis[i:i+4000])
+        else:
+            await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=status_msg.message_id, text=analysis)
+
+    except Exception as e:
+        logger.error(f"Photo Error: {e}")
+        await update.message.reply_text(f"Error processing photo: {e}")
+
 # Bot Runner
 def run_bot():
     # FIX: Network Error - Wait for network to be ready
@@ -177,6 +227,7 @@ def run_bot():
             application.add_handler(CommandHandler("start", start))
             application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat_handler))
             application.add_handler(MessageHandler(filters.Document.PDF, document_handler))
+            application.add_handler(MessageHandler(filters.PHOTO, photo_handler))
 
             # FIX: System Error - Invalid file descriptor
             application.run_polling(stop_signals=None, close_loop=False)
@@ -201,7 +252,7 @@ if "bot_thread" not in st.session_state:
 # Streamlit UI
 st.title("VBot1 System & LoRA Fine-Tuning Studio")
 
-tab1, tab2 = st.tabs(["🤖 Bot Dashboard", "🎛️ LoRA Training Studio"])
+tab1, tab2, tab3 = st.tabs(["🤖 Bot Dashboard", "🖼️ Photo Analysis", "🎛️ LoRA Training Studio"])
 
 with tab1:
     st.header("Bot Operations")
@@ -211,9 +262,25 @@ with tab1:
     with col1:
         st.metric("Llama 3 (Inference)", "Active" if hf_client else "Inactive")
     with col2:
-        st.metric("Gemini 1.5 Flash (PDF)", "Active" if GOOGLE_API_KEY else "Inactive")
+        st.metric("Gemini 1.5 Flash (Multimodal)", "Active" if GOOGLE_API_KEY else "Inactive")
 
 with tab2:
+    st.header("Photo & Image Analysis (Gemini 1.5 Flash)")
+    st.markdown("Upload photos or images to get detailed analysis and descriptions from Gemini 1.5 Flash.")
+    uploaded_photo = st.file_uploader("Upload an image file", type=["jpg", "jpeg", "png", "webp"])
+    prompt_text = st.text_input("Analysis Prompt", value="Describe this image in detail and highlight key features.")
+
+    if uploaded_photo is not None:
+        st.image(uploaded_photo, caption="Uploaded Image", use_container_width=True)
+        if st.button("🔍 Analyze Photo"):
+            with st.spinner("Analyzing photo with Gemini 1.5 Flash..."):
+                file_bytes = uploaded_photo.getvalue()
+                mime_type = uploaded_photo.type or "image/jpeg"
+                res = analyze_photo_with_gemini(file_bytes, mime_type=mime_type, prompt=prompt_text)
+                st.subheader("Analysis Result")
+                st.write(res)
+
+with tab3:
     st.header("LoRA Fine-Tuning Studio")
     st.markdown("Configure and trigger LoRA adapter training for Hugging Face LLMs.")
 
