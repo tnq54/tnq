@@ -21,6 +21,9 @@ from telegram.error import NetworkError
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters
 from huggingface_hub import InferenceClient
 
+# Call set_page_config as the first Streamlit command
+st.set_page_config(page_title="VBot1 System & LoRA Studio", layout="wide")
+
 # Setup logging filter to suppress missing ScriptRunContext warnings
 class ScriptRunContextFilter(logging.Filter):
     def filter(self, record):
@@ -196,7 +199,6 @@ if "bot_thread" not in st.session_state:
     thread.start()
 
 # Streamlit UI
-st.set_page_config(page_title="VBot1 System & LoRA Studio", layout="wide")
 st.title("VBot1 System & LoRA Fine-Tuning Studio")
 
 tab1, tab2 = st.tabs(["🤖 Bot Dashboard", "🎛️ LoRA Training Studio"])
