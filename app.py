@@ -53,6 +53,12 @@ HF_TOKEN = os.environ.get("HF_TOKEN")
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
 
+# Module-level persistent configuration dictionary
+if "CONFIG" not in globals():
+    CONFIG = {
+        "active_chat_model": os.environ.get("ACTIVE_CHAT_MODEL", "meta-llama/Meta-Llama-3-8B-Instruct")
+    }
+
 # Initialize HF Client
 if HF_TOKEN:
     try:
@@ -121,7 +127,7 @@ def analyze_photo_with_gemini(image_bytes, mime_type="image/jpeg", prompt="Descr
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "Welcome to VBot1!\n"
-        "- Chat with me (Llama 3).\n"
+        "- Chat with me (Llama 3 / Custom LoRA Model).\n"
         "- Send a PDF to summarize (Gemini 1.5 Flash).\n"
         "- Send a Photo to analyze (Gemini 1.5 Flash)."
     )
@@ -129,22 +135,22 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def chat_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_text = update.message.text
     if not hf_client:
-        await update.message.reply_text("Llama 3 is not available (HF_TOKEN missing).")
+        await update.message.reply_text("Inference model is not available (HF_TOKEN missing).")
         return
 
     status_msg = await update.message.reply_text("Thinking...")
     try:
         messages = [{"role": "user", "content": user_text}]
-        # Llama 3 via HF Inference API
+        model_to_use = CONFIG["active_chat_model"]
         completion = hf_client.chat_completion(
-            model="meta-llama/Meta-Llama-3-8B-Instruct",
+            model=model_to_use,
             messages=messages,
             max_tokens=500
         )
         reply = completion.choices[0].message.content
         await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=status_msg.message_id, text=reply)
     except Exception as e:
-        logger.error(f"Llama 3 Error: {e}")
+        logger.error(f"Inference Model Error ({CONFIG['active_chat_model']}): {e}")
         await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=status_msg.message_id, text=f"Error: {e}")
 
 async def document_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -255,12 +261,23 @@ st.title("VBot1 System & LoRA Fine-Tuning Studio")
 tab1, tab2, tab3 = st.tabs(["🤖 Bot Dashboard", "🖼️ Photo Analysis", "🎛️ LoRA Training Studio"])
 
 with tab1:
-    st.header("Bot Operations")
+    st.header("Bot Operations & Model Selection")
     st.write("Status: Bot is running in background thread.")
-    st.subheader("Configuration")
+
+    st.subheader("Active Inference Model Configuration")
+    chat_model_input = st.text_input(
+        "Active Model / LoRA Adapter ID for Chat",
+        value=CONFIG["active_chat_model"],
+        help="Specify the base model or fine-tuned LoRA adapter repository on Hugging Face (e.g. meta-llama/Meta-Llama-3-8B-Instruct or username/my-lora-adapter)"
+    )
+    if chat_model_input != CONFIG["active_chat_model"]:
+        CONFIG["active_chat_model"] = chat_model_input
+        st.success(f"Active Chat Model set to: `{CONFIG['active_chat_model']}`")
+
+    st.subheader("System Status")
     col1, col2 = st.columns(2)
     with col1:
-        st.metric("Llama 3 (Inference)", "Active" if hf_client else "Inactive")
+        st.metric(f"HF Inference Model ({CONFIG['active_chat_model'].split('/')[-1]})", "Active" if hf_client else "Inactive")
     with col2:
         st.metric("Gemini 1.5 Flash (Multimodal)", "Active" if GOOGLE_API_KEY else "Inactive")
 
