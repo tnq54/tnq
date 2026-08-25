@@ -304,6 +304,7 @@ with tab3:
     col1, col2 = st.columns(2)
 
     with col1:
+        st.subheader("Base Model & Dataset Setup")
         model_presets = [
             "meta-llama/Meta-Llama-3-8B-Instruct",
             "mistralai/Mistral-7B-Instruct-v0.2",
@@ -317,11 +318,42 @@ with tab3:
         else:
             base_model = selected_model_preset
 
-        dataset_name = st.text_input("Dataset Name or Path", value="timdettmers/openassistant-guanaco")
+        dataset_presets = [
+            "timdettmers/openassistant-guanaco",
+            "tatsu-lab/alpaca",
+            "databricks/databricks-dolly-15k",
+            "yahma/alpaca-cleaned",
+            "Custom / Upload Dataset File..."
+        ]
+        selected_dataset_preset = st.selectbox("Dataset Preset / Source", options=dataset_presets, index=0)
+
+        custom_dataset_path = None
+        if selected_dataset_preset == "Custom / Upload Dataset File...":
+            uploaded_dataset_file = st.file_uploader("Upload Dataset (.json, .jsonl, .csv, .txt)", type=["json", "jsonl", "csv", "txt"])
+            if uploaded_dataset_file is not None:
+                save_dir = "./uploaded_datasets"
+                os.makedirs(save_dir, exist_ok=True)
+                file_path = os.path.join(save_dir, uploaded_dataset_file.name)
+                with open(file_path, "wb") as f:
+                    f.write(uploaded_dataset_file.getvalue())
+                custom_dataset_path = file_path
+                st.success(f"Uploaded dataset saved to: `{custom_dataset_path}`")
+            dataset_name = custom_dataset_path if custom_dataset_path else st.text_input("Custom Dataset Path / Hub ID", value="timdettmers/openassistant-guanaco")
+        else:
+            dataset_name = selected_dataset_preset
+
         dataset_text_field = st.text_input("Dataset Text Field Column", value="text")
         output_dir = st.text_input("Output Directory", value="./lora_output")
 
     with col2:
+        st.subheader("LoRA & Prompt Template Hyperparameters")
+        prompt_templates = ["none", "alpaca", "chatml", "llama3", "custom"]
+        prompt_template = st.selectbox("Prompt Template Format", options=prompt_templates, index=0, help="Formats dataset fields into prompt structures before training")
+
+        custom_prompt_format = "Instruction: {instruction}\nInput: {input}\nResponse: {output}"
+        if prompt_template == "custom":
+            custom_prompt_format = st.text_area("Custom Prompt Template String", value=custom_prompt_format)
+
         lora_r = st.number_input("LoRA Rank (r)", min_value=1, max_value=256, value=16)
         lora_alpha = st.number_input("LoRA Alpha", min_value=1, max_value=512, value=32)
         lora_dropout = st.slider("LoRA Dropout", min_value=0.0, max_value=0.5, value=0.05, step=0.01)
@@ -338,6 +370,7 @@ with tab3:
         f"--base_model={base_model}",
         f"--dataset_name={dataset_name}",
         f"--dataset_text_field={dataset_text_field}",
+        f"--prompt_template={prompt_template}",
         f"--lora_r={lora_r}",
         f"--lora_alpha={lora_alpha}",
         f"--lora_dropout={lora_dropout}",
@@ -346,6 +379,9 @@ with tab3:
         f"--num_epochs={num_epochs}",
         f"--output_dir={output_dir}"
     ]
+
+    if prompt_template == "custom":
+        cmd.append(f"--custom_prompt_format={custom_prompt_format}")
 
     if push_to_hub and hub_model_id:
         cmd.extend(["--push_to_hub", f"--hub_model_id={hub_model_id}"])

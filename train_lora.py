@@ -15,6 +15,8 @@ def parse_args():
     parser.add_argument("--base_model", type=str, default="meta-llama/Meta-Llama-3-8B-Instruct", help="Base model identifier")
     parser.add_argument("--dataset_name", type=str, default="timdettmers/openassistant-guanaco", help="Dataset identifier or file path")
     parser.add_argument("--dataset_text_field", type=str, default="text", help="Text column name in dataset")
+    parser.add_argument("--prompt_template", type=str, default="none", choices=["none", "alpaca", "chatml", "llama3", "custom"], help="Prompt template format")
+    parser.add_argument("--custom_prompt_format", type=str, default="Instruction: {instruction}\nInput: {input}\nResponse: {output}", help="Custom format string with placeholders")
     parser.add_argument("--lora_r", type=int, default=16, help="LoRA rank")
     parser.add_argument("--lora_alpha", type=int, default=32, help="LoRA alpha scaling factor")
     parser.add_argument("--lora_dropout", type=float, default=0.05, help="LoRA dropout rate")
@@ -27,6 +29,36 @@ def parse_args():
     parser.add_argument("--push_to_hub", action="store_true", help="Whether to push trained adapter to HF Hub")
     parser.add_argument("--hub_model_id", type=str, default=None, help="Target HF Hub repository ID")
     return parser.parse_args()
+
+def format_dataset(example, template, custom_format, text_field):
+    if template == "alpaca":
+        instruction = example.get("instruction", "")
+        input_text = example.get("input", "")
+        output_text = example.get("output", example.get("response", ""))
+        if input_text:
+            text = f"Below is an instruction that describes a task, paired with an input that provides further context. Write a response that appropriately completes the request.\n\n### Instruction:\n{instruction}\n\n### Input:\n{input_text}\n\n### Response:\n{output_text}"
+        else:
+            text = f"Below is an instruction that describes a task. Write a response that appropriately completes the request.\n\n### Instruction:\n{instruction}\n\n### Response:\n{output_text}"
+        example[text_field] = text
+    elif template == "chatml":
+        system_msg = example.get("system", "You are a helpful assistant.")
+        user_msg = example.get("user", example.get("instruction", ""))
+        assistant_msg = example.get("assistant", example.get("output", example.get("response", "")))
+        text = f"<|im_start|>system\n{system_msg}<|im_end|>\n<|im_start|>user\n{user_msg}<|im_end|>\n<|im_start|>assistant\n{assistant_msg}<|im_end|>"
+        example[text_field] = text
+    elif template == "llama3":
+        system_msg = example.get("system", "You are a helpful assistant.")
+        user_msg = example.get("user", example.get("instruction", ""))
+        assistant_msg = example.get("assistant", example.get("output", example.get("response", "")))
+        text = f"<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n{system_msg}<|eot_id|><|start_header_id|>user<|end_header_id|>\n\n{user_msg}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n{assistant_msg}<|eot_id|>"
+        example[text_field] = text
+    elif template == "custom":
+        try:
+            text = custom_format.format(**example)
+        except Exception:
+            text = str(example.get(text_field, ""))
+        example[text_field] = text
+    return example
 
 def main():
     args = parse_args()
@@ -56,6 +88,12 @@ def main():
             dataset = load_dataset("text", data_files=args.dataset_name, split="train")
     else:
         dataset = load_dataset(args.dataset_name, split="train")
+
+    if args.prompt_template != "none":
+        logger.info(f"Applying prompt template: {args.prompt_template}")
+        dataset = dataset.map(
+            lambda ex: format_dataset(ex, args.prompt_template, args.custom_prompt_format, args.dataset_text_field)
+        )
 
     logger.info(f"Loading tokenizer: {args.base_model}")
     tokenizer = AutoTokenizer.from_pretrained(args.base_model, trust_remote_code=True)
