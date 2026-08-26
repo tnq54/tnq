@@ -14,6 +14,7 @@ import threading
 import asyncio
 import io
 import logging
+import json
 import subprocess
 from pypdf import PdfReader
 from telegram import Update
@@ -364,6 +365,32 @@ with tab3:
     st.subheader("Push to Hugging Face Hub (Optional)")
     push_to_hub = st.checkbox("Push trained adapter to HF Hub")
     hub_model_id = st.text_input("HF Hub Repository ID (e.g. username/my-lora-adapter)", value="")
+
+    # Config Export / Import Options
+    st.subheader("LoRA Configuration Management")
+    config_data = {
+        "base_model": base_model,
+        "dataset_name": dataset_name,
+        "dataset_text_field": dataset_text_field,
+        "prompt_template": prompt_template,
+        "custom_prompt_format": custom_prompt_format if prompt_template == "custom" else None,
+        "lora_r": lora_r,
+        "lora_alpha": lora_alpha,
+        "lora_dropout": lora_dropout,
+        "learning_rate": learning_rate,
+        "num_epochs": num_epochs,
+        "target_modules": target_modules,
+        "output_dir": output_dir,
+        "push_to_hub": push_to_hub,
+        "hub_model_id": hub_model_id,
+    }
+    config_json_str = json.dumps(config_data, indent=2)
+    st.download_button(
+        label="💾 Export LoRA Config JSON",
+        data=config_json_str,
+        file_name="lora_config.json",
+        mime="application/json"
+    )
 
     cmd = [
         "python3", "train_lora.py",
