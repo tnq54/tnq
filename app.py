@@ -345,6 +345,7 @@ with tab3:
 
         dataset_text_field = st.text_input("Dataset Text Field Column", value="text")
         output_dir = st.text_input("Output Directory", value="./lora_output")
+        use_4bit = st.checkbox("Enable 4-bit QLoRA Quantization", value=False, help="Uses bitsandbytes 4-bit NormalFloat quantization to reduce GPU VRAM requirements.")
 
     with col2:
         st.subheader("LoRA & Prompt Template Hyperparameters")
@@ -359,6 +360,8 @@ with tab3:
         lora_alpha = st.number_input("LoRA Alpha", min_value=1, max_value=512, value=32)
         lora_dropout = st.slider("LoRA Dropout", min_value=0.0, max_value=0.5, value=0.05, step=0.01)
         learning_rate = st.select_slider("Learning Rate", options=[1e-5, 5e-5, 1e-4, 2e-4, 5e-4, 1e-3], value=2e-4)
+        warmup_ratio = st.slider("Warmup Ratio", min_value=0.0, max_value=0.2, value=0.03, step=0.01)
+        max_seq_length = st.number_input("Max Sequence Length", min_value=128, max_value=4096, value=512)
         num_epochs = st.number_input("Epochs", min_value=1, max_value=50, value=1)
         target_modules = st.text_input("Target Modules", value="q_proj,v_proj,k_proj,o_proj")
 
@@ -374,10 +377,13 @@ with tab3:
         "dataset_text_field": dataset_text_field,
         "prompt_template": prompt_template,
         "custom_prompt_format": custom_prompt_format if prompt_template == "custom" else None,
+        "use_4bit": use_4bit,
         "lora_r": lora_r,
         "lora_alpha": lora_alpha,
         "lora_dropout": lora_dropout,
         "learning_rate": learning_rate,
+        "warmup_ratio": warmup_ratio,
+        "max_seq_length": max_seq_length,
         "num_epochs": num_epochs,
         "target_modules": target_modules,
         "output_dir": output_dir,
@@ -403,9 +409,14 @@ with tab3:
         f"--lora_dropout={lora_dropout}",
         f"--target_modules={target_modules}",
         f"--learning_rate={learning_rate}",
+        f"--warmup_ratio={warmup_ratio}",
+        f"--max_seq_length={max_seq_length}",
         f"--num_epochs={num_epochs}",
         f"--output_dir={output_dir}"
     ]
+
+    if use_4bit:
+        cmd.append("--use_4bit")
 
     if prompt_template == "custom":
         cmd.append(f"--custom_prompt_format={custom_prompt_format}")

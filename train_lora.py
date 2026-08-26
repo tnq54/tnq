@@ -22,6 +22,9 @@ def parse_args():
     parser.add_argument("--lora_dropout", type=float, default=0.05, help="LoRA dropout rate")
     parser.add_argument("--target_modules", type=str, default="q_proj,v_proj,k_proj,o_proj", help="Comma-separated target modules")
     parser.add_argument("--learning_rate", type=float, default=2e-4, help="Learning rate")
+    parser.add_argument("--warmup_ratio", type=float, default=0.03, help="Warmup ratio")
+    parser.add_argument("--max_seq_length", type=int, default=512, help="Max sequence length")
+    parser.add_argument("--use_4bit", action="store_true", help="Enable 4-bit QLoRA quantization")
     parser.add_argument("--num_epochs", type=int, default=1, help="Number of training epochs")
     parser.add_argument("--per_device_train_batch_size", type=int, default=2, help="Batch size per device")
     parser.add_argument("--gradient_accumulation_steps", type=int, default=4, help="Gradient accumulation steps")
@@ -75,6 +78,20 @@ def main():
         logger.info("Please ensure peft, transformers, datasets, accelerate, and trl are installed.")
         sys.exit(1)
 
+    quantization_config = None
+    if args.use_4bit:
+        try:
+            from transformers import BitsAndBytesConfig
+            quantization_config = BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_quant_type="nf4",
+                bnb_4bit_compute_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+                bnb_4bit_use_double_quant=True,
+            )
+            logger.info("4-bit QLoRA Quantization enabled.")
+        except ImportError:
+            logger.warning("bitsandbytes not installed; continuing without 4-bit quantization.")
+
     target_modules = [m.strip() for m in args.target_modules.split(",") if m.strip()]
 
     logger.info(f"Loading dataset: {args.dataset_name}")
@@ -114,6 +131,7 @@ def main():
         per_device_train_batch_size=args.per_device_train_batch_size,
         gradient_accumulation_steps=args.gradient_accumulation_steps,
         learning_rate=args.learning_rate,
+        warmup_ratio=args.warmup_ratio,
         num_train_epochs=args.num_epochs,
         logging_steps=10,
         save_strategy="epoch",
@@ -123,10 +141,16 @@ def main():
     )
 
     logger.info(f"Loading base model: {args.base_model}")
+    model_kwargs = {
+        "trust_remote_code": True,
+        "device_map": "auto" if torch.cuda.is_available() else None,
+    }
+    if quantization_config is not None:
+        model_kwargs["quantization_config"] = quantization_config
+
     model = AutoModelForCausalLM.from_pretrained(
         args.base_model,
-        trust_remote_code=True,
-        device_map="auto" if torch.cuda.is_available() else None,
+        **model_kwargs
     )
 
     trainer = SFTTrainer(
@@ -134,7 +158,7 @@ def main():
         train_dataset=dataset,
         peft_config=peft_config,
         dataset_text_field=args.dataset_text_field,
-        max_seq_length=512,
+        max_seq_length=args.max_seq_length,
         tokenizer=tokenizer,
         args=training_args,
     )
