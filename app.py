@@ -324,6 +324,7 @@ with tab3:
             "tatsu-lab/alpaca",
             "databricks/databricks-dolly-15k",
             "yahma/alpaca-cleaned",
+            "sample_dataset.json",
             "Custom / Upload Dataset File..."
         ]
         selected_dataset_preset = st.selectbox("Dataset Preset / Source", options=dataset_presets, index=0)
@@ -346,6 +347,7 @@ with tab3:
         dataset_text_field = st.text_input("Dataset Text Field Column", value="text")
         output_dir = st.text_input("Output Directory", value="./lora_output")
         use_4bit = st.checkbox("Enable 4-bit QLoRA Quantization", value=False, help="Uses bitsandbytes 4-bit NormalFloat quantization to reduce GPU VRAM requirements.")
+        use_safetensors = st.checkbox("Use SafeTensors Format (.safetensors)", value=True, help="Saves model weights in safe, fast .safetensors format instead of PyTorch .bin pickles.")
 
     with col2:
         st.subheader("LoRA & Prompt Template Hyperparameters")
@@ -378,6 +380,7 @@ with tab3:
         "prompt_template": prompt_template,
         "custom_prompt_format": custom_prompt_format if prompt_template == "custom" else None,
         "use_4bit": use_4bit,
+        "use_safetensors": use_safetensors,
         "lora_r": lora_r,
         "lora_alpha": lora_alpha,
         "lora_dropout": lora_dropout,
@@ -417,6 +420,9 @@ with tab3:
 
     if use_4bit:
         cmd.append("--use_4bit")
+
+    if use_safetensors:
+        cmd.append("--use_safetensors")
 
     if prompt_template == "custom":
         cmd.append(f"--custom_prompt_format={custom_prompt_format}")

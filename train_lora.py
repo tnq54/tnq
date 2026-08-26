@@ -25,6 +25,7 @@ def parse_args():
     parser.add_argument("--warmup_ratio", type=float, default=0.03, help="Warmup ratio")
     parser.add_argument("--max_seq_length", type=int, default=512, help="Max sequence length")
     parser.add_argument("--use_4bit", action="store_true", help="Enable 4-bit QLoRA quantization")
+    parser.add_argument("--use_safetensors", action="store_true", default=True, help="Use safetensors format for loading and saving model weights")
     parser.add_argument("--num_epochs", type=int, default=1, help="Number of training epochs")
     parser.add_argument("--per_device_train_batch_size", type=int, default=2, help="Batch size per device")
     parser.add_argument("--gradient_accumulation_steps", type=int, default=4, help="Gradient accumulation steps")
@@ -144,6 +145,7 @@ def main():
     model_kwargs = {
         "trust_remote_code": True,
         "device_map": "auto" if torch.cuda.is_available() else None,
+        "use_safetensors": args.use_safetensors,
     }
     if quantization_config is not None:
         model_kwargs["quantization_config"] = quantization_config
@@ -166,13 +168,13 @@ def main():
     logger.info("Starting training...")
     trainer.train()
 
-    logger.info(f"Saving LoRA adapter to {args.output_dir}")
-    trainer.model.save_pretrained(args.output_dir)
+    logger.info(f"Saving LoRA adapter to {args.output_dir} (safe_serialization={args.use_safetensors})")
+    trainer.model.save_pretrained(args.output_dir, safe_serialization=args.use_safetensors)
     tokenizer.save_pretrained(args.output_dir)
 
     if args.push_to_hub and args.hub_model_id:
         logger.info(f"Pushing adapter to HF Hub: {args.hub_model_id}")
-        trainer.model.push_to_hub(args.hub_model_id)
+        trainer.model.push_to_hub(args.hub_model_id, safe_serialization=args.use_safetensors)
         tokenizer.push_to_hub(args.hub_model_id)
 
     logger.info("LoRA training complete!")
