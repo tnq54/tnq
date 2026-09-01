@@ -393,8 +393,24 @@ with tab3:
         learning_rate = st.select_slider("Learning Rate", options=[1e-5, 5e-5, 1e-4, 2e-4, 5e-4, 1e-3], value=2e-4)
         warmup_ratio = st.slider("Warmup Ratio", min_value=0.0, max_value=0.2, value=0.03, step=0.01)
         max_seq_length = st.number_input("Max Sequence Length", min_value=128, max_value=4096, value=512)
-        num_epochs = st.number_input("Epochs", min_value=1, max_value=50, value=1)
+        num_epochs = st.number_input("Epochs (Vòng Lặp Luyện Tập)", min_value=1, max_value=100, value=20)
         target_modules = st.text_input("Target Modules", value="q_proj,v_proj,k_proj,o_proj,gate_proj,up_proj,down_proj")
+
+    with st.expander("⚙️ Advanced Config (Thông Số Đào Tạo & Cấu Hình Tập Dữ Liệu)", expanded=True):
+        col_adv1, col_adv2 = st.columns(2)
+        with col_adv1:
+            st.markdown("### Thông Số Đào Tạo")
+            repeat_val = st.slider("Repeat / Số Lượng Trên Mỗi Hình", min_value=1, max_value=50, value=4)
+            per_device_batch_size = st.number_input("Batch size / Kích Thước Batch", min_value=1, max_value=64, value=1)
+            mixed_precision = st.selectbox("Mixed precision / Độ Chính Xác Huấn Luyện Kết Hợp", options=["bf16", "fp16", "no"], index=0)
+            gradient_checkpointing = st.toggle("Gradient Checkpointing / Bật điểm kiểm tra gradient", value=True)
+
+        with col_adv2:
+            st.markdown("### Tham số cấu hình tập dữ liệu")
+            enable_bucket = st.toggle("Enable Bucket / Bật phân nhóm ARB", value=True, help="Khuyến nghị cao cho việc huấn luyện dữ liệu với nhiều tỷ lệ khung hình")
+            bucket_reso_steps = st.selectbox("Bucket Reso Steps / Bước phân giải nhóm ARB", options=[32, 64, 128], index=1)
+            min_bucket_reso = st.number_input("Min Bucket Reso / Độ phân giải tối thiểu nhóm ARB", min_value=64, max_value=1024, value=256, step=64)
+            max_bucket_reso = st.number_input("Max Bucket Reso / Độ phân giải tối đa nhóm ARB", min_value=256, max_value=4096, value=1024, step=64)
 
     st.subheader("Push to Hugging Face Hub (Optional)")
     push_to_hub = st.checkbox("Push trained adapter to HF Hub")
@@ -417,6 +433,14 @@ with tab3:
         "warmup_ratio": warmup_ratio,
         "max_seq_length": max_seq_length,
         "num_epochs": num_epochs,
+        "per_device_train_batch_size": per_device_batch_size,
+        "repeat": repeat_val,
+        "mixed_precision": mixed_precision,
+        "gradient_checkpointing": gradient_checkpointing,
+        "enable_bucket": enable_bucket,
+        "bucket_reso_steps": bucket_reso_steps,
+        "min_bucket_reso": min_bucket_reso,
+        "max_bucket_reso": max_bucket_reso,
         "target_modules": target_modules,
         "output_dir": output_dir,
         "push_to_hub": push_to_hub,
@@ -444,6 +468,12 @@ with tab3:
         f"--warmup_ratio={warmup_ratio}",
         f"--max_seq_length={max_seq_length}",
         f"--num_epochs={num_epochs}",
+        f"--per_device_train_batch_size={per_device_batch_size}",
+        f"--repeat={repeat_val}",
+        f"--mixed_precision={mixed_precision}",
+        f"--bucket_reso_steps={bucket_reso_steps}",
+        f"--min_bucket_reso={min_bucket_reso}",
+        f"--max_bucket_reso={max_bucket_reso}",
         f"--output_dir={output_dir}"
     ]
 
@@ -452,6 +482,12 @@ with tab3:
 
     if use_safetensors:
         cmd.append("--use_safetensors")
+
+    if gradient_checkpointing:
+        cmd.append("--gradient_checkpointing")
+
+    if enable_bucket:
+        cmd.append("--enable_bucket")
 
     if prompt_template == "custom":
         cmd.append(f"--custom_prompt_format={custom_prompt_format}")

@@ -29,6 +29,13 @@ def parse_args():
     parser.add_argument("--num_epochs", type=int, default=1, help="Number of training epochs")
     parser.add_argument("--per_device_train_batch_size", type=int, default=2, help="Batch size per device")
     parser.add_argument("--gradient_accumulation_steps", type=int, default=4, help="Gradient accumulation steps")
+    parser.add_argument("--repeat", type=int, default=4, help="Number of repeats per image/sample")
+    parser.add_argument("--mixed_precision", type=str, default="bf16", choices=["bf16", "fp16", "no"], help="Mixed precision mode")
+    parser.add_argument("--gradient_checkpointing", action="store_true", default=True, help="Enable gradient checkpointing")
+    parser.add_argument("--enable_bucket", action="store_true", default=True, help="Enable Aspect Ratio Bucketing (ARB)")
+    parser.add_argument("--bucket_reso_steps", type=int, default=64, help="Bucket resolution step size")
+    parser.add_argument("--min_bucket_reso", type=int, default=256, help="Minimum bucket resolution")
+    parser.add_argument("--max_bucket_reso", type=int, default=1024, help="Maximum bucket resolution")
     parser.add_argument("--output_dir", type=str, default="./lora_output", help="Output directory for saved adapters")
     parser.add_argument("--push_to_hub", action="store_true", help="Whether to push trained adapter to HF Hub")
     parser.add_argument("--hub_model_id", type=str, default=None, help="Target HF Hub repository ID")
@@ -86,7 +93,7 @@ def main():
             quantization_config = BitsAndBytesConfig(
                 load_in_4bit=True,
                 bnb_4bit_quant_type="nf4",
-                bnb_4bit_compute_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+                bnb_4bit_compute_dtype=torch.bfloat16 if (torch.cuda.is_available() and torch.cuda.is_bf16_supported()) else (torch.float16 if torch.cuda.is_available() else torch.float32),
                 bnb_4bit_use_double_quant=True,
             )
             logger.info("4-bit QLoRA Quantization enabled.")
@@ -106,6 +113,11 @@ def main():
             dataset = load_dataset("text", data_files=args.dataset_name, split="train")
     else:
         dataset = load_dataset(args.dataset_name, split="train")
+
+    if args.repeat > 1:
+        logger.info(f"Duplicating dataset {args.repeat} times according to repeat count.")
+        from datasets import concatenate_datasets
+        dataset = concatenate_datasets([dataset] * args.repeat)
 
     if args.prompt_template != "none":
         logger.info(f"Applying prompt template: {args.prompt_template}")
@@ -127,6 +139,9 @@ def main():
         task_type=TaskType.CAUSAL_LM,
     )
 
+    bf16_enabled = (args.mixed_precision == "bf16") and torch.cuda.is_available() and torch.cuda.is_bf16_supported()
+    fp16_enabled = (args.mixed_precision == "fp16") and torch.cuda.is_available()
+
     training_args = TrainingArguments(
         output_dir=args.output_dir,
         per_device_train_batch_size=args.per_device_train_batch_size,
@@ -136,9 +151,11 @@ def main():
         num_train_epochs=args.num_epochs,
         logging_steps=10,
         save_strategy="epoch",
+        gradient_checkpointing=args.gradient_checkpointing,
         push_to_hub=args.push_to_hub,
         hub_model_id=args.hub_model_id,
-        fp16=torch.cuda.is_available(),
+        bf16=bf16_enabled,
+        fp16=fp16_enabled,
     )
 
     logger.info(f"Loading base model: {args.base_model}")
