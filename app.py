@@ -295,8 +295,34 @@ with tab2:
                 file_bytes = uploaded_photo.getvalue()
                 mime_type = uploaded_photo.type or "image/jpeg"
                 res = analyze_photo_with_gemini(file_bytes, mime_type=mime_type, prompt=prompt_text)
+                st.session_state["last_photo_analysis"] = {
+                    "prompt": prompt_text,
+                    "analysis": res
+                }
                 st.subheader("Analysis Result")
                 st.write(res)
+
+    if "last_photo_analysis" in st.session_state:
+        st.subheader("LoRA Training Dataset Export")
+        if st.button("➕ Append Photo Analysis to sample_dataset.json"):
+            sample_file = "sample_dataset.json"
+            data = []
+            if os.path.exists(sample_file):
+                try:
+                    with open(sample_file, "r") as f:
+                        data = json.load(f)
+                except Exception:
+                    data = []
+            new_entry = {
+                "instruction": st.session_state["last_photo_analysis"]["prompt"],
+                "input": "",
+                "output": st.session_state["last_photo_analysis"]["analysis"],
+                "text": f"Below is an instruction that describes a task. Write a response that appropriately completes the request.\n\n### Instruction:\n{st.session_state['last_photo_analysis']['prompt']}\n\n### Response:\n{st.session_state['last_photo_analysis']['analysis']}"
+            }
+            data.append(new_entry)
+            with open(sample_file, "w") as f:
+                json.dump(data, f, indent=2)
+            st.success("Successfully appended photo analysis as a new training entry in sample_dataset.json!")
 
 with tab3:
     st.header("LoRA Fine-Tuning Studio")
@@ -311,6 +337,9 @@ with tab3:
             "mistralai/Mistral-7B-Instruct-v0.2",
             "Qwen/Qwen2.5-7B-Instruct",
             "google/gemma-2-9b-it",
+            "meta-llama/Llama-3.2-11B-Vision-Instruct",
+            "Qwen/Qwen2-VL-7B-Instruct",
+            "llava-hf/llava-1.5-7b-hf",
             "Custom..."
         ]
         selected_model_preset = st.selectbox("Base Model Preset", options=model_presets, index=0)
@@ -365,7 +394,7 @@ with tab3:
         warmup_ratio = st.slider("Warmup Ratio", min_value=0.0, max_value=0.2, value=0.03, step=0.01)
         max_seq_length = st.number_input("Max Sequence Length", min_value=128, max_value=4096, value=512)
         num_epochs = st.number_input("Epochs", min_value=1, max_value=50, value=1)
-        target_modules = st.text_input("Target Modules", value="q_proj,v_proj,k_proj,o_proj")
+        target_modules = st.text_input("Target Modules", value="q_proj,v_proj,k_proj,o_proj,gate_proj,up_proj,down_proj")
 
     st.subheader("Push to Hugging Face Hub (Optional)")
     push_to_hub = st.checkbox("Push trained adapter to HF Hub")

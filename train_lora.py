@@ -20,7 +20,7 @@ def parse_args():
     parser.add_argument("--lora_r", type=int, default=16, help="LoRA rank")
     parser.add_argument("--lora_alpha", type=int, default=32, help="LoRA alpha scaling factor")
     parser.add_argument("--lora_dropout", type=float, default=0.05, help="LoRA dropout rate")
-    parser.add_argument("--target_modules", type=str, default="q_proj,v_proj,k_proj,o_proj", help="Comma-separated target modules")
+    parser.add_argument("--target_modules", type=str, default="q_proj,v_proj,k_proj,o_proj,gate_proj,up_proj,down_proj", help="Comma-separated target modules")
     parser.add_argument("--learning_rate", type=float, default=2e-4, help="Learning rate")
     parser.add_argument("--warmup_ratio", type=float, default=0.03, help="Warmup ratio")
     parser.add_argument("--max_seq_length", type=int, default=512, help="Max sequence length")
