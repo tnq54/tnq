@@ -387,26 +387,34 @@ with tab3:
         if prompt_template == "custom":
             custom_prompt_format = st.text_area("Custom Prompt Template String", value=custom_prompt_format)
 
-        lora_r = st.number_input("LoRA Rank (r)", min_value=1, max_value=256, value=16)
+        lora_r = st.number_input("LoRA Rank (Network Dim)", min_value=1, max_value=256, value=16)
         lora_alpha = st.number_input("LoRA Alpha", min_value=1, max_value=512, value=32)
+        conv_dim = st.number_input("Conv LoRA Dim (Conv Rank)", min_value=1, max_value=256, value=16)
+        conv_alpha = st.number_input("Conv LoRA Alpha", min_value=1, max_value=512, value=16)
         lora_dropout = st.slider("LoRA Dropout", min_value=0.0, max_value=0.5, value=0.05, step=0.01)
-        learning_rate = st.select_slider("Learning Rate", options=[1e-5, 5e-5, 1e-4, 2e-4, 5e-4, 1e-3], value=2e-4)
+        learning_rate = st.select_slider("Learning Rate (Overall)", options=[1e-5, 5e-5, 1e-4, 2e-4, 5e-4, 1e-3], value=2e-4)
         warmup_ratio = st.slider("Warmup Ratio", min_value=0.0, max_value=0.2, value=0.03, step=0.01)
         max_seq_length = st.number_input("Max Sequence Length", min_value=128, max_value=4096, value=512)
         num_epochs = st.number_input("Epochs (Vòng Lặp Luyện Tập)", min_value=1, max_value=100, value=20)
         target_modules = st.text_input("Target Modules", value="q_proj,v_proj,k_proj,o_proj,gate_proj,up_proj,down_proj")
 
-    with st.expander("⚙️ Advanced Config (Thông Số Đào Tạo & Cấu Hình Tập Dữ Liệu)", expanded=True):
+    with st.expander("⚙️ Advanced Config (Thông Số Đào Tạo, Mạng & Tối Ưu Hóa)", expanded=True):
         col_adv1, col_adv2 = st.columns(2)
         with col_adv1:
-            st.markdown("### Thông Số Đào Tạo")
+            st.markdown("### Tốc Độ Học & Tối Ưu Hóa")
+            unet_lr = st.number_input("UNet Learning Rate (0 = default)", min_value=0.0, max_value=1e-2, value=0.0, format="%.5f")
+            text_encoder_lr = st.number_input("Text Encoder Learning Rate (0 = default)", min_value=0.0, max_value=1e-2, value=0.0, format="%.5f")
+            min_snr_gamma = st.slider("Min SNR Gamma (Tỷ Lệ Tín Hiệu-Nhiễu Tối Thiểu)", min_value=0.0, max_value=20.0, value=0.0, step=0.5)
+            save_every_n_epochs = st.number_input("Save Every N Epochs (Lưu theo N Vòng)", min_value=1, max_value=50, value=1)
             repeat_val = st.slider("Repeat / Số Lượng Trên Mỗi Hình", min_value=1, max_value=50, value=4)
             per_device_batch_size = st.number_input("Batch size / Kích Thước Batch", min_value=1, max_value=64, value=1)
             mixed_precision = st.selectbox("Mixed precision / Độ Chính Xác Huấn Luyện Kết Hợp", options=["bf16", "fp16", "no"], index=0)
             gradient_checkpointing = st.toggle("Gradient Checkpointing / Bật điểm kiểm tra gradient", value=True)
 
         with col_adv2:
-            st.markdown("### Tham số cấu hình tập dữ liệu")
+            st.markdown("### Tham số cấu hình tập dữ liệu & Thư Mục")
+            caption_extension = st.text_input("Caption Extension", value=".txt")
+            config_save_dir = st.text_input("Config Save Directory", value="./configs")
             enable_bucket = st.toggle("Enable Bucket / Bật phân nhóm ARB", value=True, help="Khuyến nghị cao cho việc huấn luyện dữ liệu với nhiều tỷ lệ khung hình")
             bucket_reso_steps = st.selectbox("Bucket Reso Steps / Bước phân giải nhóm ARB", options=[32, 64, 128], index=1)
             min_bucket_reso = st.number_input("Min Bucket Reso / Độ phân giải tối thiểu nhóm ARB", min_value=64, max_value=1024, value=256, step=64)
@@ -428,9 +436,17 @@ with tab3:
         "use_safetensors": use_safetensors,
         "lora_r": lora_r,
         "lora_alpha": lora_alpha,
+        "conv_dim": conv_dim,
+        "conv_alpha": conv_alpha,
         "lora_dropout": lora_dropout,
         "learning_rate": learning_rate,
+        "unet_lr": unet_lr if unet_lr > 0 else None,
+        "text_encoder_lr": text_encoder_lr if text_encoder_lr > 0 else None,
         "warmup_ratio": warmup_ratio,
+        "min_snr_gamma": min_snr_gamma,
+        "save_every_n_epochs": save_every_n_epochs,
+        "caption_extension": caption_extension,
+        "config_save_dir": config_save_dir,
         "max_seq_length": max_seq_length,
         "num_epochs": num_epochs,
         "per_device_train_batch_size": per_device_batch_size,
@@ -462,10 +478,15 @@ with tab3:
         f"--prompt_template={prompt_template}",
         f"--lora_r={lora_r}",
         f"--lora_alpha={lora_alpha}",
+        f"--conv_dim={conv_dim}",
+        f"--conv_alpha={conv_alpha}",
         f"--lora_dropout={lora_dropout}",
         f"--target_modules={target_modules}",
         f"--learning_rate={learning_rate}",
         f"--warmup_ratio={warmup_ratio}",
+        f"--min_snr_gamma={min_snr_gamma}",
+        f"--save_every_n_epochs={save_every_n_epochs}",
+        f"--caption_extension={caption_extension}",
         f"--max_seq_length={max_seq_length}",
         f"--num_epochs={num_epochs}",
         f"--per_device_train_batch_size={per_device_batch_size}",
@@ -474,8 +495,15 @@ with tab3:
         f"--bucket_reso_steps={bucket_reso_steps}",
         f"--min_bucket_reso={min_bucket_reso}",
         f"--max_bucket_reso={max_bucket_reso}",
-        f"--output_dir={output_dir}"
+        f"--output_dir={output_dir}",
+        f"--config_save_dir={config_save_dir}"
     ]
+
+    if unet_lr > 0:
+        cmd.append(f"--unet_lr={unet_lr}")
+
+    if text_encoder_lr > 0:
+        cmd.append(f"--text_encoder_lr={text_encoder_lr}")
 
     if use_4bit:
         cmd.append("--use_4bit")
