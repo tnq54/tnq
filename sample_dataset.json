@@ -1,0 +1,20 @@
+[
+  {
+    "instruction": "Explain the concept of LoRA (Low-Rank Adaptation) in fine-tuning large language models.",
+    "input": "",
+    "output": "LoRA (Low-Rank Adaptation) is an efficient fine-tuning technique that freezes pre-trained model weights and injects trainable rank decomposition matrices into each layer of the Transformer architecture, significantly reducing trainable parameters and VRAM requirements.",
+    "text": "Below is an instruction that describes a task. Write a response that appropriately completes the request.\n\n### Instruction:\nExplain the concept of LoRA (Low-Rank Adaptation) in fine-tuning large language models.\n\n### Response:\nLoRA (Low-Rank Adaptation) is an efficient fine-tuning technique that freezes pre-trained model weights and injects trainable rank decomposition matrices into each layer of the Transformer architecture, significantly reducing trainable parameters and VRAM requirements."
+  },
+  {
+    "instruction": "Summarize the key benefits of QLoRA 4-bit quantization.",
+    "input": "",
+    "output": "QLoRA combines 4-bit NormalFloat (NF4) quantization with double quantization and paged optimizers, allowing 33B+ or 70B parameter models to be fine-tuned on a single consumer GPU without sacrificing accuracy.",
+    "text": "Below is an instruction that describes a task. Write a response that appropriately completes the request.\n\n### Instruction:\nSummarize the key benefits of QLoRA 4-bit quantization.\n\n### Response:\nQLoRA combines 4-bit NormalFloat (NF4) quantization with double quantization and paged optimizers, allowing 33B+ or 70B parameter models to be fine-tuned on a single consumer GPU without sacrificing accuracy."
+  },
+  {
+    "instruction": "What is the purpose of Hugging Face Spaces?",
+    "input": "",
+    "output": "Hugging Face Spaces provides an easy-to-use platform to host, demonstrate, and share machine learning Web applications powered by Streamlit, Gradio, or Docker containers.",
+    "text": "Below is an instruction that describes a task. Write a response that appropriately completes the request.\n\n### Instruction:\nWhat is the purpose of Hugging Face Spaces?\n\n### Response:\nHugging Face Spaces provides an easy-to-use platform to host, demonstrate, and share machine learning Web applications powered by Streamlit, Gradio, or Docker containers."
+  }
+]

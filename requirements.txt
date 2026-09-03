@@ -3,3 +3,9 @@ python-telegram-bot
 google-genai
 pypdf
 huggingface_hub
+peft
+transformers
+datasets
+accelerate
+trl
+torch

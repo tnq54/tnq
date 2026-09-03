@@ -1,33 +1,64 @@
-import streamlit as st
-import time
 import os
+import sys
+
+# Direct execution relaunch guard: if executed directly with python app.py, relaunch via streamlit run
+try:
+    import streamlit as st
+    if not st.runtime.exists():
+        os.execv(sys.executable, [sys.executable, "-m", "streamlit", "run", __file__] + sys.argv[1:])
+except Exception:
+    pass
+
+import time
 import threading
 import asyncio
 import io
 import logging
+import json
+import subprocess
 from pypdf import PdfReader
 from telegram import Update
 from telegram.error import NetworkError
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters
 from huggingface_hub import InferenceClient
 
-# Setup logging
+# Call set_page_config as the first Streamlit command
+st.set_page_config(page_title="VBot1 System & LoRA Studio", layout="wide")
+
+# Setup logging filter to suppress missing ScriptRunContext warnings
+class ScriptRunContextFilter(logging.Filter):
+    def filter(self, record):
+        msg = record.getMessage()
+        return "missing ScriptRunContext" not in msg and "Session state does not function" not in msg
+
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
 )
 logger = logging.getLogger(__name__)
 
+context_filter = ScriptRunContextFilter()
+logging.getLogger("streamlit").addFilter(context_filter)
+logging.getLogger("streamlit.runtime.scriptrunner_utils.script_run_context").addFilter(context_filter)
+
 # Try importing Google GenAI
 try:
     from google import genai
+    from google.genai import types
 except ImportError:
     genai = None
+    types = None
 
 # Load Environment Variables
 HF_TOKEN = os.environ.get("HF_TOKEN")
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
+
+# Module-level persistent configuration dictionary
+if "CONFIG" not in globals():
+    CONFIG = {
+        "active_chat_model": os.environ.get("ACTIVE_CHAT_MODEL", "meta-llama/Meta-Llama-3-8B-Instruct")
+    }
 
 # Initialize HF Client
 if HF_TOKEN:
@@ -60,7 +91,6 @@ def summarize_with_gemini(text):
 
     try:
         client = genai.Client(api_key=GOOGLE_API_KEY)
-        # Using gemini-1.5-flash as requested (closest valid model to 2.5)
         response = client.models.generate_content(
             model='gemini-1.5-flash',
             contents=f"Summarize this document:\n\n{text[:30000]}"
@@ -70,33 +100,58 @@ def summarize_with_gemini(text):
         logger.error(f"Gemini Error: {e}")
         return f"Error summarizing: {e}"
 
+# Gemini Photo/Image Analysis
+def analyze_photo_with_gemini(image_bytes, mime_type="image/jpeg", prompt="Describe this image in detail and highlight key features."):
+    if not GOOGLE_API_KEY:
+        return "Error: GOOGLE_API_KEY not found."
+    if not genai:
+        return "Error: google-genai library not installed."
+
+    try:
+        client = genai.Client(api_key=GOOGLE_API_KEY)
+        if types and hasattr(types, "Part"):
+            part = types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
+            contents = [prompt, part]
+        else:
+            contents = [prompt, {"mime_type": mime_type, "data": image_bytes}]
+
+        response = client.models.generate_content(
+            model='gemini-1.5-flash',
+            contents=contents
+        )
+        return response.text
+    except Exception as e:
+        logger.error(f"Gemini Photo Error: {e}")
+        return f"Error analyzing photo: {e}"
+
 # Telegram Bot Handlers
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "Welcome to VBot1!\n"
-        "- Chat with me (Llama 3).\n"
-        "- Send a PDF to summarize (Gemini 1.5 Flash)."
+        "- Chat with me (Llama 3 / Custom LoRA Model).\n"
+        "- Send a PDF to summarize (Gemini 1.5 Flash).\n"
+        "- Send a Photo to analyze (Gemini 1.5 Flash)."
     )
 
 async def chat_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_text = update.message.text
     if not hf_client:
-        await update.message.reply_text("Llama 3 is not available (HF_TOKEN missing).")
+        await update.message.reply_text("Inference model is not available (HF_TOKEN missing).")
         return
 
     status_msg = await update.message.reply_text("Thinking...")
     try:
         messages = [{"role": "user", "content": user_text}]
-        # Llama 3 via HF Inference API
+        model_to_use = CONFIG["active_chat_model"]
         completion = hf_client.chat_completion(
-            model="meta-llama/Meta-Llama-3-8B-Instruct",
+            model=model_to_use,
             messages=messages,
             max_tokens=500
         )
         reply = completion.choices[0].message.content
         await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=status_msg.message_id, text=reply)
     except Exception as e:
-        logger.error(f"Llama 3 Error: {e}")
+        logger.error(f"Inference Model Error ({CONFIG['active_chat_model']}): {e}")
         await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=status_msg.message_id, text=f"Error: {e}")
 
 async def document_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -131,6 +186,30 @@ async def document_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"Document Error: {e}")
         await update.message.reply_text(f"Error processing document: {e}")
 
+async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message.photo:
+        return
+
+    status_msg = await update.message.reply_text("Downloading photo...")
+    try:
+        photo = update.message.photo[-1]
+        file = await context.bot.get_file(photo.file_id)
+        image_bytes = await file.download_as_bytearray()
+
+        await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=status_msg.message_id, text="Analyzing photo with Gemini 1.5 Flash...")
+        caption = update.message.caption or "Describe this image in detail and highlight key features."
+        analysis = analyze_photo_with_gemini(image_bytes, mime_type="image/jpeg", prompt=caption)
+
+        if len(analysis) > 4000:
+            for i in range(0, len(analysis), 4000):
+                await update.message.reply_text(analysis[i:i+4000])
+        else:
+            await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=status_msg.message_id, text=analysis)
+
+    except Exception as e:
+        logger.error(f"Photo Error: {e}")
+        await update.message.reply_text(f"Error processing photo: {e}")
+
 # Bot Runner
 def run_bot():
     # FIX: Network Error - Wait for network to be ready
@@ -155,6 +234,7 @@ def run_bot():
             application.add_handler(CommandHandler("start", start))
             application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat_handler))
             application.add_handler(MessageHandler(filters.Document.PDF, document_handler))
+            application.add_handler(MessageHandler(filters.PHOTO, photo_handler))
 
             # FIX: System Error - Invalid file descriptor
             application.run_polling(stop_signals=None, close_loop=False)
@@ -177,8 +257,296 @@ if "bot_thread" not in st.session_state:
     thread.start()
 
 # Streamlit UI
-st.title("VBot1 System Rebuilt")
-st.write("Status: Bot is running in background.")
-st.write("Config:")
-st.write(f"- Llama 3: {'Active' if hf_client else 'Inactive'}")
-st.write(f"- Gemini 1.5 Flash: {'Active' if GOOGLE_API_KEY else 'Inactive'}")
+st.title("VBot1 System & LoRA Fine-Tuning Studio")
+
+tab1, tab2, tab3 = st.tabs(["🤖 Bot Dashboard", "🖼️ Photo Analysis", "🎛️ LoRA Training Studio"])
+
+with tab1:
+    st.header("Bot Operations & Model Selection")
+    st.write("Status: Bot is running in background thread.")
+
+    st.subheader("Active Inference Model Configuration")
+    chat_model_input = st.text_input(
+        "Active Model / LoRA Adapter ID for Chat",
+        value=CONFIG["active_chat_model"],
+        help="Specify the base model or fine-tuned LoRA adapter repository on Hugging Face (e.g. meta-llama/Meta-Llama-3-8B-Instruct or username/my-lora-adapter)"
+    )
+    if chat_model_input != CONFIG["active_chat_model"]:
+        CONFIG["active_chat_model"] = chat_model_input
+        st.success(f"Active Chat Model set to: `{CONFIG['active_chat_model']}`")
+
+    st.subheader("System Status")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric(f"HF Inference Model ({CONFIG['active_chat_model'].split('/')[-1]})", "Active" if hf_client else "Inactive")
+    with col2:
+        st.metric("Gemini 1.5 Flash (Multimodal)", "Active" if GOOGLE_API_KEY else "Inactive")
+
+with tab2:
+    st.header("Photo & Image Analysis (Gemini 1.5 Flash)")
+    st.markdown("Upload photos or images to get detailed analysis and descriptions from Gemini 1.5 Flash.")
+    uploaded_photo = st.file_uploader("Upload an image file", type=["jpg", "jpeg", "png", "webp"])
+    prompt_text = st.text_input("Analysis Prompt", value="Describe this image in detail and highlight key features.")
+
+    if uploaded_photo is not None:
+        st.image(uploaded_photo, caption="Uploaded Image", use_container_width=True)
+        if st.button("🔍 Analyze Photo"):
+            with st.spinner("Analyzing photo with Gemini 1.5 Flash..."):
+                file_bytes = uploaded_photo.getvalue()
+                mime_type = uploaded_photo.type or "image/jpeg"
+                res = analyze_photo_with_gemini(file_bytes, mime_type=mime_type, prompt=prompt_text)
+                st.session_state["last_photo_analysis"] = {
+                    "prompt": prompt_text,
+                    "analysis": res
+                }
+                st.subheader("Analysis Result")
+                st.write(res)
+
+    if "last_photo_analysis" in st.session_state:
+        st.subheader("LoRA Training Dataset Export")
+        if st.button("➕ Append Photo Analysis to sample_dataset.json"):
+            sample_file = "sample_dataset.json"
+            data = []
+            if os.path.exists(sample_file):
+                try:
+                    with open(sample_file, "r") as f:
+                        data = json.load(f)
+                except Exception:
+                    data = []
+            new_entry = {
+                "instruction": st.session_state["last_photo_analysis"]["prompt"],
+                "input": "",
+                "output": st.session_state["last_photo_analysis"]["analysis"],
+                "text": f"Below is an instruction that describes a task. Write a response that appropriately completes the request.\n\n### Instruction:\n{st.session_state['last_photo_analysis']['prompt']}\n\n### Response:\n{st.session_state['last_photo_analysis']['analysis']}"
+            }
+            data.append(new_entry)
+            with open(sample_file, "w") as f:
+                json.dump(data, f, indent=2)
+            st.success("Successfully appended photo analysis as a new training entry in sample_dataset.json!")
+
+with tab3:
+    st.header("LoRA Fine-Tuning Studio")
+    st.markdown("Configure and trigger LoRA adapter training for Hugging Face LLMs.")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.subheader("Base Model & Dataset Setup")
+        model_presets = [
+            "meta-llama/Meta-Llama-3-8B-Instruct",
+            "mistralai/Mistral-7B-Instruct-v0.2",
+            "Qwen/Qwen2.5-7B-Instruct",
+            "google/gemma-2-9b-it",
+            "meta-llama/Llama-3.2-11B-Vision-Instruct",
+            "Qwen/Qwen2-VL-7B-Instruct",
+            "llava-hf/llava-1.5-7b-hf",
+            "Custom..."
+        ]
+        selected_model_preset = st.selectbox("Base Model Preset", options=model_presets, index=0)
+        if selected_model_preset == "Custom...":
+            base_model = st.text_input("Custom Base Model Path/ID", value="meta-llama/Meta-Llama-3-8B-Instruct")
+        else:
+            base_model = selected_model_preset
+
+        dataset_presets = [
+            "timdettmers/openassistant-guanaco",
+            "tatsu-lab/alpaca",
+            "databricks/databricks-dolly-15k",
+            "yahma/alpaca-cleaned",
+            "sample_dataset.json",
+            "Custom / Upload Dataset File..."
+        ]
+        selected_dataset_preset = st.selectbox("Dataset Preset / Source", options=dataset_presets, index=0)
+
+        custom_dataset_path = None
+        if selected_dataset_preset == "Custom / Upload Dataset File...":
+            uploaded_dataset_file = st.file_uploader("Upload Dataset (.json, .jsonl, .csv, .txt)", type=["json", "jsonl", "csv", "txt"])
+            if uploaded_dataset_file is not None:
+                save_dir = "./uploaded_datasets"
+                os.makedirs(save_dir, exist_ok=True)
+                file_path = os.path.join(save_dir, uploaded_dataset_file.name)
+                with open(file_path, "wb") as f:
+                    f.write(uploaded_dataset_file.getvalue())
+                custom_dataset_path = file_path
+                st.success(f"Uploaded dataset saved to: `{custom_dataset_path}`")
+            dataset_name = custom_dataset_path if custom_dataset_path else st.text_input("Custom Dataset Path / Hub ID", value="timdettmers/openassistant-guanaco")
+        else:
+            dataset_name = selected_dataset_preset
+
+        dataset_text_field = st.text_input("Dataset Text Field Column", value="text")
+        output_dir = st.text_input("Output Directory", value="./lora_output")
+        use_4bit = st.checkbox("Enable 4-bit QLoRA Quantization", value=False, help="Uses bitsandbytes 4-bit NormalFloat quantization to reduce GPU VRAM requirements.")
+        use_safetensors = st.checkbox("Use SafeTensors Format (.safetensors)", value=True, help="Saves model weights in safe, fast .safetensors format instead of PyTorch .bin pickles.")
+
+    with col2:
+        st.subheader("LoRA & Prompt Template Hyperparameters")
+        prompt_templates = ["none", "alpaca", "chatml", "llama3", "custom"]
+        prompt_template = st.selectbox("Prompt Template Format", options=prompt_templates, index=0, help="Formats dataset fields into prompt structures before training")
+
+        custom_prompt_format = "Instruction: {instruction}\nInput: {input}\nResponse: {output}"
+        if prompt_template == "custom":
+            custom_prompt_format = st.text_area("Custom Prompt Template String", value=custom_prompt_format)
+
+        lora_r = st.number_input("LoRA Rank (Network Dim)", min_value=1, max_value=256, value=16)
+        lora_alpha = st.number_input("LoRA Alpha", min_value=1, max_value=512, value=32)
+        conv_dim = st.number_input("Conv LoRA Dim (Conv Rank)", min_value=1, max_value=256, value=16)
+        conv_alpha = st.number_input("Conv LoRA Alpha", min_value=1, max_value=512, value=16)
+        lora_dropout = st.slider("LoRA Dropout", min_value=0.0, max_value=0.5, value=0.05, step=0.01)
+        learning_rate = st.select_slider("Learning Rate (Overall)", options=[1e-5, 5e-5, 1e-4, 2e-4, 5e-4, 1e-3], value=2e-4)
+        warmup_ratio = st.slider("Warmup Ratio", min_value=0.0, max_value=0.2, value=0.03, step=0.01)
+        max_seq_length = st.number_input("Max Sequence Length", min_value=128, max_value=4096, value=512)
+        num_epochs = st.number_input("Epochs (Vòng Lặp Luyện Tập)", min_value=1, max_value=100, value=20)
+        target_modules = st.text_input("Target Modules", value="q_proj,v_proj,k_proj,o_proj,gate_proj,up_proj,down_proj")
+
+    with st.expander("⚙️ Advanced Config (Thông Số Đào Tạo, Mạng & Tối Ưu Hóa)", expanded=True):
+        col_adv1, col_adv2 = st.columns(2)
+        with col_adv1:
+            st.markdown("### Tốc Độ Học & Tối Ưu Hóa")
+            unet_lr = st.number_input("UNet Learning Rate (0 = default)", min_value=0.0, max_value=1e-2, value=0.0, format="%.5f")
+            text_encoder_lr = st.number_input("Text Encoder Learning Rate (0 = default)", min_value=0.0, max_value=1e-2, value=0.0, format="%.5f")
+            min_snr_gamma = st.slider("Min SNR Gamma (Tỷ Lệ Tín Hiệu-Nhiễu Tối Thiểu)", min_value=0.0, max_value=20.0, value=0.0, step=0.5)
+            save_every_n_epochs = st.number_input("Save Every N Epochs (Lưu theo N Vòng)", min_value=1, max_value=50, value=1)
+            repeat_val = st.slider("Repeat / Số Lượng Trên Mỗi Hình", min_value=1, max_value=50, value=4)
+            per_device_batch_size = st.number_input("Batch size / Kích Thước Batch", min_value=1, max_value=64, value=1)
+            mixed_precision = st.selectbox("Mixed precision / Độ Chính Xác Huấn Luyện Kết Hợp", options=["bf16", "fp16", "no"], index=0)
+            gradient_checkpointing = st.toggle("Gradient Checkpointing / Bật điểm kiểm tra gradient", value=True)
+
+        with col_adv2:
+            st.markdown("### Tham số cấu hình tập dữ liệu & Thư Mục")
+            caption_extension = st.text_input("Caption Extension", value=".txt")
+            config_save_dir = st.text_input("Config Save Directory", value="./configs")
+            enable_bucket = st.toggle("Enable Bucket / Bật phân nhóm ARB", value=True, help="Khuyến nghị cao cho việc huấn luyện dữ liệu với nhiều tỷ lệ khung hình")
+            bucket_reso_steps = st.selectbox("Bucket Reso Steps / Bước phân giải nhóm ARB", options=[32, 64, 128], index=1)
+            min_bucket_reso = st.number_input("Min Bucket Reso / Độ phân giải tối thiểu nhóm ARB", min_value=64, max_value=1024, value=256, step=64)
+            max_bucket_reso = st.number_input("Max Bucket Reso / Độ phân giải tối đa nhóm ARB", min_value=256, max_value=4096, value=1024, step=64)
+
+    st.subheader("Push to Hugging Face Hub (Optional)")
+    push_to_hub = st.checkbox("Push trained adapter to HF Hub")
+    hub_model_id = st.text_input("HF Hub Repository ID (e.g. username/my-lora-adapter)", value="")
+
+    # Config Export / Import Options
+    st.subheader("LoRA Configuration Management")
+    config_data = {
+        "base_model": base_model,
+        "dataset_name": dataset_name,
+        "dataset_text_field": dataset_text_field,
+        "prompt_template": prompt_template,
+        "custom_prompt_format": custom_prompt_format if prompt_template == "custom" else None,
+        "use_4bit": use_4bit,
+        "use_safetensors": use_safetensors,
+        "lora_r": lora_r,
+        "lora_alpha": lora_alpha,
+        "conv_dim": conv_dim,
+        "conv_alpha": conv_alpha,
+        "lora_dropout": lora_dropout,
+        "learning_rate": learning_rate,
+        "unet_lr": unet_lr if unet_lr > 0 else None,
+        "text_encoder_lr": text_encoder_lr if text_encoder_lr > 0 else None,
+        "warmup_ratio": warmup_ratio,
+        "min_snr_gamma": min_snr_gamma,
+        "save_every_n_epochs": save_every_n_epochs,
+        "caption_extension": caption_extension,
+        "config_save_dir": config_save_dir,
+        "max_seq_length": max_seq_length,
+        "num_epochs": num_epochs,
+        "per_device_train_batch_size": per_device_batch_size,
+        "repeat": repeat_val,
+        "mixed_precision": mixed_precision,
+        "gradient_checkpointing": gradient_checkpointing,
+        "enable_bucket": enable_bucket,
+        "bucket_reso_steps": bucket_reso_steps,
+        "min_bucket_reso": min_bucket_reso,
+        "max_bucket_reso": max_bucket_reso,
+        "target_modules": target_modules,
+        "output_dir": output_dir,
+        "push_to_hub": push_to_hub,
+        "hub_model_id": hub_model_id,
+    }
+    config_json_str = json.dumps(config_data, indent=2)
+    st.download_button(
+        label="💾 Export LoRA Config JSON",
+        data=config_json_str,
+        file_name="lora_config.json",
+        mime="application/json"
+    )
+
+    cmd = [
+        "python3", "train_lora.py",
+        f"--base_model={base_model}",
+        f"--dataset_name={dataset_name}",
+        f"--dataset_text_field={dataset_text_field}",
+        f"--prompt_template={prompt_template}",
+        f"--lora_r={lora_r}",
+        f"--lora_alpha={lora_alpha}",
+        f"--conv_dim={conv_dim}",
+        f"--conv_alpha={conv_alpha}",
+        f"--lora_dropout={lora_dropout}",
+        f"--target_modules={target_modules}",
+        f"--learning_rate={learning_rate}",
+        f"--warmup_ratio={warmup_ratio}",
+        f"--min_snr_gamma={min_snr_gamma}",
+        f"--save_every_n_epochs={save_every_n_epochs}",
+        f"--caption_extension={caption_extension}",
+        f"--max_seq_length={max_seq_length}",
+        f"--num_epochs={num_epochs}",
+        f"--per_device_train_batch_size={per_device_batch_size}",
+        f"--repeat={repeat_val}",
+        f"--mixed_precision={mixed_precision}",
+        f"--bucket_reso_steps={bucket_reso_steps}",
+        f"--min_bucket_reso={min_bucket_reso}",
+        f"--max_bucket_reso={max_bucket_reso}",
+        f"--output_dir={output_dir}",
+        f"--config_save_dir={config_save_dir}"
+    ]
+
+    if unet_lr > 0:
+        cmd.append(f"--unet_lr={unet_lr}")
+
+    if text_encoder_lr > 0:
+        cmd.append(f"--text_encoder_lr={text_encoder_lr}")
+
+    if use_4bit:
+        cmd.append("--use_4bit")
+
+    if use_safetensors:
+        cmd.append("--use_safetensors")
+
+    if gradient_checkpointing:
+        cmd.append("--gradient_checkpointing")
+
+    if enable_bucket:
+        cmd.append("--enable_bucket")
+
+    if prompt_template == "custom":
+        cmd.append(f"--custom_prompt_format={custom_prompt_format}")
+
+    if push_to_hub and hub_model_id:
+        cmd.extend(["--push_to_hub", f"--hub_model_id={hub_model_id}"])
+
+    generated_command = " ".join(cmd)
+    st.subheader("Generated CLI Command")
+    st.code(generated_command, language="bash")
+
+    if st.button("🚀 Start LoRA Training"):
+        st.info("Starting LoRA training subprocess...")
+        log_area = st.empty()
+        try:
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1
+            )
+            logs = ""
+            for line in iter(process.stdout.readline, ''):
+                logs += line
+                log_area.code(logs[-2000:], language="text")
+            process.stdout.close()
+            return_code = process.wait()
+            if return_code == 0:
+                st.success("LoRA training finished successfully!")
+            else:
+                st.error(f"Training failed with return code {return_code}")
+        except Exception as e:
+            st.error(f"Error executing training: {e}")
