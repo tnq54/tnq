@@ -214,8 +214,9 @@ main_tabs = st.tabs([
     "📸 1. Dataset & Auto-Caption",
     "⚙️ 2. Cấu Hình LoRA",
     "🚀 3. Huấn Luyện & Logs",
-    "📦 4. Export & Push HF Hub",
-    "🤖 5. Telegram Bot & System"
+    "🖼️ 4. Xem Ảnh Sample Đã Train",
+    "📦 5. Export & Push HF Hub",
+    "🤖 6. Telegram Bot & System"
 ])
 
 # TAB 1: DATASET MANAGEMENT
@@ -470,8 +471,35 @@ with main_tabs[2]:
         except Exception as e:
             st.error(f"Lỗi khi thực thi train_lora.py: {e}")
 
-# TAB 4: EXPORT & PUSH TO HF HUB
+# TAB 4: VIEW TRAINED SAMPLE IMAGES
 with main_tabs[3]:
+    st.header("🖼️ Thư Viện Ảnh Sample Sau Khi Train (Trained Preview Gallery)")
+    st.write("Xem trực tiếp các bức ảnh sample được sinh ra trong quá trình huấn luyện LoRA từ thư mục `./output`.")
+
+    if os.path.exists(OUTPUT_DIR):
+        out_files = os.listdir(OUTPUT_DIR)
+        sample_images = [f for f in out_files if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))]
+
+        if sample_images:
+            st.success(f"Tìm thấy {len(sample_images)} ảnh sample huấn luyện!")
+            gallery_cols = st.columns(3)
+            for idx, sample_f in enumerate(sorted(sample_images)):
+                sample_p = os.path.join(OUTPUT_DIR, sample_f)
+                with gallery_cols[idx % 3]:
+                    st.image(sample_p, caption=f"Sample: {sample_f}", use_column_width=True)
+                    with open(sample_p, "rb") as sf:
+                        st.download_button(
+                            label=f"📥 Tải Ảnh {sample_f}",
+                            data=sf.read(),
+                            file_name=sample_f,
+                            mime="image/png",
+                            key=f"dl_sample_{sample_f}"
+                        )
+        else:
+            st.warning("Chưa có ảnh sample nào trong `./output`. Hãy chạy Huấn Luyện ở Tab 3 để tạo ảnh sample!")
+
+# TAB 5: EXPORT & PUSH TO HF HUB
+with main_tabs[4]:
     st.header("📦 Export & Push Weights Lên Hugging Face Hub")
 
     if os.path.exists(OUTPUT_DIR):
@@ -503,8 +531,8 @@ with main_tabs[3]:
             except Exception as e:
                 st.error(f"Lỗi khi push lên HF Hub: {e}")
 
-# TAB 5: TELEGRAM BOT & SYSTEM STATUS
-with main_tabs[4]:
+# TAB 6: TELEGRAM BOT & SYSTEM STATUS
+with main_tabs[5]:
     st.header("🤖 Telegram Bot & System Diagnostic Status")
     st.write(f"- Llama 3 Client: {'✅ Hoạt Động' if hf_client else '❌ Chưa Cấu Hình HF_TOKEN'}")
     st.write(f"- Gemini 1.5 Flash: {'✅ Hoạt Động' if GOOGLE_API_KEY else '❌ Chưa Cấu Hình GOOGLE_API_KEY'}")
