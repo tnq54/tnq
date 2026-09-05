@@ -257,7 +257,7 @@ with main_tabs[0]:
                     img_path = os.path.join(DATASET_DIR, img_f)
                     txt_path = os.path.join(DATASET_DIR, os.path.splitext(img_f)[0] + ".txt")
 
-                    st.image(img_path, use_container_width=True)
+                    st.image(img_path, use_column_width=True)
                     caption_val = ""
                     if os.path.exists(txt_path):
                         with open(txt_path, "r", encoding="utf-8") as f:
