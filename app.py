@@ -89,20 +89,28 @@ def summarize_with_gemini(text):
         logger.error(f"Gemini Error: {e}")
         return f"Error summarizing: {e}"
 
-def generate_image_caption_with_gemini(image_bytes):
+def generate_image_caption_with_gemini(image_bytes, trigger_word="", custom_prompt=""):
+    if not custom_prompt:
+        custom_prompt = "Provide a detailed 1-sentence prompt caption describing the subject, style, lighting, and background of this image for LoRA diffusion model training."
+
     if not GOOGLE_API_KEY or not genai:
-        return "a high quality detailed photo"
-    try:
-        client = genai.Client(api_key=GOOGLE_API_KEY)
-        img = Image.open(io.BytesIO(image_bytes))
-        response = client.models.generate_content(
-            model='gemini-1.5-flash',
-            contents=["Provide a detailed 1-sentence prompt caption describing the subject, style, lighting, and background of this image for LoRA diffusion model training.", img]
-        )
-        return response.text.strip()
-    except Exception as e:
-        logger.error(f"Gemini Image Captioning Error: {e}")
-        return "a high quality detailed photo"
+        caption = "a high quality detailed photo"
+    else:
+        try:
+            client = genai.Client(api_key=GOOGLE_API_KEY)
+            img = Image.open(io.BytesIO(image_bytes))
+            response = client.models.generate_content(
+                model='gemini-1.5-flash',
+                contents=[custom_prompt, img]
+            )
+            caption = response.text.strip()
+        except Exception as e:
+            logger.error(f"Gemini Image Captioning Error: {e}")
+            caption = "a high quality detailed photo"
+
+    if trigger_word and not caption.startswith(trigger_word):
+        caption = f"{trigger_word}, {caption}"
+    return caption
 
 # Telegram Bot Handlers
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -212,8 +220,18 @@ main_tabs = st.tabs([
 
 # TAB 1: DATASET MANAGEMENT
 with main_tabs[0]:
-    st.header("📸 Quản Lý Dataset Ảnh & Tự Động Tạo Caption")
-    st.write("Tải lên danh sách ảnh huấn luyện (`.png`, `.jpg`, `.jpeg`, `.webp`). Gemini 1.5 Flash sẽ hỗ trợ tạo caption tự động.")
+    st.header("📸 Quản Lý Dataset Ảnh & Tự Động Tạo Caption Prompt")
+    st.write("Tải lên ảnh huấn luyện (`.png`, `.jpg`, `.jpeg`, `.webp`). Tùy chỉnh Trigger Word (Từ Khóa Trigger) và Prompt để Gemini 1.5 tạo caption tự động.")
+
+    col_p1, col_p2 = st.columns(2)
+    with col_p1:
+        trigger_word = st.text_input("Từ khóa Trigger (Trigger Word / Prompt Prefix):", value="sks photo", help="Mẫu từ khóa sẽ tự động được chèn vào đầu mọi tệp caption ảnh (ví dụ: sks style, ohwx man)")
+    with col_p2:
+        custom_gemini_prompt = st.text_area(
+            "Prompt Hướng Dẫn Cho Gemini Auto-Caption:",
+            value="Provide a detailed 1-sentence prompt caption describing the subject, style, lighting, and background of this image for LoRA diffusion model training.",
+            height=68
+        )
 
     uploaded_files = st.file_uploader(
         "Chọn các tệp ảnh huấn luyện:",
@@ -222,7 +240,7 @@ with main_tabs[0]:
     )
 
     if uploaded_files:
-        if st.button("💾 Lưu Dataset & Tạo Captions", type="primary"):
+        if st.button("💾 Lưu Dataset & Tạo Captions Với Prompt", type="primary"):
             progress_bar = st.progress(0)
             for idx, file in enumerate(uploaded_files):
                 img_bytes = file.read()
@@ -234,7 +252,7 @@ with main_tabs[0]:
                 img.save(img_path)
 
                 # Generate Caption
-                caption = generate_image_caption_with_gemini(img_bytes)
+                caption = generate_image_caption_with_gemini(img_bytes, trigger_word=trigger_word, custom_prompt=custom_gemini_prompt)
                 cap_path = os.path.join(DATASET_DIR, f"{filename_base}.txt")
                 with open(cap_path, "w", encoding="utf-8") as f:
                     f.write(caption)
@@ -251,6 +269,20 @@ with main_tabs[0]:
         st.info(f"Tổng số ảnh trong dataset: {len(image_files)}")
 
         if image_files:
+            if st.button("⚡ Tự Động Thêm Trigger Word Vào Tất Cả Caption Hiện Có"):
+                count_updated = 0
+                for img_f in image_files:
+                    txt_path = os.path.join(DATASET_DIR, os.path.splitext(img_f)[0] + ".txt")
+                    if os.path.exists(txt_path):
+                        with open(txt_path, "r", encoding="utf-8") as f:
+                            content = f.read().strip()
+                        if trigger_word and not content.startswith(trigger_word):
+                            content = f"{trigger_word}, {content}"
+                            with open(txt_path, "w", encoding="utf-8") as f:
+                                f.write(content)
+                            count_updated += 1
+                st.success(f"Đã cập nhật Trigger Word '{trigger_word}' cho {count_updated} tệp caption!")
+
             cols = st.columns(3)
             for idx, img_f in enumerate(image_files[:6]):
                 with cols[idx % 3]:
