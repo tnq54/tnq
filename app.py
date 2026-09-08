@@ -320,56 +320,96 @@ with main_tabs[0]:
 
 # TAB 2: LORA HYPERPARAMETERS CONFIGURATION
 with main_tabs[1]:
-    st.header("⚙️ Thiết Lập Cấu Hình LoRA & Siêu Tham Số")
+    st.header("⚙️ Thiết Lập Cấu Hình LoRA & Siêu Tham Số (Advanced Training Settings)")
 
-    col1, col2 = st.columns(2)
+    base_model_preset = st.selectbox(
+        "Chọn Mô Hình Gốc (Base Model):",
+        [
+            "black-forest-labs/FLUX.1-dev",
+            "stabilityai/stable-diffusion-xl-base-1.0",
+            "runwayml/stable-diffusion-v1-5",
+            "meta-llama/Llama-3.2-11B-Vision-Instruct",
+            "Tùy Chỉnh Repo ID"
+        ]
+    )
+    if base_model_preset == "Tùy Chỉnh Repo ID":
+        base_model = st.text_input("Nhập HF Repo ID:", value="black-forest-labs/FLUX.1-dev")
+    else:
+        base_model = base_model_preset
 
-    with col1:
-        base_model_preset = st.selectbox(
-            "Chọn Mô Hình Gốc (Base Model):",
-            [
-                "black-forest-labs/FLUX.1-dev",
-                "stabilityai/stable-diffusion-xl-base-1.0",
-                "runwayml/stable-diffusion-v1-5",
-                "meta-llama/Llama-3.2-11B-Vision-Instruct",
-                "Tùy Chỉnh Repo ID"
-            ]
-        )
-        if base_model_preset == "Tùy Chỉnh Repo ID":
-            base_model = st.text_input("Nhập HF Repo ID:", value="black-forest-labs/FLUX.1-dev")
-        else:
-            base_model = base_model_preset
+    st.checkbox("resize_control", value=True)
 
-        resolution = st.select_slider("Độ phân giải ảnh (Resolution):", options=[512, 768, 1024, 1280], value=1024)
-        lora_r = st.selectbox("LoRA Rank (r):", [4, 8, 16, 32, 64, 128], index=2)
-        lora_alpha = st.slider("LoRA Alpha:", min_value=1, max_value=128, value=16)
+    c_ep1, c_ep2, c_ep3 = st.columns(3)
+    with c_ep1:
+        num_repeats = st.number_input("num_repeats", value=20, min_value=1)
+    with c_ep2:
+        max_train_epochs = st.number_input("max_train_epochs", value=4, min_value=1)
+    with c_ep3:
+        max_train_steps = st.number_input("max_train_steps", value=0, min_value=0)
 
-        learning_rate = st.number_input("Base Learning Rate:", value=1e-4, format="%.6f")
-        unet_lr = st.number_input("UNet / Transformer Backbone LR:", value=1e-4, format="%.6f")
+    c_sav1, c_sav2, c_sav3 = st.columns(3)
+    with c_sav1:
+        save_every_n_epochs = st.number_input("save_every_n_epochs", value=1, min_value=1)
+    with c_sav2:
+        save_last_n_epochs = st.number_input("save_last_n_epochs", value=0, min_value=0)
+    with c_sav3:
+        save_every_n_steps = st.number_input("save_every_n_steps", value=0, min_value=0)
+
+    st.markdown("---")
+    st.markdown("### 🔹 Điều chỉnh Learning Rate")
+    st.info("💡 **Nên đặt lr = 1e-4 với lora, 1e-6 với finetuning**")
+
+    c_lr1, c_lr2 = st.columns(2)
+    with c_lr1:
+        learning_rate = st.number_input("learning_rate", value=1e-4, format="%.6f")
+    with c_lr2:
+        optimizer_type = st.selectbox("optimizer_type", ["adamw8bit", "adamw", "adafactor", "lion", "prodigy"], index=0)
+
+    st.caption("💡 **Mặc định finetuning sẽ dùng adafactor**")
+
+    c_sch1, c_sch2, c_sch3 = st.columns(3)
+    with c_sch1:
+        lr_scheduler = st.selectbox("lr_scheduler", ["constant", "cosine", "linear", "cosine_with_restarts", "polynomial"], index=0)
+    with c_sch2:
+        lr_poly_power = st.number_input("lr_poly_power", value=0)
+    with c_sch3:
+        lr_warmup_steps = st.number_input("lr_warmup_steps", value=10)
+
+    c_sch4, c_dim, c_alpha = st.columns(3)
+    with c_sch4:
+        lr_restarts_num_cycles = st.number_input("lr_restarts_num_cycles", value=4)
+    with c_dim:
+        network_dim = st.number_input("network_dim (lora_r)", value=32, min_value=1)
+    with c_alpha:
+        network_alpha = st.number_input("network_alpha (lora_alpha)", value=16, min_value=1)
+
+    st.markdown("---")
+    st.info("💡 **Phương pháp timestep_sampling: shift - Cân bằng, logsnr - Tổng thể, sigma - Chi tiết**")
+    timestep_sampling = st.selectbox("timestep_sampling", ["None", "shift", "logsnr", "sigma"], index=0)
+
+    st.info("💡 **Điều chỉnh khoảng timestep: Thấp (vd 0-200) - Train chi tiết (face, detail), Cao (400-1000) - Train tổng thể (màu, ánh sáng, phong cách)**")
+
+    c_ts1, c_ts2 = st.columns(2)
+    with c_ts1:
+        min_timestep = st.number_input("min_timestep", value=0, min_value=0)
+    with c_ts2:
+        max_timestep = st.number_input("max_timestep", value=1000, min_value=0)
+
+    preserve_distribution_shape = st.checkbox("preserve_distribution_shape", value=False)
+
+    st.markdown("---")
+    st.subheader("🛠️ Cấu Hình Bổ Sung (Resolution, Precision & Bucketing)")
+    col_opt1, col_opt2 = st.columns(2)
+    with col_opt1:
+        resolution = st.select_slider("Resolution (px):", options=[512, 768, 1024, 1280], value=1024)
+        unet_lr = st.number_input("UNet LR:", value=1e-4, format="%.6f")
         text_encoder_lr = st.number_input("Text Encoder LR:", value=5e-5, format="%.6f")
-
-    with col2:
-        repeat = st.number_input("Số lần lặp Dataset (Repeat):", value=10, min_value=1)
-        save_every_n_epochs = st.number_input("Lưu Checkpoint sau mỗi N Epochs:", value=1, min_value=1)
-        mixed_precision = st.selectbox("Chế độ Mixed Precision:", ["fp16", "bf16", "no"], index=0)
-
-        gradient_checkpointing = st.checkbox("Gradient Checkpointing (Tiết kiệm VRAM)", value=True)
+        mixed_precision = st.selectbox("Mixed Precision:", ["fp16", "bf16", "no"], index=0)
+    with col_opt2:
+        gradient_checkpointing = st.checkbox("Gradient Checkpointing", value=True)
         use_4bit = st.checkbox("4-bit QLoRA Quantization", value=False)
-        use_safetensors = st.checkbox("Xuất Định Dạng SafeTensors (.safetensors)", value=True)
-
+        use_safetensors = st.checkbox("SafeTensors (.safetensors)", value=True)
         enable_bucket = st.checkbox("Aspect Ratio Bucketing (ARB)", value=True)
-        bucket_reso_steps = st.number_input("Bucket Reso Steps:", value=64)
-        min_bucket_reso = st.number_input("Min Bucket Reso:", value=256)
-        max_bucket_reso = st.number_input("Max Bucket Reso:", value=1024)
-
-    st.subheader("🛠️ Cấu Hình Nâng Cao (Conv LoRA & Min SNR)")
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        conv_dim = st.number_input("Conv LoRA Dim:", value=4)
-    with c2:
-        conv_alpha = st.number_input("Conv LoRA Alpha:", value=4)
-    with c3:
-        min_snr_gamma = st.number_input("Min SNR Gamma:", value=5.0)
 
     # Save Config JSON
     training_config = {
@@ -377,28 +417,32 @@ with main_tabs[1]:
         "dataset_dir": DATASET_DIR,
         "output_dir": OUTPUT_DIR,
         "config_save_dir": CONFIG_DIR,
-        "resolution": resolution,
+        "num_repeats": num_repeats,
+        "max_train_epochs": max_train_epochs,
+        "max_train_steps": max_train_steps,
+        "save_every_n_epochs": save_every_n_epochs,
+        "save_last_n_epochs": save_last_n_epochs,
+        "save_every_n_steps": save_every_n_steps,
         "learning_rate": learning_rate,
         "unet_lr": unet_lr,
         "text_encoder_lr": text_encoder_lr,
-        "lora_r": lora_r,
-        "lora_alpha": lora_alpha,
-        "repeat": repeat,
-        "save_every_n_epochs": save_every_n_epochs,
-        "caption_extension": ".txt",
-        "warmup_ratio": 0.05,
-        "max_seq_length": 512,
+        "optimizer_type": optimizer_type,
+        "lr_scheduler": lr_scheduler,
+        "lr_poly_power": lr_poly_power,
+        "lr_warmup_steps": lr_warmup_steps,
+        "lr_restarts_num_cycles": lr_restarts_num_cycles,
+        "network_dim": network_dim,
+        "network_alpha": network_alpha,
+        "resolution": resolution,
+        "timestep_sampling": timestep_sampling,
+        "min_timestep": min_timestep,
+        "max_timestep": max_timestep,
+        "preserve_distribution_shape": preserve_distribution_shape,
         "mixed_precision": mixed_precision,
         "gradient_checkpointing": gradient_checkpointing,
         "use_4bit": use_4bit,
         "use_safetensors": use_safetensors,
-        "enable_bucket": enable_bucket,
-        "bucket_reso_steps": bucket_reso_steps,
-        "min_bucket_reso": min_bucket_reso,
-        "max_bucket_reso": max_bucket_reso,
-        "conv_dim": conv_dim,
-        "conv_alpha": conv_alpha,
-        "min_snr_gamma": min_snr_gamma
+        "enable_bucket": enable_bucket
     }
 
     config_json_str = json.dumps(training_config, indent=2, ensure_ascii=False)
@@ -427,20 +471,31 @@ with main_tabs[2]:
             "--dataset_dir", DATASET_DIR,
             "--output_dir", OUTPUT_DIR,
             "--config_save_dir", CONFIG_DIR,
-            "--resolution", str(resolution),
+            "--num_repeats", str(num_repeats),
+            "--max_train_epochs", str(max_train_epochs),
+            "--max_train_steps", str(max_train_steps),
+            "--save_every_n_epochs", str(save_every_n_epochs),
+            "--save_last_n_epochs", str(save_last_n_epochs),
+            "--save_every_n_steps", str(save_every_n_steps),
             "--learning_rate", str(learning_rate),
             "--unet_lr", str(unet_lr),
             "--text_encoder_lr", str(text_encoder_lr),
-            "--lora_r", str(lora_r),
-            "--lora_alpha", str(lora_alpha),
-            "--repeat", str(repeat),
-            "--save_every_n_epochs", str(save_every_n_epochs),
-            "--mixed_precision", mixed_precision,
-            "--conv_dim", str(conv_dim),
-            "--conv_alpha", str(conv_alpha),
-            "--min_snr_gamma", str(min_snr_gamma)
+            "--optimizer_type", optimizer_type,
+            "--lr_scheduler", lr_scheduler,
+            "--lr_poly_power", str(lr_poly_power),
+            "--lr_warmup_steps", str(lr_warmup_steps),
+            "--lr_restarts_num_cycles", str(lr_restarts_num_cycles),
+            "--network_dim", str(network_dim),
+            "--network_alpha", str(network_alpha),
+            "--resolution", str(resolution),
+            "--timestep_sampling", timestep_sampling,
+            "--min_timestep", str(min_timestep),
+            "--max_timestep", str(max_timestep),
+            "--mixed_precision", mixed_precision
         ]
 
+        if preserve_distribution_shape:
+            cmd.append("--preserve_distribution_shape")
         if gradient_checkpointing:
             cmd.append("--gradient_checkpointing")
         if use_4bit:

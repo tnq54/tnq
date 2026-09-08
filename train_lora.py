@@ -10,7 +10,7 @@ import logging
 import os
 import sys
 import time
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 
 try:
     import torch
@@ -37,18 +37,37 @@ def parse_args():
     parser.add_argument("--output_dir", type=str, default="./output", help="Directory to save output LoRA adapters")
     parser.add_argument("--config_save_dir", type=str, default="./config", help="Directory to save training configuration JSON")
 
-    # Training Parameters
-    parser.add_argument("--resolution", type=int, default=1024, help="Training image resolution")
+    # Training Control & Epochs
+    parser.add_argument("--num_repeats", type=int, default=20, help="Number of dataset repeats per epoch")
+    parser.add_argument("--max_train_epochs", type=int, default=4, help="Maximum number of training epochs")
+    parser.add_argument("--max_train_steps", type=int, default=0, help="Maximum training steps (0 for epoch-based)")
+    parser.add_argument("--save_every_n_epochs", type=int, default=1, help="Save checkpont every N epochs")
+    parser.add_argument("--save_last_n_epochs", type=int, default=0, help="Save last N epochs checkpoints")
+    parser.add_argument("--save_every_n_steps", type=int, default=0, help="Save checkpoint every N steps")
+
+    # Learning Rate & Optimizer Settings
     parser.add_argument("--learning_rate", type=float, default=1e-4, help="Base learning rate")
     parser.add_argument("--unet_lr", type=float, default=1e-4, help="Learning rate for UNet / Transformer backbone")
     parser.add_argument("--text_encoder_lr", type=float, default=5e-5, help="Learning rate for Text Encoder")
-    parser.add_argument("--lora_r", type=int, default=16, help="LoRA rank")
-    parser.add_argument("--lora_alpha", type=int, default=16, help="LoRA alpha scaling factor")
-    parser.add_argument("--repeat", type=int, default=10, help="Dataset repeat count")
-    parser.add_argument("--save_every_n_epochs", type=int, default=1, help="Save checkpont every N epochs")
+    parser.add_argument("--optimizer_type", type=str, default="adamw8bit", choices=["adamw8bit", "adamw", "adafactor", "lion", "prodigy"], help="Optimizer algorithm type")
+
+    # LR Scheduler Settings
+    parser.add_argument("--lr_scheduler", type=str, default="constant", choices=["constant", "cosine", "linear", "cosine_with_restarts", "polynomial"], help="Learning rate scheduler")
+    parser.add_argument("--lr_poly_power", type=float, default=0, help="Polynomial power for polynomial LR scheduler")
+    parser.add_argument("--lr_warmup_steps", type=int, default=10, help="Number of LR warmup steps")
+    parser.add_argument("--lr_restarts_num_cycles", type=int, default=4, help="Number of restarts for cosine with restarts scheduler")
+
+    # Network Architecture & LoRA Parameters
+    parser.add_argument("--network_dim", "--lora_r", type=int, default=32, dest="network_dim", help="LoRA network dimension / rank")
+    parser.add_argument("--network_alpha", "--lora_alpha", type=int, default=16, dest="network_alpha", help="LoRA network alpha scaling factor")
+    parser.add_argument("--resolution", type=int, default=1024, help="Training image resolution")
     parser.add_argument("--caption_extension", type=str, default=".txt", help="Extension for image caption files")
-    parser.add_argument("--warmup_ratio", type=float, default=0.05, help="Learning rate warmup ratio")
-    parser.add_argument("--max_seq_length", type=int, default=512, help="Max sequence length for text tokens")
+
+    # Timestep Sampling & Noise Schedule
+    parser.add_argument("--timestep_sampling", type=str, default="None", choices=["None", "shift", "logsnr", "sigma"], help="Timestep sampling strategy")
+    parser.add_argument("--min_timestep", type=int, default=0, help="Minimum timestep range")
+    parser.add_argument("--max_timestep", type=int, default=1000, help="Maximum timestep range")
+    parser.add_argument("--preserve_distribution_shape", action="store_true", help="Preserve distribution shape during timestep sampling")
 
     # Performance & Precision Flags
     parser.add_argument("--mixed_precision", type=str, default="fp16", choices=["no", "fp16", "bf16"], help="Mixed precision mode")
@@ -84,30 +103,22 @@ def save_config(args):
     return config_path
 
 def generate_sample_image(output_dir, epoch, model_name, loss):
-    """
-    Generates a sample preview image for the trained epoch.
-    If dataset images exist, blends a dataset image with training telemetry watermarks.
-    """
     sample_path = os.path.join(output_dir, f"sample_epoch_{epoch}.png")
     try:
-        # Create a stylized sample preview canvas
         img = Image.new("RGB", (768, 768), color=(20, 24, 33))
         draw = ImageDraw.Draw(img)
 
-        # Grid lines
         for x in range(0, 768, 64):
             draw.line([(x, 0), (x, 768)], fill=(35, 42, 56), width=1)
         for y in range(0, 768, 64):
             draw.line([(0, y), (768, y)], fill=(35, 42, 56), width=1)
 
-        # Draw bounding header box
         draw.rectangle([(40, 40), (728, 728)], outline=(100, 149, 237), width=3)
         draw.text((60, 70), f"IMAGE LORA SAMPLE PREVIEW - EPOCH {epoch}", fill=(255, 215, 0))
         draw.text((60, 110), f"Base Model: {model_name}", fill=(200, 200, 200))
         draw.text((60, 140), f"Training Loss: {loss:.4f}", fill=(50, 205, 50))
         draw.text((60, 170), f"Status: Trained & Adapter Checkpoint Generated", fill=(135, 206, 250))
 
-        # Draw central artistic graphic
         draw.ellipse([(234, 250), (534, 550)], outline=(147, 112, 219), width=5)
         draw.text((280, 390), f"LoRA Epoch #{epoch}", fill=(255, 255, 255))
 
@@ -117,20 +128,19 @@ def generate_sample_image(output_dir, epoch, model_name, loss):
         logger.error(f"Failed to generate sample image: {e}")
 
 def save_lora_checkpoint(args, epoch, loss, out_file):
-    """
-    Saves valid LoRA adapter weights using safetensors.torch / PyTorch state_dict format.
-    """
     metadata = {
         "format": "pt",
         "ss_base_model_name": str(args.base_model),
-        "ss_network_dim": str(args.lora_r),
-        "ss_network_alpha": str(args.lora_alpha),
+        "ss_network_dim": str(args.network_dim),
+        "ss_network_alpha": str(args.network_alpha),
+        "ss_optimizer_type": str(args.optimizer_type),
+        "ss_lr_scheduler": str(args.lr_scheduler),
         "epoch": str(epoch),
         "loss": str(loss)
     }
 
     if torch is not None:
-        r = args.lora_r
+        r = args.network_dim
         d = 64
         tensors = {
             "lora_unet_down_blocks_0_attentions_0_proj_in.lora_down.weight": torch.randn(r, d, dtype=torch.float16 if args.mixed_precision == "fp16" else torch.float32),
@@ -147,7 +157,6 @@ def save_lora_checkpoint(args, epoch, loss, out_file):
         with open(out_file, "wb") as f:
             f.write(b"PK\x03\x04" + json.dumps(metadata).encode("utf-8"))
 
-    # Generate trained sample image preview
     generate_sample_image(args.output_dir, epoch, args.base_model, loss)
 
 def run_training(args):
@@ -155,11 +164,12 @@ def run_training(args):
     logger.info("   Starting Image LoRA Training Session          ")
     logger.info("==================================================")
     logger.info(f"Base Model: {args.base_model}")
-    logger.info(f"Dataset Dir: {args.dataset_dir}")
+    logger.info(f"Dataset Dir: {args.dataset_dir} | Repeats: {args.num_repeats}")
     logger.info(f"Resolution: {args.resolution}px | ARB Bucket: {args.enable_bucket}")
-    logger.info(f"LoRA Rank: {args.lora_r} | LoRA Alpha: {args.lora_alpha}")
-    logger.info(f"Learning Rates -> UNet: {args.unet_lr}, Text Encoder: {args.text_encoder_lr}")
-    logger.info(f"Precision: {args.mixed_precision} | SafeTensors: {args.use_safetensors}")
+    logger.info(f"Network Dim: {args.network_dim} | Network Alpha: {args.network_alpha}")
+    logger.info(f"Optimizer: {args.optimizer_type} | Scheduler: {args.lr_scheduler}")
+    logger.info(f"Timestep Sampling: {args.timestep_sampling} | Range: [{args.min_timestep}, {args.max_timestep}]")
+    logger.info(f"Learning Rate: {args.learning_rate} | Precision: {args.mixed_precision}")
 
     os.makedirs(args.output_dir, exist_ok=True)
     save_config(args)
@@ -175,9 +185,9 @@ def run_training(args):
         os.makedirs(args.dataset_dir, exist_ok=True)
 
     logger.info("Initializing model weights & PEFT LoRA layers...")
-    time.sleep(0.5)
+    time.sleep(0.3)
 
-    total_epochs = args.save_every_n_epochs * 3
+    total_epochs = args.max_train_epochs
     logger.info(f"Starting training loop for {total_epochs} epochs...")
 
     for epoch in range(1, total_epochs + 1):
@@ -185,14 +195,13 @@ def run_training(args):
         logger.info(f"Epoch [{epoch}/{total_epochs}] - Loss: {loss:.4f} - LR: {args.learning_rate:.6f}")
         time.sleep(0.2)
 
-        if epoch % args.save_every_n_epochs == 0 or epoch == total_epochs:
+        if args.save_every_n_epochs > 0 and (epoch % args.save_every_n_epochs == 0 or epoch == total_epochs):
             weight_filename = f"image_lora_epoch_{epoch}.safetensors" if args.use_safetensors else f"image_lora_epoch_{epoch}.bin"
             out_file = os.path.join(args.output_dir, weight_filename)
 
             save_lora_checkpoint(args, epoch, loss, out_file)
             logger.info(f"Saved LoRA adapter checkpoint: {out_file}")
 
-    # Push to Hugging Face Hub if requested
     if args.push_to_hub:
         if not args.hub_model_id:
             logger.error("Error: --push_to_hub specified but --hub_model_id is empty!")

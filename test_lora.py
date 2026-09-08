@@ -3,6 +3,7 @@ import sys
 import json
 import tempfile
 import unittest
+from unittest.mock import MagicMock
 
 import train_lora
 
@@ -29,8 +30,13 @@ class TestImageLoRAStudio(unittest.TestCase):
         args = train_lora.parse_args()
         self.assertEqual(args.base_model, "black-forest-labs/FLUX.1-dev")
         self.assertEqual(args.resolution, 1024)
-        self.assertEqual(args.lora_r, 16)
-        self.assertEqual(args.mixed_precision, "fp16")
+        self.assertEqual(args.network_dim, 32)
+        self.assertEqual(args.network_alpha, 16)
+        self.assertEqual(args.optimizer_type, "adamw8bit")
+        self.assertEqual(args.lr_scheduler, "constant")
+        self.assertEqual(args.timestep_sampling, "None")
+        self.assertEqual(args.num_repeats, 20)
+        self.assertEqual(args.max_train_epochs, 4)
 
     def test_save_config(self):
         sys.argv = [
@@ -38,7 +44,10 @@ class TestImageLoRAStudio(unittest.TestCase):
             "--base_model", "stabilityai/stable-diffusion-xl-base-1.0",
             "--config_save_dir", self.config_dir,
             "--resolution", "512",
-            "--lora_r", "32"
+            "--network_dim", "64",
+            "--optimizer_type", "adafactor",
+            "--lr_scheduler", "cosine",
+            "--timestep_sampling", "shift"
         ]
         args = train_lora.parse_args()
         config_path = train_lora.save_config(args)
@@ -48,7 +57,10 @@ class TestImageLoRAStudio(unittest.TestCase):
             data = json.load(f)
         self.assertEqual(data["base_model"], "stabilityai/stable-diffusion-xl-base-1.0")
         self.assertEqual(data["resolution"], 512)
-        self.assertEqual(data["lora_r"], 32)
+        self.assertEqual(data["network_dim"], 64)
+        self.assertEqual(data["optimizer_type"], "adafactor")
+        self.assertEqual(data["lr_scheduler"], "cosine")
+        self.assertEqual(data["timestep_sampling"], "shift")
 
     def test_run_training_execution(self):
         sys.argv = [
@@ -56,6 +68,7 @@ class TestImageLoRAStudio(unittest.TestCase):
             "--dataset_dir", self.dataset_dir,
             "--output_dir", self.output_dir,
             "--config_save_dir", self.config_dir,
+            "--max_train_epochs", "2",
             "--save_every_n_epochs", "1",
             "--use_safetensors"
         ]
