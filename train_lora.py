@@ -102,6 +102,65 @@ def save_config(args):
     logger.info(f"Training configuration saved to: {config_path}")
     return config_path
 
+def generate_model_card(output_dir, args):
+    """
+    Generates a Hugging Face Model Card README.md file in output_dir.
+    """
+    model_card_path = os.path.join(output_dir, "README.md")
+    content = f"""---
+license: creativecommons
+tags:
+- text-to-image
+- lora
+- diffusers
+- {args.base_model.replace('/', '-')}
+base_model: {args.base_model}
+instance_prompt: lora style photo
+widget:
+- text: lora style photo, a high quality detailed portrait
+---
+
+# Image LoRA Adapter - {args.base_model}
+
+This LoRA adapter was trained using **Hugging Face Image LoRA Training Studio**.
+
+## ⚙️ Training Hyperparameters
+
+| Parameter | Value |
+|---|---|
+| **Base Model** | `{args.base_model}` |
+| **Network Dim (Rank)** | `{args.network_dim}` |
+| **Network Alpha** | `{args.network_alpha}` |
+| **Resolution** | `{args.resolution}px` |
+| **Learning Rate** | `{args.learning_rate}` |
+| **Optimizer** | `{args.optimizer_type}` |
+| **LR Scheduler** | `{args.lr_scheduler}` |
+| **Repeats** | `{args.num_repeats}` |
+| **Epochs** | `{args.max_train_epochs}` |
+| **Mixed Precision** | `{args.mixed_precision}` |
+| **Aspect Ratio Bucketing** | `{args.enable_bucket}` |
+
+## 🚀 Usage with Diffusers
+
+```python
+import torch
+from diffusers import AutoPipelineForText2Image
+
+pipeline = AutoPipelineForText2Image.from_pretrained(
+    "{args.base_model}",
+    torch_dtype=torch.float16
+).to("cuda")
+
+pipeline.load_lora_weights(".", weight_name="image_lora_epoch_{args.max_train_epochs}.safetensors")
+
+image = pipeline("lora style photo, high quality portrait").images[0]
+image.save("result.png")
+```
+"""
+    with open(model_card_path, "w", encoding="utf-8") as f:
+        f.write(content)
+    logger.info(f"Generated Hugging Face Model Card: {model_card_path}")
+
 def generate_sample_image(output_dir, epoch, model_name, loss):
     sample_path = os.path.join(output_dir, f"sample_epoch_{epoch}.png")
     try:
@@ -158,6 +217,7 @@ def save_lora_checkpoint(args, epoch, loss, out_file):
             f.write(b"PK\x03\x04" + json.dumps(metadata).encode("utf-8"))
 
     generate_sample_image(args.output_dir, epoch, args.base_model, loss)
+    generate_model_card(args.output_dir, args)
 
 def run_training(args):
     logger.info("==================================================")

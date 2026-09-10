@@ -17,11 +17,14 @@ from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, Messa
 from huggingface_hub import InferenceClient, HfApi
 
 # Page configuration
-st.set_page_config(
-    page_title="Hugging Face Image LoRA Training Studio",
-    page_icon="🎨",
-    layout="wide"
-)
+try:
+    st.set_page_config(
+        page_title="Hugging Face Image LoRA Training Studio",
+        page_icon="🎨",
+        layout="wide"
+    )
+except Exception:
+    pass
 
 # Setup logging
 logging.basicConfig(
@@ -199,12 +202,14 @@ def run_bot():
             logger.error(f"Error during polling: {e}")
             time.sleep(10)
 
-# Background Thread Launcher
-if __name__ == "__main__" or "bot_thread" not in st.session_state:
+# Background Thread Launcher (Guarded for safe import context)
+try:
     if "bot_thread" not in st.session_state:
         st.session_state.bot_thread = True
         thread = threading.Thread(target=run_bot, daemon=True)
         thread.start()
+except Exception:
+    pass
 
 # --- Streamlit Navigation & UI ---
 st.title("🎨 Hugging Face Image LoRA Training Studio")
@@ -262,12 +267,17 @@ with main_tabs[0]:
 
             st.success(f"Đã lưu thành công {len(uploaded_files)} ảnh và tệp caption vào `{DATASET_DIR}`!")
 
-    # Existing Dataset Files
-    st.subheader("📂 Danh Sách Tệp Trong Dataset Hiện Tại")
+    # Existing Dataset Files & Analytics
+    st.subheader("📊 Phân Tích & Danh Sách Dataset Hiện Tại")
     if os.path.exists(DATASET_DIR):
         files = os.listdir(DATASET_DIR)
         image_files = [f for f in files if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))]
-        st.info(f"Tổng số ảnh trong dataset: {len(image_files)}")
+        caption_files = [f for f in files if f.lower().endswith('.txt')]
+
+        m1, m2, m3 = st.columns(3)
+        m1.metric("Tổng Số Ảnh", len(image_files))
+        m2.metric("Tổng Tệp Caption", len(caption_files))
+        m3.metric("Kích Thước Dataset", f"{len(image_files) * 20} Repeats / Epoch")
 
         if image_files:
             if st.button("⚡ Tự Động Thêm Trigger Word Vào Tất Cả Caption Hiện Có"):
@@ -337,7 +347,7 @@ with main_tabs[1]:
     else:
         base_model = base_model_preset
 
-    st.checkbox("resize_control", value=True)
+    resize_control = st.checkbox("resize_control", value=True)
 
     c_ep1, c_ep2, c_ep3 = st.columns(3)
     with c_ep1:
@@ -417,6 +427,7 @@ with main_tabs[1]:
         "dataset_dir": DATASET_DIR,
         "output_dir": OUTPUT_DIR,
         "config_save_dir": CONFIG_DIR,
+        "resize_control": resize_control,
         "num_repeats": num_repeats,
         "max_train_epochs": max_train_epochs,
         "max_train_steps": max_train_steps,
@@ -559,12 +570,19 @@ with main_tabs[4]:
 
     if os.path.exists(OUTPUT_DIR):
         out_files = os.listdir(OUTPUT_DIR)
-        st.write("📂 Các Checkpoints LoRA Đã Tạo:")
+        st.write("📂 Các Checkpoints & Files LoRA Đã Tạo:")
         for of in out_files:
             file_p = os.path.join(OUTPUT_DIR, of)
             if os.path.isfile(file_p):
                 with open(file_p, "rb") as f:
                     st.download_button(f"📥 Tải Về {of}", data=f, file_name=of)
+
+        # Show Model Card Preview if README.md exists
+        mc_path = os.path.join(OUTPUT_DIR, "README.md")
+        if os.path.exists(mc_path):
+            st.subheader("📄 Tự Động Sinh Hugging Face Model Card (README.md)")
+            with open(mc_path, "r", encoding="utf-8") as f:
+                st.code(f.read(), language="markdown")
 
     st.subheader("🤗 Push Adapter Lên Hugging Face Hub Repo")
     target_repo = st.text_input("Nhập Target Hugging Face Repo ID (Ví dụ: `username/flux-my-style-lora`):")
