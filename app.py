@@ -28,29 +28,26 @@ except ImportError:
 
 # Configure Streamlit Page
 st.set_page_config(
-    page_title="Adobe Photoshop CC Web",
+    page_title="Adobe Photoshop CC Web Studio",
     page_icon="🎨",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
-# Inject Photoshop CC Theme CSS
+# Inject Photoshop CC Dark Workspace CSS
 st.markdown("""
 <style>
-    /* Full dark theme matching Photoshop CC */
     body, .stApp {
         background-color: #1e1e1e !important;
         color: #d0d0d0 !important;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
     }
 
-    /* Hide Streamlit header & footer for maximum screen space */
     header, footer, #MainMenu {
         visibility: hidden !important;
         height: 0px !important;
     }
 
-    /* Photoshop CC Top Menu Bar */
     .ps-header {
         background-color: #333333;
         padding: 6px 16px;
@@ -77,7 +74,6 @@ st.markdown("""
         border-radius: 3px;
     }
 
-    /* Tab Styling like Photoshop Toolbar/Panels */
     .stTabs [data-baseweb="tab-list"] {
         background-color: #262626 !important;
         gap: 2px !important;
@@ -99,7 +95,6 @@ st.markdown("""
         border-top: 2px solid #31A8FF !important;
     }
 
-    /* Main Content Padding */
     .block-container {
         padding-top: 0.5rem !important;
         padding-bottom: 0rem !important;
@@ -282,8 +277,8 @@ if "bot_thread" not in st.session_state:
 
 # --- PHOTOSHOP CC WORKSPACE TABS ---
 tabs = st.tabs([
-    "🎨 Photoshop CC Workspace",
-    "🖌️ HTML5 Canvas Tool",
+    "🎨 Photoshop CC Suite (Photopea)",
+    "🖌️ Photoshop Canvas Tools",
     "✨ Firefly / AI Generator",
     "🔍 Gemini Smart Inspector",
     "⚙️ System Status"
@@ -298,78 +293,222 @@ with tabs[0]:
     """
     components.html(photopea_html, height=890)
 
-# 2. HTML5 CANVAS STUDIO
+# 2. FULL PHOTOSHOP CANVAS TOOLS
 with tabs[1]:
-    st.markdown("#### Custom Interactive Paint & Vector Studio")
+    st.markdown("#### Photoshop CC Toolset (Brush, Eraser, Shapes, Text, Fill, Eyedropper, Opacity)")
     canvas_html = """
     <!DOCTYPE html>
     <html>
     <head>
         <style>
-            body { margin: 0; background: #1e1e1e; color: #fff; font-family: sans-serif; }
-            #toolbar { padding: 10px; background: #2b2b2b; display: flex; gap: 12px; align-items: center; border-radius: 4px; }
-            canvas { background: #ffffff; border: 2px solid #3d3d3d; cursor: crosshair; margin-top: 10px; border-radius: 4px; }
-            .btn { background: #383838; color: white; border: 1px solid #555; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 13px; }
-            .btn:hover { background: #4a4a4a; }
+            body { margin: 0; background: #1e1e1e; color: #e0e0e0; font-family: -apple-system, sans-serif; }
+            #app-container { display: flex; gap: 10px; padding: 10px; }
+
+            /* Photoshop Toolbar (Left Sidebar) */
+            #ps-toolbar {
+                background: #2b2b2b;
+                width: 50px;
+                padding: 8px 4px;
+                display: flex;
+                flex-direction: column;
+                gap: 6px;
+                align-items: center;
+                border-radius: 4px;
+                border: 1px solid #3a3a3a;
+            }
+            .tool-btn {
+                width: 38px;
+                height: 38px;
+                background: #383838;
+                color: #d0d0d0;
+                border: 1px solid #4a4a4a;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 16px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition: all 0.15s ease;
+            }
+            .tool-btn:hover, .tool-btn.active {
+                background: #0078d4;
+                color: #ffffff;
+                border-color: #31A8FF;
+            }
+
+            /* Main Workspace Area */
+            #workspace { flex: 1; display: flex; flex-direction: column; gap: 10px; }
+
+            /* Top Options Bar */
+            #options-bar {
+                background: #2b2b2b;
+                padding: 8px 14px;
+                display: flex;
+                gap: 16px;
+                align-items: center;
+                border-radius: 4px;
+                border: 1px solid #3a3a3a;
+                font-size: 13px;
+            }
+            input[type="range"] { width: 100px; }
+            input[type="color"] { width: 32px; height: 32px; border: none; cursor: pointer; background: none; }
+
+            canvas {
+                background: #ffffff;
+                border: 2px solid #3a3a3a;
+                cursor: crosshair;
+                border-radius: 4px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            }
         </style>
     </head>
     <body>
-        <div id="toolbar">
-            <label>Tool: </label>
-            <select id="tool" class="btn">
-                <option value="brush">Brush 🖌️</option>
-                <option value="eraser">Eraser 🧽</option>
-                <option value="line">Line 📏</option>
-            </select>
-            <label>Color: </label>
-            <input type="color" id="colorPicker" value="#000000">
-            <label>Size: </label>
-            <input type="range" id="brushSize" min="1" max="50" value="5">
-            <button class="btn" onclick="clearCanvas()">Clear 🗑️</button>
-            <button class="btn" onclick="downloadCanvas()">Export PNG 💾</button>
+        <div id="app-container">
+            <!-- Photoshop Left Toolbar -->
+            <div id="ps-toolbar">
+                <button class="tool-btn active" title="Brush Tool (B)" onclick="setTool('brush', this)">🖌️</button>
+                <button class="tool-btn" title="Pencil Tool (P)" onclick="setTool('pencil', this)">✏️</button>
+                <button class="tool-btn" title="Eraser Tool (E)" onclick="setTool('eraser', this)">🧽</button>
+                <button class="tool-btn" title="Line Tool (L)" onclick="setTool('line', this)">📏</button>
+                <button class="tool-btn" title="Rectangle Tool (U)" onclick="setTool('rect', this)">🔲</button>
+                <button class="tool-btn" title="Ellipse Tool (C)" onclick="setTool('circle', this)">⭕</button>
+                <button class="tool-btn" title="Text Tool (T)" onclick="setTool('text', this)">🔤</button>
+                <button class="tool-btn" title="Paint Bucket / Fill (G)" onclick="setTool('fill', this)">🪣</button>
+                <button class="tool-btn" title="Eyedropper Tool (I)" onclick="setTool('eyedropper', this)">💉</button>
+            </div>
+
+            <!-- Main Workspace & Options -->
+            <div id="workspace">
+                <div id="options-bar">
+                    <label><strong>Color:</strong></label>
+                    <input type="color" id="colorPicker" value="#0078d4">
+
+                    <label><strong>Size:</strong></label>
+                    <input type="range" id="brushSize" min="1" max="100" value="10">
+                    <span id="sizeVal">10px</span>
+
+                    <label><strong>Opacity:</strong></label>
+                    <input type="range" id="opacity" min="0.1" max="1.0" step="0.1" value="1.0">
+                    <span id="opacityVal">100%</span>
+
+                    <button class="tool-btn" style="width: auto; padding: 0 12px;" onclick="clearCanvas()">Clear 🗑️</button>
+                    <button class="tool-btn" style="width: auto; padding: 0 12px;" onclick="downloadCanvas()">Export PNG 💾</button>
+                </div>
+
+                <canvas id="paintCanvas" width="900" height="540"></canvas>
+            </div>
         </div>
-        <canvas id="paintCanvas" width="950" height="580"></canvas>
 
         <script>
             const canvas = document.getElementById('paintCanvas');
             const ctx = canvas.getContext('2d');
+            let currentTool = 'brush';
             let painting = false;
+            let startX = 0, startY = 0;
+            let snapshot;
+
+            // Update UI Labels
+            document.getElementById('brushSize').oninput = function() {
+                document.getElementById('sizeVal').innerText = this.value + 'px';
+            };
+            document.getElementById('opacity').oninput = function() {
+                document.getElementById('opacityVal').innerText = Math.round(this.value * 100) + '%';
+            };
+
+            function setTool(tool, btn) {
+                currentTool = tool;
+                document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+                if(btn) btn.classList.add('active');
+            }
 
             function startPosition(e) {
                 painting = true;
-                draw(e);
+                const rect = canvas.getBoundingClientRect();
+                startX = e.clientX - rect.left;
+                startY = e.clientY - rect.top;
+                snapshot = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+                if (currentTool === 'brush' || currentTool === 'pencil' || currentTool === 'eraser') {
+                    draw(e);
+                } else if (currentTool === 'text') {
+                    const text = prompt("Enter text for layer:");
+                    if (text) {
+                        ctx.globalAlpha = parseFloat(document.getElementById('opacity').value);
+                        ctx.fillStyle = document.getElementById('colorPicker').value;
+                        ctx.font = `${document.getElementById('brushSize').value * 2}px sans-serif`;
+                        ctx.fillText(text, startX, startY);
+                    }
+                    painting = false;
+                } else if (currentTool === 'fill') {
+                    ctx.globalAlpha = parseFloat(document.getElementById('opacity').value);
+                    ctx.fillStyle = document.getElementById('colorPicker').value;
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    painting = false;
+                } else if (currentTool === 'eyedropper') {
+                    const pixel = ctx.getImageData(startX, startY, 1, 1).data;
+                    const hex = "#" + ((1 << 24) + (pixel[0] << 16) + (pixel[1] << 8) + pixel[2]).toString(16).slice(1);
+                    document.getElementById('colorPicker').value = hex;
+                    painting = false;
+                }
             }
 
-            function finishedPosition() {
+            function finishedPosition(e) {
+                if(!painting) return;
                 painting = false;
                 ctx.beginPath();
             }
 
             function draw(e) {
-                if(!painting) return;
+                if (!painting) return;
                 const rect = canvas.getBoundingClientRect();
                 const x = e.clientX - rect.left;
                 const y = e.clientY - rect.top;
 
-                const tool = document.getElementById('tool').value;
                 const color = document.getElementById('colorPicker').value;
                 const size = document.getElementById('brushSize').value;
+                const opacity = parseFloat(document.getElementById('opacity').value);
 
+                ctx.globalAlpha = opacity;
                 ctx.lineWidth = size;
                 ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
 
-                if(tool === 'brush') {
+                if (currentTool === 'brush') {
                     ctx.strokeStyle = color;
                     ctx.lineTo(x, y);
                     ctx.stroke();
                     ctx.beginPath();
                     ctx.moveTo(x, y);
-                } else if(tool === 'eraser') {
+                } else if (currentTool === 'pencil') {
+                    ctx.strokeStyle = color;
+                    ctx.lineWidth = Math.max(1, Math.floor(size / 3));
+                    ctx.lineTo(x, y);
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.moveTo(x, y);
+                } else if (currentTool === 'eraser') {
                     ctx.strokeStyle = '#ffffff';
                     ctx.lineTo(x, y);
                     ctx.stroke();
                     ctx.beginPath();
                     ctx.moveTo(x, y);
+                } else if (currentTool === 'line' || currentTool === 'rect' || currentTool === 'circle') {
+                    ctx.putImageData(snapshot, 0, 0);
+                    ctx.strokeStyle = color;
+                    ctx.fillStyle = color;
+                    ctx.beginPath();
+
+                    if (currentTool === 'line') {
+                        ctx.moveTo(startX, startY);
+                        ctx.lineTo(x, y);
+                        ctx.stroke();
+                    } else if (currentTool === 'rect') {
+                        ctx.strokeRect(startX, startY, x - startX, y - startY);
+                    } else if (currentTool === 'circle') {
+                        const radius = Math.sqrt(Math.pow(x - startX, 2) + Math.pow(y - startY, 2));
+                        ctx.arc(startX, startY, radius, 0, 2 * Math.PI);
+                        ctx.stroke();
+                    }
                 }
             }
 
@@ -379,7 +518,7 @@ with tabs[1]:
 
             function downloadCanvas() {
                 const link = document.createElement('a');
-                link.download = 'photoshop_canvas.png';
+                link.download = 'photoshop_canvas_export.png';
                 link.href = canvas.toDataURL();
                 link.click();
             }
