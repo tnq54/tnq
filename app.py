@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import time
 import os
 import threading
@@ -217,7 +218,7 @@ with tabs[0]:
     photopea_html = """
     <iframe src="https://www.photopea.com" style="width: 100%; height: 850px; border: none; border-radius: 8px;"></iframe>
     """
-    st.components.v1.html(photopea_html, height=870)
+    components.html(photopea_html, height=870)
 
 # 2. HTML5 CANVAS EDITOR
 with tabs[1]:
@@ -316,7 +317,7 @@ with tabs[1]:
     </body>
     </html>
     """
-    st.components.v1.html(canvas_html, height=650)
+    components.html(canvas_html, height=650)
 
 # 3. AI IMAGE GENERATOR
 with tabs[2]:
