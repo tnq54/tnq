@@ -28,11 +28,94 @@ except ImportError:
 
 # Configure Streamlit Page
 st.set_page_config(
-    page_title="Photoshop CC Web Studio",
+    page_title="Adobe Photoshop CC Web",
     page_icon="🎨",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
+
+# Inject Photoshop CC Theme CSS
+st.markdown("""
+<style>
+    /* Full dark theme matching Photoshop CC */
+    body, .stApp {
+        background-color: #1e1e1e !important;
+        color: #d0d0d0 !important;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+    }
+
+    /* Hide Streamlit header & footer for maximum screen space */
+    header, footer, #MainMenu {
+        visibility: hidden !important;
+        height: 0px !important;
+    }
+
+    /* Photoshop CC Top Menu Bar */
+    .ps-header {
+        background-color: #333333;
+        padding: 6px 16px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 1px solid #181818;
+        font-size: 13px;
+    }
+    .ps-brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: bold;
+        color: #31A8FF;
+    }
+    .ps-logo {
+        background-color: #001E36;
+        color: #31A8FF;
+        border: 1.5px solid #31A8FF;
+        font-weight: 900;
+        font-size: 12px;
+        padding: 2px 5px;
+        border-radius: 3px;
+    }
+
+    /* Tab Styling like Photoshop Toolbar/Panels */
+    .stTabs [data-baseweb="tab-list"] {
+        background-color: #262626 !important;
+        gap: 2px !important;
+        border-bottom: 1px solid #181818 !important;
+        padding-left: 10px !important;
+    }
+    .stTabs [data-baseweb="tab"] {
+        background-color: #2d2d2d !important;
+        color: #b0b0b0 !important;
+        border-radius: 4px 4px 0px 0px !important;
+        padding: 8px 16px !important;
+        font-size: 13px !important;
+        font-weight: 500 !important;
+        border: none !important;
+    }
+    .stTabs [aria-selected="true"] {
+        background-color: #1e1e1e !important;
+        color: #ffffff !important;
+        border-top: 2px solid #31A8FF !important;
+    }
+
+    /* Main Content Padding */
+    .block-container {
+        padding-top: 0.5rem !important;
+        padding-bottom: 0rem !important;
+        max-width: 100% !important;
+    }
+</style>
+<div class="ps-header">
+    <div class="ps-brand">
+        <span class="ps-logo">Ps</span>
+        <span>Adobe Photoshop CC Web Studio</span>
+    </div>
+    <div style="color: #888; font-size: 12px;">
+        File &nbsp;|&nbsp; Edit &nbsp;|&nbsp; Image &nbsp;|&nbsp; Layer &nbsp;|&nbsp; Type &nbsp;|&nbsp; Select &nbsp;|&nbsp; Filter &nbsp;|&nbsp; 3D &nbsp;|&nbsp; View &nbsp;|&nbsp; Window &nbsp;|&nbsp; Help
+    </div>
+</div>
+""", unsafe_allow_html=True)
 
 # Load Environment Variables
 HF_TOKEN = os.environ.get("HF_TOKEN")
@@ -197,44 +280,37 @@ if "bot_thread" not in st.session_state:
     thread = threading.Thread(target=run_bot, daemon=True)
     thread.start()
 
-# --- STREAMLIT UI: PHOTOSHOP CC WEB STUDIO ---
-st.title("🎨 Photoshop CC Web Studio")
-st.caption("Full Photoshop CC Web Application with Layer Editing, Custom Canvas Tools, AI Image Generation & Photo Analysis on Hugging Face Space")
-
+# --- PHOTOSHOP CC WORKSPACE TABS ---
 tabs = st.tabs([
-    "🖼️ Photoshop CC (Photopea)",
-    "🖌️ HTML5 Canvas Editor",
-    "✨ AI Image Generator",
-    "🔍 Gemini Photo Analysis",
+    "🎨 Photoshop CC Workspace",
+    "🖌️ HTML5 Canvas Tool",
+    "✨ Firefly / AI Generator",
+    "🔍 Gemini Smart Inspector",
     "⚙️ System Status"
 ])
 
-# 1. PHOTOSHOP CC (PHOTOPEA EMBED)
+# 1. PHOTOSHOP CC MAIN WORKSPACE (PHOTOPEA EMBED)
 with tabs[0]:
-    st.markdown("### Professional Photoshop CC Editor")
-    st.write("Full-featured browser image editor supporting `.psd`, `.png`, `.jpg`, `.webp`, custom layers, masks, smart objects, and filters.")
-
-    # Embedded Photopea UI
     photopea_html = """
-    <iframe src="https://www.photopea.com" style="width: 100%; height: 850px; border: none; border-radius: 8px;"></iframe>
+    <div style="width: 100%; height: 880px; background: #121212; overflow: hidden; border-radius: 4px;">
+        <iframe src="https://www.photopea.com" style="width: 100%; height: 100%; border: none;"></iframe>
+    </div>
     """
-    components.html(photopea_html, height=870)
+    components.html(photopea_html, height=890)
 
-# 2. HTML5 CANVAS EDITOR
+# 2. HTML5 CANVAS STUDIO
 with tabs[1]:
-    st.markdown("### Custom Interactive HTML5 Canvas Studio")
-    st.write("Responsive client-side painting canvas with layer controls, brush size, color picker, and real-time image adjustment filters.")
-
+    st.markdown("#### Custom Interactive Paint & Vector Studio")
     canvas_html = """
     <!DOCTYPE html>
     <html>
     <head>
         <style>
-            body { margin: 0; background: #121212; color: #fff; font-family: sans-serif; }
-            #toolbar { padding: 10px; background: #1e1e1e; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-            canvas { background: #ffffff; border: 2px solid #333; cursor: crosshair; margin: 10px 0; border-radius: 4px; }
-            .btn { background: #2b2b2b; color: white; border: 1px solid #444; padding: 6px 12px; border-radius: 4px; cursor: pointer; }
-            .btn:hover { background: #3b3b3b; }
+            body { margin: 0; background: #1e1e1e; color: #fff; font-family: sans-serif; }
+            #toolbar { padding: 10px; background: #2b2b2b; display: flex; gap: 12px; align-items: center; border-radius: 4px; }
+            canvas { background: #ffffff; border: 2px solid #3d3d3d; cursor: crosshair; margin-top: 10px; border-radius: 4px; }
+            .btn { background: #383838; color: white; border: 1px solid #555; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 13px; }
+            .btn:hover { background: #4a4a4a; }
         </style>
     </head>
     <body>
@@ -244,7 +320,6 @@ with tabs[1]:
                 <option value="brush">Brush 🖌️</option>
                 <option value="eraser">Eraser 🧽</option>
                 <option value="line">Line 📏</option>
-                <option value="rect">Rectangle 🔲</option>
             </select>
             <label>Color: </label>
             <input type="color" id="colorPicker" value="#000000">
@@ -253,13 +328,12 @@ with tabs[1]:
             <button class="btn" onclick="clearCanvas()">Clear 🗑️</button>
             <button class="btn" onclick="downloadCanvas()">Export PNG 💾</button>
         </div>
-        <canvas id="paintCanvas" width="900" height="550"></canvas>
+        <canvas id="paintCanvas" width="950" height="580"></canvas>
 
         <script>
             const canvas = document.getElementById('paintCanvas');
             const ctx = canvas.getContext('2d');
             let painting = false;
-            let startX, startY;
 
             function startPosition(e) {
                 painting = true;
@@ -305,7 +379,7 @@ with tabs[1]:
 
             function downloadCanvas() {
                 const link = document.createElement('a');
-                link.download = 'photoshop_canvas_export.png';
+                link.download = 'photoshop_canvas.png';
                 link.href = canvas.toDataURL();
                 link.click();
             }
@@ -317,57 +391,51 @@ with tabs[1]:
     </body>
     </html>
     """
-    components.html(canvas_html, height=650)
+    components.html(canvas_html, height=680)
 
-# 3. AI IMAGE GENERATOR
+# 3. AI FIREFLY / IMAGE GENERATOR
 with tabs[2]:
-    st.markdown("### AI Image Generation & Diffusion Studio")
-    st.write("Generate high-quality artwork using Hugging Face Diffusion Models (e.g., FLUX.1-dev, Stable Diffusion XL).")
-
-    prompt = st.text_area("Prompt:", value="A realistic portrait of a futuristic cyberpunk city with neon lights, high resolution, 8k", height=100)
-    model_choice = st.selectbox("AI Model:", [
+    st.markdown("#### Adobe Firefly-style Generative Fill & Text-to-Image")
+    prompt = st.text_area("Generative Prompt:", value="A surreal artistic photo of a dragon flying over ancient mountains at sunrise, 8k resolution, photorealistic", height=100)
+    model_choice = st.selectbox("Generative Model:", [
         "black-forest-labs/FLUX.1-dev",
         "stabilityai/stable-diffusion-xl-base-1.0",
         "runwayml/stable-diffusion-v1-5"
     ])
 
-    if st.button("🚀 Generate AI Image"):
+    if st.button("🚀 Generate Artwork"):
         if not hf_client:
-            st.error("HF_TOKEN is missing in environment. Please configure your Hugging Face API key.")
+            st.error("HF_TOKEN is missing in environment.")
         else:
-            with st.spinner("Generating image via Hugging Face Inference API..."):
+            with st.spinner("Generating artwork via Hugging Face Inference API..."):
                 try:
                     generated_image = hf_client.text_to_image(prompt, model=model_choice)
-                    st.image(generated_image, caption=f"Generated with {model_choice}", use_column_width=True)
-
-                    # Download option
+                    st.image(generated_image, caption=f"Generated via {model_choice}", use_column_width=True)
                     buf = io.BytesIO()
                     generated_image.save(buf, format="PNG")
-                    st.download_button("💾 Download Image", data=buf.getvalue(), file_name="ai_generated_image.png", mime="image/png")
+                    st.download_button("💾 Download Layer PNG", data=buf.getvalue(), file_name="firefly_generated.png", mime="image/png")
                 except Exception as e:
-                    st.error(f"Generation failed: {e}")
+                    st.error(f"Generation error: {e}")
 
-# 4. GEMINI PHOTO ANALYSIS
+# 4. GEMINI SMART INSPECTOR
 with tabs[3]:
-    st.markdown("### Gemini 1.5 Flash Multimodal Photo Analysis")
-    st.write("Upload an image for visual analysis, composition feedback, or editing suggestions.")
-
-    uploaded_file = st.file_uploader("Choose an image file...", type=["jpg", "jpeg", "png", "webp"])
-    analysis_prompt = st.text_input("Custom Analysis Prompt:", value="Analyze composition, lighting, subject matter, and suggest Photoshop enhancements.")
+    st.markdown("#### Gemini Multimodal Photoshop Analysis")
+    uploaded_file = st.file_uploader("Upload Image Layer...", type=["jpg", "jpeg", "png", "webp"])
+    analysis_prompt = st.text_input("Analysis Request:", value="Analyze color palette, lighting, subject placement, and suggest Photoshop CC retouches.")
 
     if uploaded_file is not None:
         image_bytes = uploaded_file.read()
-        st.image(image_bytes, caption="Uploaded Image Preview", use_column_width=True)
+        st.image(image_bytes, caption="Layer Preview", use_column_width=True)
 
-        if st.button("🔍 Analyze Image"):
-            with st.spinner("Analyzing image using Gemini 1.5 Flash..."):
+        if st.button("🔍 Run Smart Analysis"):
+            with st.spinner("Analyzing image layer with Gemini 1.5 Flash..."):
                 analysis_result = analyze_photo_with_gemini(image_bytes, prompt=analysis_prompt)
-                st.markdown("#### Analysis Results:")
+                st.markdown("##### Analysis & Suggestions:")
                 st.write(analysis_result)
 
 # 5. SYSTEM STATUS
 with tabs[4]:
-    st.markdown("### System & API Status")
+    st.markdown("#### Photoshop CC Web System Status")
     st.write(f"- **Hugging Face Inference Token (HF_TOKEN)**: {'✅ Active' if HF_TOKEN else '❌ Missing'}")
     st.write(f"- **Google GenAI API Key (GOOGLE_API_KEY)**: {'✅ Active' if GOOGLE_API_KEY else '❌ Missing'}")
     st.write(f"- **Telegram Bot Token (TELEGRAM_TOKEN)**: {'✅ Active' if TELEGRAM_TOKEN else '❌ Missing'}")
