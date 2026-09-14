@@ -1,11 +1,18 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
-        body { margin: 0; background: #1e1e1e; color: #e0e0e0; font-family: -apple-system, sans-serif; }
-        #app-container { display: flex; gap: 10px; padding: 10px; }
+        body { margin: 0; background: #1e1e1e; color: #e0e0e0; font-family: -apple-system, sans-serif; touch-action: none; }
+        #app-container { display: flex; gap: 10px; padding: 10px; flex-direction: row; }
 
-        /* Photoshop Toolbar (Left Sidebar) */
+        @media (max-width: 600px) {
+            #app-container { flex-direction: column; }
+            #ps-toolbar { flex-direction: row !important; width: 100% !important; height: auto !important; overflow-x: auto; }
+            canvas { width: 100% !important; height: auto !important; }
+        }
+
+        /* Photoshop Toolbar */
         #ps-toolbar {
             background: #2b2b2b;
             width: 50px;
@@ -30,6 +37,7 @@
             align-items: center;
             justify-content: center;
             transition: all 0.15s ease;
+            flex-shrink: 0;
         }
         .tool-btn:hover, .tool-btn.active {
             background: #0078d4;
@@ -45,13 +53,14 @@
             background: #2b2b2b;
             padding: 8px 14px;
             display: flex;
-            gap: 16px;
+            gap: 12px;
             align-items: center;
             border-radius: 4px;
             border: 1px solid #3a3a3a;
             font-size: 13px;
+            flex-wrap: wrap;
         }
-        input[type="range"] { width: 100px; }
+        input[type="range"] { width: 80px; }
         input[type="color"] { width: 32px; height: 32px; border: none; cursor: pointer; background: none; }
 
         canvas {
@@ -60,6 +69,8 @@
             cursor: crosshair;
             border-radius: 4px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            max-width: 100%;
+            touch-action: none;
         }
     </style>
 </head>
@@ -92,8 +103,8 @@
                 <input type="range" id="opacity" min="0.1" max="1.0" step="0.1" value="1.0">
                 <span id="opacityVal">100%</span>
 
-                <button class="tool-btn" style="width: auto; padding: 0 12px;" onclick="clearCanvas()">Clear 🗑️</button>
-                <button class="tool-btn" style="width: auto; padding: 0 12px;" onclick="downloadCanvas()">Export PNG 💾</button>
+                <button class="tool-btn" style="width: auto; padding: 0 10px;" onclick="clearCanvas()">Clear 🗑️</button>
+                <button class="tool-btn" style="width: auto; padding: 0 10px;" onclick="downloadCanvas()">Export PNG 💾</button>
             </div>
 
             <canvas id="paintCanvas" width="900" height="540"></canvas>
@@ -121,11 +132,30 @@
             if(btn) btn.classList.add('active');
         }
 
-        function startPosition(e) {
-            painting = true;
+        function getPos(e) {
             const rect = canvas.getBoundingClientRect();
-            startX = e.clientX - rect.left;
-            startY = e.clientY - rect.top;
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            let clientX = e.clientX;
+            let clientY = e.clientY;
+
+            if (e.touches && e.touches.length > 0) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            }
+
+            return {
+                x: (clientX - rect.left) * scaleX,
+                y: (clientY - rect.top) * scaleY
+            };
+        }
+
+        function startPosition(e) {
+            e.preventDefault();
+            painting = true;
+            const pos = getPos(e);
+            startX = pos.x;
+            startY = pos.y;
             snapshot = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
             if (currentTool === 'brush' || currentTool === 'pencil' || currentTool === 'eraser') {
@@ -145,7 +175,7 @@
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
                 painting = false;
             } else if (currentTool === 'eyedropper') {
-                const pixel = ctx.getImageData(startX, startY, 1, 1).data;
+                const pixel = ctx.getImageData(Math.floor(startX), Math.floor(startY), 1, 1).data;
                 const hex = "#" + ((1 << 24) + (pixel[0] << 16) + (pixel[1] << 8) + pixel[2]).toString(16).slice(1);
                 document.getElementById('colorPicker').value = hex;
                 painting = false;
@@ -160,9 +190,10 @@
 
         function draw(e) {
             if (!painting) return;
-            const rect = canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
+            e.preventDefault();
+            const pos = getPos(e);
+            const x = pos.x;
+            const y = pos.y;
 
             const color = document.getElementById('colorPicker').value;
             const size = document.getElementById('brushSize').value;
@@ -226,6 +257,10 @@
         canvas.addEventListener('mousedown', startPosition);
         canvas.addEventListener('mouseup', finishedPosition);
         canvas.addEventListener('mousemove', draw);
+
+        canvas.addEventListener('touchstart', startPosition, { passive: false });
+        canvas.addEventListener('touchend', finishedPosition, { passive: false });
+        canvas.addEventListener('touchmove', draw, { passive: false });
     </script>
 </body>
 </html>

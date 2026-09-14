@@ -17,6 +17,8 @@ header, footer, #MainMenu {
     justify-content: space-between;
     border-bottom: 1px solid #181818;
     font-size: 13px;
+    flex-wrap: wrap;
+    gap: 8px;
 }
 .ps-brand {
     display: flex;
@@ -40,13 +42,14 @@ header, footer, #MainMenu {
     gap: 2px !important;
     border-bottom: 1px solid #181818 !important;
     padding-left: 10px !important;
+    flex-wrap: wrap !important;
 }
 .stTabs [data-baseweb="tab"] {
     background-color: #2d2d2d !important;
     color: #b0b0b0 !important;
     border-radius: 4px 4px 0px 0px !important;
-    padding: 8px 16px !important;
-    font-size: 13px !important;
+    padding: 8px 12px !important;
+    font-size: 12px !important;
     font-weight: 500 !important;
     border: none !important;
 }
@@ -60,4 +63,15 @@ header, footer, #MainMenu {
     padding-top: 0.5rem !important;
     padding-bottom: 0rem !important;
     max-width: 100% !important;
+}
+
+/* Mobile responsive optimizations */
+@media (max-width: 768px) {
+    .ps-header {
+        font-size: 11px;
+        padding: 4px 8px;
+    }
+    .ps-header div:last-child {
+        display: none;
+    }
 }
