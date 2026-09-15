@@ -110,21 +110,21 @@ def generate_image_hf(prompt: str):
             logger.error(f"Fallback HF Image Generation Error: {ex}")
             return None
 
-# Authentic n8n Dark Canvas & Node Graph Renderer with Bezier Curved Connection Lines
+# Authentic Modern n8n Dark Canvas & Node Graph Renderer with Glowing Wires and Animated Signal Pulses
 def render_n8n_canvas_svg(workflow_data: dict | list):
     """
-    Renders an authentic n8n Dark Canvas UI with grid background (#090C10),
-    n8n node cards at [x, y] coordinates, port connection handles, and SVG cubic bezier curved paths.
+    Renders an ultra-modern n8n Dark Glassmorphism Canvas UI with grid background (#090C10),
+    glowing wire paths, animated flowing signal pulses, port handles, and status duration pills.
     """
     if isinstance(workflow_data, dict):
         nodes = workflow_data.get("nodes", [])
     else:
         nodes = workflow_data
 
-    node_dict = {n["id"]: n for n in nodes}
     svg_paths = []
+    svg_pulses = []
 
-    # Generate cubic bezier curved connection lines between consecutive nodes or via connections dict
+    # Generate cubic bezier curved connection lines and animated signal pulse dots
     for idx in range(len(nodes) - 1):
         src = nodes[idx]
         tgt = nodes[idx + 1]
@@ -132,7 +132,17 @@ def render_n8n_canvas_svg(workflow_data: dict | list):
         x2, y2 = tgt.get("position", [200 + (idx + 1) * 220, 200])[0], tgt.get("position", [200 + (idx + 1) * 220, 200])[1] + 40
         dx = max(40, (x2 - x1) / 2)
         path_d = f"M {x1} {y1} C {x1 + dx} {y1}, {x2 - dx} {y2}, {x2} {y2}"
-        svg_paths.append(f'<path d="{path_d}" stroke="#EA4B71" stroke-width="3" fill="none" stroke-dasharray="6,3" />')
+
+        path_id = f"wire_path_{idx}"
+        svg_paths.append(f'<path id="{path_id}" d="{path_d}" stroke="url(#wireGradient)" stroke-width="3.5" fill="none" filter="url(#glow)" />')
+
+        # Animated flowing signal pulse along path
+        pulse_svg = f"""
+        <circle r="5" fill="#FF6D5A" filter="url(#glowPulse)">
+            <animateMotion dur="2.5s" repeatCount="indefinite" path="{path_d}" />
+        </circle>
+        """
+        svg_pulses.append(pulse_svg)
 
     cards_html = []
     for idx, node in enumerate(nodes):
@@ -143,8 +153,8 @@ def render_n8n_canvas_svg(workflow_data: dict | list):
         disabled = node.get("disabled", False)
 
         status_dot_color = "#9CA3AF" if disabled else "#10B981"
-        status_text = "Disabled" if disabled else "Active"
-        card_opacity = "0.45" if disabled else "1.0"
+        status_text = "DISABLED" if disabled else "ACTIVE"
+        card_opacity = "0.5" if disabled else "1.0"
         header_color = meta.get("color", "#3B82F6")
 
         card_html = f"""
@@ -152,23 +162,25 @@ def render_n8n_canvas_svg(workflow_data: dict | list):
             position: absolute;
             left: {x}px;
             top: {y}px;
-            width: 180px;
-            background: #161B22;
-            border: 2px solid {header_color};
-            border-radius: 10px;
-            box-shadow: 0 8px 20px rgba(0,0,0,0.6);
+            width: 190px;
+            background: rgba(22, 27, 34, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-left: 4px solid {header_color};
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
             opacity: {card_opacity};
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             color: #F0F6FC;
             user-select: none;
             z-index: 10;
+            transition: all 0.3s ease;
         ">
             <!-- n8n Node Header Bar -->
             <div style="
-                background: {header_color};
-                padding: 6px 10px;
-                border-top-left-radius: 8px;
-                border-top-right-radius: 8px;
+                background: rgba(255, 255, 255, 0.04);
+                padding: 8px 12px;
+                border-top-right-radius: 10px;
                 display: flex;
                 align-items: center;
                 justify-content: space-between;
@@ -176,19 +188,22 @@ def render_n8n_canvas_svg(workflow_data: dict | list):
                 font-size: 11px;
                 text-transform: uppercase;
                 letter-spacing: 0.5px;
+                border-bottom: 1px solid rgba(255,255,255,0.06);
             ">
-                <span>{meta.get('icon', '⚡')} {meta.get('category', 'Action')}</span>
-                <span style="font-size: 9px; opacity: 0.9;">v{node.get('typeVersion', 1.0)}</span>
+                <span style="color: {header_color};">{meta.get('icon', '⚡')} {meta.get('category', 'Action')}</span>
+                <span style="font-size: 9px; color: #8B949E; background: rgba(255,255,255,0.08); padding: 2px 6px; border-radius: 6px;">v{node.get('typeVersion', 1.0)}</span>
             </div>
 
             <!-- Node Content -->
             <div style="padding: 10px 12px;">
-                <div style="font-size: 13px; font-weight: 600; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                <div style="font-size: 13px; font-weight: 600; margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
                     {node.get('name', meta['name'])}
                 </div>
-                <div style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: #8B949E;">
-                    <span style="width: 7px; height: 7px; border-radius: 50%; background: {status_dot_color}; display: inline-block;"></span>
-                    {status_text}
+                <div style="display: flex; align-items: center; justify-content: space-between; font-size: 10px; color: #8B949E;">
+                    <div style="display: flex; align-items: center; gap: 5px;">
+                        <span style="width: 7px; height: 7px; border-radius: 50%; background: {status_dot_color}; display: inline-block; box-shadow: 0 0 8px {status_dot_color};"></span>
+                        <span style="font-weight: 600; letter-spacing: 0.3px;">{status_text}</span>
+                    </div>
                 </div>
             </div>
 
@@ -196,24 +211,26 @@ def render_n8n_canvas_svg(workflow_data: dict | list):
             <div style="
                 position: absolute;
                 left: -7px;
-                top: 36px;
+                top: 40px;
                 width: 12px;
                 height: 12px;
                 border-radius: 50%;
                 background: #090C10;
                 border: 2px solid {header_color};
+                box-shadow: 0 0 6px {header_color};
             "></div>
 
             <!-- Right Output Port Handle -->
             <div style="
                 position: absolute;
                 right: -7px;
-                top: 36px;
+                top: 40px;
                 width: 12px;
                 height: 12px;
                 border-radius: 50%;
                 background: #EA4B71;
                 border: 2px solid #090C10;
+                box-shadow: 0 0 8px #EA4B71;
             "></div>
         </div>
         """
@@ -223,17 +240,34 @@ def render_n8n_canvas_svg(workflow_data: dict | list):
     <div style="
         position: relative;
         width: 100%;
-        height: 380px;
+        height: 400px;
         background-color: #090C10;
-        background-image: radial-gradient(#21262D 1px, transparent 1px);
-        background-size: 16px 16px;
-        border: 1px solid #30363D;
-        border-radius: 14px;
+        background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+        background-size: 20px 20px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 16px;
         overflow: auto;
         margin-bottom: 20px;
+        box-shadow: inset 0 0 40px rgba(0,0,0,0.8);
     ">
         <svg style="position: absolute; width: 100%; height: 100%; pointer-events: none; z-index: 1;">
+            <defs>
+                <linearGradient id="wireGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stop-color="#3B82F6" />
+                    <stop offset="50%" stop-color="#EA4B71" />
+                    <stop offset="100%" stop-color="#EC4899" />
+                </linearGradient>
+                <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+                    <feGaussianBlur stdDeviation="3" result="blur" />
+                    <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                </filter>
+                <filter id="glowPulse" x="-50%" y="-50%" width="200%" height="200%">
+                    <feGaussianBlur stdDeviation="4" result="blur" />
+                    <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                </filter>
+            </defs>
             {''.join(svg_paths)}
+            {''.join(svg_pulses)}
         </svg>
         {''.join(cards_html)}
     </div>
@@ -375,19 +409,66 @@ def main():
         layout="wide"
     )
 
-    st.title("⚡ n8n Node Graph Image Editing Server")
-    st.markdown(
-        "Design, inspect, and execute modular **n8n Node Graphs** on Hugging Face Spaces with PIL, Gemini 1.5 Flash, and Llama 3."
-    )
+    # Inject Ultra-Modern Glassmorphism Custom CSS Style
+    st.markdown("""
+    <style>
+        .stApp {
+            background-color: #090C10;
+            color: #F0F6FC;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        .n8n-header-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: linear-gradient(135deg, rgba(22, 27, 34, 0.9), rgba(13, 17, 23, 0.9));
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(234, 75, 113, 0.3);
+            border-radius: 16px;
+            padding: 16px 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 8px 32px rgba(234, 75, 113, 0.15);
+        }
+        .n8n-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+
+    # Top Header Navigation Bar
+    st.markdown(f"""
+    <div class="n8n-header-bar">
+        <div style="display: flex; align-items: center; gap: 14px;">
+            <div style="font-size: 32px; filter: drop-shadow(0 0 10px #EA4B71);">⚡</div>
+            <div>
+                <div style="font-size: 20px; font-weight: 800; letter-spacing: -0.5px; color: #FFFFFF;">n8n Image Workflow Server Studio</div>
+                <div style="font-size: 12px; color: #8B949E;">Automated Node Graph Pipeline Execution Engine on Hugging Face Spaces</div>
+            </div>
+        </div>
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <div class="n8n-badge"><span style="color: #10B981;">🟢</span> Llama 3 Chat</div>
+            <div class="n8n-badge"><span style="color: #10B981;">🟢</span> Gemini 1.5 Flash</div>
+            <div class="n8n-badge"><span style="color: #10B981;">🟢</span> Telegram Bot</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
     # Sidebar n8n Config & Templates
-    st.sidebar.header("⚡ n8n Server Status")
-    st.sidebar.markdown(f"- **Llama 3 Chat**: {'🟢 Active' if hf_client else '🔴 Inactive (Missing HF_TOKEN)'}")
+    st.sidebar.header("⚡ n8n Server Config")
+    st.sidebar.markdown(f"- **Llama 3 Chat**: {'🟢 Active' if hf_client else '🔴 Inactive'}")
     st.sidebar.markdown(f"- **Gemini 1.5 Flash**: {'🟢 Active' if GOOGLE_API_KEY and genai else '🔴 Inactive'}")
     st.sidebar.markdown(f"- **Telegram Bot**: {'🟢 Active' if TELEGRAM_TOKEN else '🔴 Inactive'}")
 
     st.sidebar.divider()
-    st.sidebar.header("🎯 n8n Workflow Templates")
+    st.sidebar.header("🎯 Workflow Templates")
     preset_choice = st.sidebar.selectbox("Load Workflow Template:", ["Custom"] + list(ImageWorkflowEngine.PRESETS.keys()))
 
     if preset_choice != "Custom":
@@ -411,7 +492,7 @@ def main():
 
     # TAB 1: VISUAL FLOW CANVAS
     with tab_canvas:
-        st.header("Authentic n8n Dark Canvas & Graph Connections")
+        st.subheader("Authentic n8n Dark Canvas & Graph Connections")
         st.markdown(render_n8n_canvas_svg(st.session_state.current_workflow), unsafe_allow_html=True)
 
         col_img, col_metrics = st.columns([1, 1])
