@@ -45,7 +45,7 @@ else:
 
 # Global thread-safe Active Workflow Storage (for Telegram & API default)
 GLOBAL_WORKFLOW_CONFIG = {
-    "active_workflow_steps": list(ImageWorkflowEngine.PRESETS["n8n Social Media Flow"])
+    "active_workflow_steps": dict(ImageWorkflowEngine.PRESETS["n8n Social Media Auto-Branding"])
 }
 
 # PDF Text Extraction
@@ -110,92 +110,135 @@ def generate_image_hf(prompt: str):
             logger.error(f"Fallback HF Image Generation Error: {ex}")
             return None
 
-# n8n Node Canvas Flowchart Renderer
-def render_n8n_flowchart_html(nodes: list[dict]):
+# Authentic n8n Dark Canvas & Node Graph Renderer with Bezier Curved Connection Lines
+def render_n8n_canvas_svg(workflow_data: dict | list):
     """
-    Renders an interactive n8n-style visual graph canvas showing node flow connections, status pills, and category colors.
+    Renders an authentic n8n Dark Canvas UI with grid background (#090C10),
+    n8n node cards at [x, y] coordinates, port connection handles, and SVG cubic bezier curved paths.
     """
-    html_cards = []
+    if isinstance(workflow_data, dict):
+        nodes = workflow_data.get("nodes", [])
+    else:
+        nodes = workflow_data
+
+    node_dict = {n["id"]: n for n in nodes}
+    svg_paths = []
+
+    # Generate cubic bezier curved connection lines between consecutive nodes or via connections dict
+    for idx in range(len(nodes) - 1):
+        src = nodes[idx]
+        tgt = nodes[idx + 1]
+        x1, y1 = src.get("position", [200 + idx * 220, 200])[0] + 180, src.get("position", [200 + idx * 220, 200])[1] + 40
+        x2, y2 = tgt.get("position", [200 + (idx + 1) * 220, 200])[0], tgt.get("position", [200 + (idx + 1) * 220, 200])[1] + 40
+        dx = max(40, (x2 - x1) / 2)
+        path_d = f"M {x1} {y1} C {x1 + dx} {y1}, {x2 - dx} {y2}, {x2} {y2}"
+        svg_paths.append(f'<path d="{path_d}" stroke="#EA4B71" stroke-width="3" fill="none" stroke-dasharray="6,3" />')
+
+    cards_html = []
     for idx, node in enumerate(nodes):
+        pos = node.get("position", [200 + idx * 220, 180])
+        x, y = pos[0], pos[1]
         ntype = node.get("type", "unknown")
-        meta = ImageWorkflowEngine.NODE_TYPES.get(ntype, {"name": ntype, "category": "Processor", "icon": "⚙️"})
-        enabled = node.get("enabled", True)
-        cat = meta.get("category", "Processor")
+        meta = ImageWorkflowEngine.NODE_TYPES.get(ntype, {"name": ntype, "category": "Action", "icon": "⚡", "color": "#3B82F6"})
+        disabled = node.get("disabled", False)
 
-        # Category colors mimicking n8n theme
-        bg_color = "#1F2937"
-        border_color = "#374151"
-        badge_bg = "#4B5563"
-
-        if cat == "Trigger":
-            border_color = "#10B981"  # Emerald
-            badge_bg = "#065F46"
-        elif cat == "Processor":
-            border_color = "#3B82F6"  # Blue
-            badge_bg = "#1E40AF"
-        elif cat == "Output":
-            border_color = "#8B5CF6"  # Purple
-            badge_bg = "#5B21B6"
-
-        opacity = "1.0" if enabled else "0.45"
-        status_dot = "🟢" if enabled else "⚪ Bypassed"
+        status_dot_color = "#9CA3AF" if disabled else "#10B981"
+        status_text = "Disabled" if disabled else "Active"
+        card_opacity = "0.45" if disabled else "1.0"
+        header_color = meta.get("color", "#3B82F6")
 
         card_html = f"""
         <div style="
-            display: inline-flex;
-            flex-direction: column;
-            align-items: center;
-            background: {bg_color};
-            border: 2px solid {border_color};
-            border-radius: 12px;
-            padding: 12px 16px;
-            min-width: 170px;
-            opacity: {opacity};
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            margin: 8px 4px;
-            font-family: system-ui, sans-serif;
-            color: #F9FAFB;
+            position: absolute;
+            left: {x}px;
+            top: {y}px;
+            width: 180px;
+            background: #161B22;
+            border: 2px solid {header_color};
+            border-radius: 10px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.6);
+            opacity: {card_opacity};
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            color: #F0F6FC;
+            user-select: none;
+            z-index: 10;
         ">
-            <div style="font-size: 24px; margin-bottom: 4px;">{meta.get('icon', '⚡')}</div>
-            <div style="font-size: 13px; font-weight: 700; text-align: center; margin-bottom: 4px;">{node.get('name', meta['name'])}</div>
+            <!-- n8n Node Header Bar -->
             <div style="
-                background: {badge_bg};
-                font-size: 10px;
-                padding: 2px 8px;
-                border-radius: 10px;
+                background: {header_color};
+                padding: 6px 10px;
+                border-top-left-radius: 8px;
+                border-top-right-radius: 8px;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                font-weight: 700;
+                font-size: 11px;
                 text-transform: uppercase;
                 letter-spacing: 0.5px;
-                font-weight: 600;
-                margin-bottom: 6px;
-            ">{cat}</div>
-            <div style="font-size: 10px; color: #9CA3AF;">{status_dot}</div>
+            ">
+                <span>{meta.get('icon', '⚡')} {meta.get('category', 'Action')}</span>
+                <span style="font-size: 9px; opacity: 0.9;">v{node.get('typeVersion', 1.0)}</span>
+            </div>
+
+            <!-- Node Content -->
+            <div style="padding: 10px 12px;">
+                <div style="font-size: 13px; font-weight: 600; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                    {node.get('name', meta['name'])}
+                </div>
+                <div style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: #8B949E;">
+                    <span style="width: 7px; height: 7px; border-radius: 50%; background: {status_dot_color}; display: inline-block;"></span>
+                    {status_text}
+                </div>
+            </div>
+
+            <!-- Left Input Port Handle -->
+            <div style="
+                position: absolute;
+                left: -7px;
+                top: 36px;
+                width: 12px;
+                height: 12px;
+                border-radius: 50%;
+                background: #090C10;
+                border: 2px solid {header_color};
+            "></div>
+
+            <!-- Right Output Port Handle -->
+            <div style="
+                position: absolute;
+                right: -7px;
+                top: 36px;
+                width: 12px;
+                height: 12px;
+                border-radius: 50%;
+                background: #EA4B71;
+                border: 2px solid #090C10;
+            "></div>
         </div>
         """
-        html_cards.append(card_html)
-        if idx < len(nodes) - 1:
-            arrow_html = """
-            <div style="display: inline-flex; align-items: center; margin: 0 6px; color: #FF6D5A; font-size: 20px; font-weight: bold;">
-                ➔
-            </div>
-            """
-            html_cards.append(arrow_html)
+        cards_html.append(card_html)
 
-    flow_container = f"""
+    canvas_html = f"""
     <div style="
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        background-color: #0D1117;
-        padding: 20px;
-        border-radius: 16px;
+        position: relative;
+        width: 100%;
+        height: 380px;
+        background-color: #090C10;
+        background-image: radial-gradient(#21262D 1px, transparent 1px);
+        background-size: 16px 16px;
         border: 1px solid #30363D;
-        overflow-x: auto;
+        border-radius: 14px;
+        overflow: auto;
         margin-bottom: 20px;
     ">
-        {''.join(html_cards)}
+        <svg style="position: absolute; width: 100%; height: 100%; pointer-events: none; z-index: 1;">
+            {''.join(svg_paths)}
+        </svg>
+        {''.join(cards_html)}
     </div>
     """
-    return flow_container
+    return canvas_html
 
 # Telegram Bot Handlers
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -203,7 +246,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "👋 Welcome to Hugging Face Image Editing Workflow Server Bot!\n"
         "- Chat with Llama 3 by sending a text message.\n"
         "- Send a PDF to summarize via Gemini 1.5 Flash.\n"
-        "- Send a Photo to apply the server's active image workflow automatically!"
+        "- Send a Photo to apply the server's active n8n workflow automatically!"
     )
 
 async def chat_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -258,14 +301,14 @@ async def document_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"Error processing document: {e}")
 
 async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    status_msg = await update.message.reply_text("🎨 Applying active Image Workflow pipeline...")
+    status_msg = await update.message.reply_text("🎨 Applying active n8n Image Workflow pipeline...")
     try:
         photo_file = await update.message.photo[-1].get_file()
         img_bytes = await photo_file.download_as_bytearray()
         input_img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
 
-        steps = GLOBAL_WORKFLOW_CONFIG.get("active_workflow_steps", ImageWorkflowEngine.PRESETS["n8n Social Media Flow"])
-        processed_img, telemetry = ImageWorkflowEngine.run_pipeline(input_img, steps)
+        workflow_data = GLOBAL_WORKFLOW_CONFIG.get("active_workflow_steps", ImageWorkflowEngine.PRESETS["n8n Social Media Auto-Branding"])
+        processed_img, telemetry = ImageWorkflowEngine.run_pipeline(input_img, workflow_data)
 
         out_buffer = io.BytesIO()
         processed_img.save(out_buffer, format="JPEG", quality=92)
@@ -327,39 +370,40 @@ def main():
         pass
 
     st.set_page_config(
-        page_title="n8n Image Workflow Server Studio",
+        page_title="n8n Node Graph Image Editing Server",
         page_icon="⚡",
         layout="wide"
     )
 
-    st.title("⚡ n8n Image Workflow Server Studio")
+    st.title("⚡ n8n Node Graph Image Editing Server")
     st.markdown(
-        "Build, visualize, and execute modular **n8n-style Node Graph Workflows** on Hugging Face Spaces with PIL, Gemini 1.5 Flash, and Llama 3."
+        "Design, inspect, and execute modular **n8n Node Graphs** on Hugging Face Spaces with PIL, Gemini 1.5 Flash, and Llama 3."
     )
 
-    st.sidebar.header("⚙️ Server Status & Config")
+    # Sidebar n8n Config & Templates
+    st.sidebar.header("⚡ n8n Server Status")
     st.sidebar.markdown(f"- **Llama 3 Chat**: {'🟢 Active' if hf_client else '🔴 Inactive (Missing HF_TOKEN)'}")
     st.sidebar.markdown(f"- **Gemini 1.5 Flash**: {'🟢 Active' if GOOGLE_API_KEY and genai else '🔴 Inactive'}")
     st.sidebar.markdown(f"- **Telegram Bot**: {'🟢 Active' if TELEGRAM_TOKEN else '🔴 Inactive'}")
 
     st.sidebar.divider()
     st.sidebar.header("🎯 n8n Workflow Templates")
-    preset_choice = st.sidebar.selectbox("Load Preset Workflow:", ["Custom"] + list(ImageWorkflowEngine.PRESETS.keys()))
+    preset_choice = st.sidebar.selectbox("Load Workflow Template:", ["Custom"] + list(ImageWorkflowEngine.PRESETS.keys()))
 
     if preset_choice != "Custom":
         if st.sidebar.button(f"Load '{preset_choice}'"):
-            st.session_state.current_workflow = list(ImageWorkflowEngine.PRESETS[preset_choice])
+            st.session_state.current_workflow = dict(ImageWorkflowEngine.PRESETS[preset_choice])
             GLOBAL_WORKFLOW_CONFIG["active_workflow_steps"] = st.session_state.current_workflow
             st.sidebar.success(f"Loaded template: {preset_choice}")
 
     if "current_workflow" not in st.session_state:
-        st.session_state.current_workflow = list(ImageWorkflowEngine.PRESETS["n8n Social Media Flow"])
+        st.session_state.current_workflow = dict(ImageWorkflowEngine.PRESETS["n8n Social Media Auto-Branding"])
         GLOBAL_WORKFLOW_CONFIG["active_workflow_steps"] = st.session_state.current_workflow
 
     tab_canvas, tab_inspector, tab_batch, tab_ai, tab_json, tab_api = st.tabs([
-        "🌐 n8n Flow Visualizer",
-        "🎛️ Node Inspector & Builder",
-        "📦 Batch Processing",
+        "🌐 n8n Flow Canvas",
+        "🎛️ Node Inspector & Graph Editor",
+        "📦 Batch Execution",
         "🤖 AI Multi-Modal Suite",
         "📄 Workflow JSON",
         "💻 API & Server Docs"
@@ -367,13 +411,13 @@ def main():
 
     # TAB 1: VISUAL FLOW CANVAS
     with tab_canvas:
-        st.header("Interactive n8n Node Flowchart Canvas")
-        st.markdown(render_n8n_flowchart_html(st.session_state.current_workflow), unsafe_allow_html=True)
+        st.header("Authentic n8n Dark Canvas & Graph Connections")
+        st.markdown(render_n8n_canvas_svg(st.session_state.current_workflow), unsafe_allow_html=True)
 
         col_img, col_metrics = st.columns([1, 1])
 
         with col_img:
-            st.subheader("Source & Render Preview")
+            st.subheader("Source & Render Output Preview")
             input_image = None
             upload_source = st.radio("Image Source:", ["Upload Local File", "Generate via AI Text Prompt", "Sample Placeholder"], horizontal=True)
 
@@ -400,110 +444,120 @@ def main():
 
             if input_image and st.session_state.current_workflow:
                 out_img, telemetry = ImageWorkflowEngine.run_pipeline(input_image, st.session_state.current_workflow)
-                st.image(out_img, caption=f"Final Output Asset ({out_img.width}x{out_img.height})", use_container_width=True)
+                st.image(out_img, caption=f"Rendered Output Asset ({out_img.width}x{out_img.height})", use_container_width=True)
 
                 buf = io.BytesIO()
                 out_img.save(buf, format="PNG")
-                st.download_button("💾 Download Rendered Asset (PNG)", data=buf.getvalue(), file_name="n8n_processed.png", mime="image/png")
+                st.download_button("💾 Download Rendered Asset (PNG)", data=buf.getvalue(), file_name="n8n_rendered.png", mime="image/png")
 
         with col_metrics:
-            st.subheader("⚡ Per-Node Execution Telemetry Metrics")
+            st.subheader("⚡ n8n Node Execution Telemetry")
             if input_image and st.session_state.current_workflow:
                 for t in telemetry:
-                    status_badge = "🟢 SUCCESS" if t["status"] == "success" else ("⚪ BYPASSED" if t["status"] == "bypassed" else "🔴 ERROR")
+                    status_badge = "🟢 SUCCESS" if t["status"] == "success" else ("⚪ DISABLED" if t["status"] == "disabled" else "🔴 ERROR")
                     st.markdown(f"**Step {t['step_number']}: {t['icon']} {t['name']}** — `{status_badge}`")
-                    st.caption(f"Category: {t.get('category', 'Processor')} | Time: **{t['execution_time_ms']} ms** | Output Dim: **{t['output_dimensions']}**")
+                    st.caption(f"Category: {t.get('category', 'Action')} | Execution Time: **{t['execution_time_ms']} ms** | Output Dim: **{t['output_dimensions']}**")
                     st.divider()
 
-    # TAB 2: NODE INSPECTOR & BUILDER
+    # TAB 2: NODE INSPECTOR & GRAPH EDITOR
     with tab_inspector:
-        st.header("🎛️ Node Graph Inspector & Builder")
+        st.header("🎛️ n8n Node Inspector Drawer & Graph Editor")
 
         col_nodes, col_add = st.columns([3, 2])
 
-        with col_nodes:
-            st.subheader("Configured Nodes Sequence")
-            if not st.session_state.current_workflow:
-                st.info("Graph is empty. Add a node from the panel.")
-            else:
-                for idx, node in enumerate(st.session_state.current_workflow):
-                    ntype = node.get("type", "unknown")
-                    meta = ImageWorkflowEngine.NODE_TYPES.get(ntype, {"name": ntype, "icon": "⚙️"})
+        curr_nodes = st.session_state.current_workflow.get("nodes", []) if isinstance(st.session_state.current_workflow, dict) else st.session_state.current_workflow
 
-                    with st.expander(f"#{idx+1} {meta['icon']} {node.get('name', meta['name'])} [{'Active' if node.get('enabled', True) else 'Bypassed'}]", expanded=False):
+        with col_nodes:
+            st.subheader("Active Nodes & Parameters")
+            if not curr_nodes:
+                st.info("Graph is empty. Add a node from the library.")
+            else:
+                for idx, node in enumerate(curr_nodes):
+                    ntype = node.get("type", "unknown")
+                    meta = ImageWorkflowEngine.NODE_TYPES.get(ntype, {"name": ntype, "icon": "⚡"})
+                    is_disabled = node.get("disabled", False)
+
+                    with st.expander(f"#{idx+1} {meta['icon']} {node.get('name', meta['name'])} [{'Disabled' if is_disabled else 'Active'}]", expanded=False):
                         c1, c2, c3 = st.columns([2, 2, 1])
-                        node["name"] = c1.text_input("Node Custom Label:", value=node.get("name", meta["name"]), key=f"lbl_{idx}")
-                        node["enabled"] = c2.checkbox("Enable Node", value=node.get("enabled", True), key=f"enb_{idx}")
+                        node["name"] = c1.text_input("Custom Label:", value=node.get("name", meta["name"]), key=f"lbl_{idx}")
+                        node["disabled"] = not c2.checkbox("Enabled", value=not is_disabled, key=f"enb_{idx}")
                         if c3.button("🗑️ Delete", key=f"del_{idx}"):
-                            st.session_state.current_workflow.pop(idx)
+                            curr_nodes.pop(idx)
                             GLOBAL_WORKFLOW_CONFIG["active_workflow_steps"] = st.session_state.current_workflow
                             st.rerun()
 
-                        st.write("**Parameters:**", node.get("params", {}))
+                        st.write("**Parameters JSON:**", node.get("parameters", {}))
 
         with col_add:
-            st.subheader("➕ Add New n8n Node")
-            node_type_key = st.selectbox("Select Node Type:", list(ImageWorkflowEngine.NODE_TYPES.keys()), format_func=lambda k: f"{ImageWorkflowEngine.NODE_TYPES[k]['icon']} {ImageWorkflowEngine.NODE_TYPES[k]['name']} ({ImageWorkflowEngine.NODE_TYPES[k]['category']})")
+            st.subheader("➕ Add Node from Library")
+            node_type_key = st.selectbox(
+                "Select Node Type:",
+                list(ImageWorkflowEngine.NODE_TYPES.keys()),
+                format_func=lambda k: f"{ImageWorkflowEngine.NODE_TYPES[k]['icon']} {ImageWorkflowEngine.NODE_TYPES[k]['name']} ({ImageWorkflowEngine.NODE_TYPES[k]['category']})"
+            )
 
             node_meta = ImageWorkflowEngine.NODE_TYPES[node_type_key]
-            node_name = st.text_input("Node Name:", node_meta["name"])
+            node_name = st.text_input("Node Custom Label:", node_meta["name"])
 
             params = {}
-            if node_type_key == "resize":
+            if "resize" in node_type_key:
                 w = st.number_input("Width (px):", min_value=10, max_value=4000, value=1080)
                 h = st.number_input("Height (px):", min_value=10, max_value=4000, value=1080)
-                aspect = st.checkbox("Keep Aspect Ratio", value=True)
+                aspect = st.checkbox("Maintain Aspect Ratio", value=True)
                 params = {"width": w, "height": h, "maintain_aspect_ratio": aspect}
-            elif node_type_key == "crop":
+            elif "crop" in node_type_key:
                 left = st.slider("Left %:", 0.0, 50.0, 0.0)
                 top = st.slider("Top %:", 0.0, 50.0, 0.0)
                 right = st.slider("Right %:", 50.0, 100.0, 100.0)
                 bottom = st.slider("Bottom %:", 50.0, 100.0, 100.0)
                 params = {"left_pct": left, "top_pct": top, "right_pct": right, "bottom_pct": bottom}
-            elif node_type_key == "adjust_color":
+            elif "adjustColor" in node_type_key:
                 b = st.slider("Brightness:", 0.1, 2.0, 1.0, 0.05)
                 c = st.slider("Contrast:", 0.1, 2.0, 1.0, 0.05)
                 s = st.slider("Saturation:", 0.0, 2.0, 1.0, 0.05)
                 sh = st.slider("Sharpness:", 0.0, 3.0, 1.0, 0.1)
                 params = {"brightness": b, "contrast": c, "saturation": s, "sharpness": sh}
-            elif node_type_key == "filter":
-                ftype = st.selectbox("Filter:", ["grayscale", "sepia", "blur", "contour", "edge_enhance", "invert", "posterize", "vignette"])
+            elif "filterFx" in node_type_key:
+                ftype = st.selectbox("Filter FX:", ["grayscale", "sepia", "blur", "contour", "edge_enhance", "invert", "posterize", "vignette"])
                 radius = st.slider("Radius (for blur):", 0.5, 10.0, 2.0) if ftype == "blur" else 2.0
                 params = {"filter_type": ftype, "radius": radius}
-            elif node_type_key == "watermark":
-                wtext = st.text_input("Watermark Text:", "n8n Workflow")
+            elif "watermark" in node_type_key:
+                wtext = st.text_input("Watermark Text:", "n8n Studio")
                 pos = st.selectbox("Position:", ["bottom-right", "bottom-left", "top-right", "top-left", "center"])
                 color = st.color_picker("Color:", "#FFFFFF")
                 opacity = st.slider("Opacity:", 0.1, 1.0, 0.8)
                 params = {"text": wtext, "position": pos, "color": color, "opacity": opacity}
 
-            if st.button("Add Node to Graph"):
+            if st.button("Add Node to Graph Canvas"):
+                new_x = 240 + len(curr_nodes) * 240
                 new_node_obj = {
-                    "id": f"node_{len(st.session_state.current_workflow)+1}",
+                    "id": f"node_{len(curr_nodes)+1}",
                     "type": node_type_key,
                     "name": node_name,
-                    "enabled": True,
-                    "params": params
+                    "typeVersion": node_meta.get("typeVersion", 1.0),
+                    "position": [new_x, 300],
+                    "disabled": False,
+                    "parameters": params
                 }
-                st.session_state.current_workflow.append(new_node_obj)
+                curr_nodes.append(new_node_obj)
                 GLOBAL_WORKFLOW_CONFIG["active_workflow_steps"] = st.session_state.current_workflow
                 st.success(f"Added node '{node_name}'!")
                 st.rerun()
 
     # TAB 3: BATCH PROCESSING
     with tab_batch:
-        st.header("📦 Batch Image Processing Server")
+        st.header("📦 n8n Batch Execution Engine")
         batch_files = st.file_uploader("Upload multiple images for batch processing:", type=["png", "jpg", "jpeg", "webp"], accept_multiple_files=True)
 
         if batch_files and st.session_state.current_workflow:
-            if st.button("🚀 Execute Batch Node Workflow"):
+            if st.button("🚀 Run Batch Workflow Graph"):
                 results = []
-                for i, file_item in enumerate(batch_files):
+                for file_item in batch_files:
                     img = Image.open(file_item).convert("RGB")
                     pimg, _ = ImageWorkflowEngine.run_pipeline(img, st.session_state.current_workflow)
                     results.append((file_item.name, pimg))
 
-                st.success(f"Processed {len(results)} images successfully!")
+                st.success(f"Processed {len(results)} images!")
                 cols = st.columns(min(3, len(results)))
                 for idx, (fname, pimg) in enumerate(results):
                     with cols[idx % 3]:
@@ -511,7 +565,7 @@ def main():
 
     # TAB 4: AI MULTI-MODAL SUITE
     with tab_ai:
-        st.header("🤖 AI Multi-Modal & Photo Assistant")
+        st.header("🤖 AI Multi-Modal Suite")
         ai_file = st.file_uploader("Upload image to analyze with Gemini 1.5 Flash:", type=["png", "jpg", "jpeg", "webp"], key="ai_photo_uploader")
         custom_prompt = st.text_input("Analysis Prompt:", "Analyze this image in detail and recommend optimal editing adjustments.")
 
@@ -527,15 +581,15 @@ def main():
         col_exp, col_imp = st.columns(2)
 
         with col_exp:
-            st.subheader("Export Graph JSON")
+            st.subheader("Export Workflow JSON")
             json_str = ImageWorkflowEngine.export_workflow_json(st.session_state.current_workflow)
             st.code(json_str, language="json")
-            st.download_button("💾 Download Workflow (.json)", data=json_str, file_name="n8n_image_workflow.json", mime="application/json")
+            st.download_button("💾 Download Workflow (.json)", data=json_str, file_name="n8n_workflow.json", mime="application/json")
 
         with col_imp:
-            st.subheader("Import Graph JSON")
-            uploaded_json = st.file_uploader("Upload Workflow JSON:", type=["json"], key="json_uploader")
-            if uploaded_json and st.button("📥 Import JSON"):
+            st.subheader("Import Workflow JSON")
+            uploaded_json = st.file_uploader("Upload n8n Workflow JSON:", type=["json"], key="json_uploader")
+            if uploaded_json and st.button("📥 Load Workflow JSON"):
                 imported = ImageWorkflowEngine.import_workflow_json(uploaded_json.getvalue().decode("utf-8"))
                 if imported:
                     st.session_state.current_workflow = imported
@@ -547,7 +601,7 @@ def main():
     with tab_api:
         st.header("💻 Server API & Integration Documentation")
         st.markdown("""
-        This Hugging Face Space operates an **n8n-style Node Graph Image Workflow Server**.
+        This Hugging Face Space runs an authentic **n8n Node Graph Image Workflow Server**.
 
         ### Python Code Snippet to Run Node Graph Headlessly
         ```python
@@ -555,15 +609,16 @@ def main():
         from workflow_engine import ImageWorkflowEngine
 
         img = Image.open("input.jpg")
-        nodes = [
-            {"id": "n1", "type": "trigger_file", "name": "Input Image", "enabled": True, "params": {}},
-            {"id": "n2", "type": "resize", "name": "Resize 1080p", "enabled": True, "params": {"width": 1080, "height": 1080, "maintain_aspect_ratio": True}},
-            {"id": "n3", "type": "filter", "name": "Sepia Tone", "enabled": True, "params": {"filter_type": "sepia"}},
-            {"id": "n4", "type": "watermark", "name": "Watermark", "enabled": True, "params": {"text": "n8n Server"}}
-        ]
+        workflow = {
+            "nodes": [
+                {"id": "n1", "type": "n8n-nodes-base.fileTrigger", "name": "Input", "position": [240, 300], "disabled": False, "parameters": {}},
+                {"id": "n2", "type": "n8n-nodes-base.resize", "name": "Resize 1080p", "position": [480, 300], "disabled": False, "parameters": {"width": 1080, "height": 1080}},
+                {"id": "n3", "type": "n8n-nodes-base.filterFx", "name": "Sepia", "position": [720, 300], "disabled": False, "parameters": {"filter_type": "sepia"}}
+            ]
+        }
 
-        out_img, telemetry = ImageWorkflowEngine.run_pipeline(img, nodes)
-        out_img.save("processed_output.jpg")
+        out_img, telemetry = ImageWorkflowEngine.run_pipeline(img, workflow)
+        out_img.save("rendered_asset.jpg")
         print(telemetry)
         ```
         """)

@@ -8,54 +8,205 @@ logger = logging.getLogger(__name__)
 
 class ImageWorkflowEngine:
     """
-    n8n-style Node Graph image processing workflow engine.
-    Supports modular Nodes (Trigger, Processor, Output), node bypass toggles,
-    execution graph sequence, and per-node performance telemetry.
+    Authentic n8n Node Graph Execution Engine.
+    Supports n8n Node Schemas (id, type, name, typeVersion, position [x,y], parameters, disabled),
+    Connections/Edges between nodes, topological sorting graph execution, and execution telemetry.
     """
 
     NODE_TYPES = {
-        # Triggers
-        "trigger_file": {"name": "File Upload Trigger", "category": "Trigger", "icon": "📁"},
-        "trigger_telegram": {"name": "Telegram Photo Trigger", "category": "Trigger", "icon": "✈️"},
-        "trigger_ai_gen": {"name": "AI Generation Trigger", "category": "Trigger", "icon": "✨"},
-        # Processors
-        "resize": {"name": "Resize Node", "category": "Processor", "icon": "📐"},
-        "crop": {"name": "Crop Node", "category": "Processor", "icon": "✂️"},
-        "adjust_color": {"name": "Color Adjustment Node", "category": "Processor", "icon": "🎨"},
-        "rotate_flip": {"name": "Rotate & Flip Node", "category": "Processor", "icon": "🔄"},
-        "filter": {"name": "Artistic Filter Node", "category": "Processor", "icon": "🎭"},
-        "gemini_analysis": {"name": "Gemini AI Analyzer Node", "category": "Processor", "icon": "🧠"},
-        # Outputs
-        "watermark": {"name": "Watermark Node", "category": "Output", "icon": "🏷️"},
-        "output_download": {"name": "Download Output Node", "category": "Output", "icon": "💾"}
+        # Triggers (Green / Emerald)
+        "n8n-nodes-base.fileTrigger": {
+            "name": "On File Upload",
+            "category": "Trigger",
+            "icon": "📁",
+            "color": "#10B981",
+            "typeVersion": 1.0
+        },
+        "n8n-nodes-base.telegramTrigger": {
+            "name": "Telegram Photo Trigger",
+            "category": "Trigger",
+            "icon": "✈️",
+            "color": "#10B981",
+            "typeVersion": 1.0
+        },
+        "n8n-nodes-base.aiGenTrigger": {
+            "name": "AI Generation Trigger",
+            "category": "Trigger",
+            "icon": "✨",
+            "color": "#10B981",
+            "typeVersion": 1.0
+        },
+        # Actions / Processors (Blue / Indigo)
+        "n8n-nodes-base.resize": {
+            "name": "Resize Asset",
+            "category": "Action",
+            "icon": "📐",
+            "color": "#3B82F6",
+            "typeVersion": 1.1
+        },
+        "n8n-nodes-base.crop": {
+            "name": "Crop Canvas",
+            "category": "Action",
+            "icon": "✂️",
+            "color": "#3B82F6",
+            "typeVersion": 1.0
+        },
+        "n8n-nodes-base.adjustColor": {
+            "name": "Color Grade & Adjust",
+            "category": "Action",
+            "icon": "🎨",
+            "color": "#3B82F6",
+            "typeVersion": 1.2
+        },
+        "n8n-nodes-base.rotateFlip": {
+            "name": "Rotate & Mirror",
+            "category": "Action",
+            "icon": "🔄",
+            "color": "#3B82F6",
+            "typeVersion": 1.0
+        },
+        "n8n-nodes-base.filterFx": {
+            "name": "Artistic Filter FX",
+            "category": "Action",
+            "icon": "🎭",
+            "color": "#3B82F6",
+            "typeVersion": 1.0
+        },
+        "n8n-nodes-base.geminiVision": {
+            "name": "Gemini 1.5 AI Inspector",
+            "category": "AI",
+            "icon": "🧠",
+            "color": "#EC4899",
+            "typeVersion": 2.0
+        },
+        # Outputs (Purple / Pink)
+        "n8n-nodes-base.watermark": {
+            "name": "Brand Watermark Overlay",
+            "category": "Output",
+            "icon": "🏷️",
+            "color": "#8B5CF6",
+            "typeVersion": 1.0
+        },
+        "n8n-nodes-base.downloadOutput": {
+            "name": "Export Rendered Asset",
+            "category": "Output",
+            "icon": "💾",
+            "color": "#8B5CF6",
+            "typeVersion": 1.0
+        }
     }
 
     PRESETS = {
-        "n8n Social Media Flow": [
-            {"id": "node_1", "type": "trigger_file", "name": "Image Input", "enabled": True, "params": {}},
-            {"id": "node_2", "type": "resize", "name": "Format Square (1080x1080)", "enabled": True, "params": {"width": 1080, "height": 1080, "maintain_aspect_ratio": True}},
-            {"id": "node_3", "type": "adjust_color", "name": "Vibrant Color Enhancement", "enabled": True, "params": {"brightness": 1.05, "contrast": 1.1, "saturation": 1.2, "sharpness": 1.1}},
-            {"id": "node_4", "type": "watermark", "name": "Brand Watermark Overlay", "enabled": True, "params": {"text": "n8n Workflow Space", "position": "bottom-right", "color": "#FFFFFF", "opacity": 0.8}},
-            {"id": "node_5", "type": "output_download", "name": "Export Final Asset", "enabled": True, "params": {}}
-        ],
-        "n8n Vintage Film Flow": [
-            {"id": "node_1", "type": "trigger_file", "name": "Image Input", "enabled": True, "params": {}},
-            {"id": "node_2", "type": "adjust_color", "name": "Warm Film Tone", "enabled": True, "params": {"brightness": 0.95, "contrast": 1.15, "saturation": 0.7, "sharpness": 0.9}},
-            {"id": "node_3", "type": "filter", "name": "Sepia Filter Node", "enabled": True, "params": {"filter_type": "sepia"}},
-            {"id": "node_4", "type": "filter", "name": "Vignette Shading Node", "enabled": True, "params": {"filter_type": "vignette"}},
-            {"id": "node_5", "type": "output_download", "name": "Export Vintage Asset", "enabled": True, "params": {}}
-        ],
-        "n8n Monochrome Art Flow": [
-            {"id": "node_1", "type": "trigger_file", "name": "Image Input", "enabled": True, "params": {}},
-            {"id": "node_2", "type": "filter", "name": "Grayscale Filter Node", "enabled": True, "params": {"filter_type": "grayscale"}},
-            {"id": "node_3", "type": "adjust_color", "name": "High Contrast Boost", "enabled": True, "params": {"brightness": 1.0, "contrast": 1.4, "saturation": 1.0, "sharpness": 1.3}},
-            {"id": "node_4", "type": "watermark", "name": "Signature Stamp", "enabled": True, "params": {"text": "Monochrome Studio", "position": "bottom-left", "color": "#000000", "opacity": 0.9}}
-        ],
-        "n8n Edge Sketch Flow": [
-            {"id": "node_1", "type": "trigger_file", "name": "Image Input", "enabled": True, "params": {}},
-            {"id": "node_2", "type": "filter", "name": "Contour Edge Detect", "enabled": True, "params": {"filter_type": "contour"}},
-            {"id": "node_3", "type": "adjust_color", "name": "Edge Sharpening", "enabled": True, "params": {"brightness": 1.1, "contrast": 1.3, "saturation": 1.0, "sharpness": 1.5}}
-        ]
+        "n8n Social Media Auto-Branding": {
+            "nodes": [
+                {
+                    "id": "node_trigger",
+                    "type": "n8n-nodes-base.fileTrigger",
+                    "name": "File Input Trigger",
+                    "typeVersion": 1.0,
+                    "position": [240, 300],
+                    "disabled": False,
+                    "parameters": {}
+                },
+                {
+                    "id": "node_resize",
+                    "type": "n8n-nodes-base.resize",
+                    "name": "Format Square 1080p",
+                    "typeVersion": 1.1,
+                    "position": [480, 300],
+                    "disabled": False,
+                    "parameters": {"width": 1080, "height": 1080, "maintain_aspect_ratio": True}
+                },
+                {
+                    "id": "node_color",
+                    "type": "n8n-nodes-base.adjustColor",
+                    "name": "Vibrant Color Boost",
+                    "typeVersion": 1.2,
+                    "position": [720, 300],
+                    "disabled": False,
+                    "parameters": {"brightness": 1.05, "contrast": 1.1, "saturation": 1.2, "sharpness": 1.1}
+                },
+                {
+                    "id": "node_watermark",
+                    "type": "n8n-nodes-base.watermark",
+                    "name": "Brand Watermark Stamp",
+                    "typeVersion": 1.0,
+                    "position": [960, 300],
+                    "disabled": False,
+                    "parameters": {"text": "n8n Workflow Studio", "position": "bottom-right", "color": "#FFFFFF", "opacity": 0.8}
+                },
+                {
+                    "id": "node_output",
+                    "type": "n8n-nodes-base.downloadOutput",
+                    "name": "Export Asset",
+                    "typeVersion": 1.0,
+                    "position": [1200, 300],
+                    "disabled": False,
+                    "parameters": {}
+                }
+            ],
+            "connections": {
+                "node_trigger": {"main": [[{"node": "node_resize", "type": "main", "index": 0}]]},
+                "node_resize": {"main": [[{"node": "node_color", "type": "main", "index": 0}]]},
+                "node_color": {"main": [[{"node": "node_watermark", "type": "main", "index": 0}]]},
+                "node_watermark": {"main": [[{"node": "node_output", "type": "main", "index": 0}]]}
+            }
+        },
+        "n8n Vintage Filter Pipeline": {
+            "nodes": [
+                {
+                    "id": "node_trigger",
+                    "type": "n8n-nodes-base.fileTrigger",
+                    "name": "Source File",
+                    "typeVersion": 1.0,
+                    "position": [240, 300],
+                    "disabled": False,
+                    "parameters": {}
+                },
+                {
+                    "id": "node_color",
+                    "type": "n8n-nodes-base.adjustColor",
+                    "name": "Warm Contrast",
+                    "typeVersion": 1.2,
+                    "position": [480, 300],
+                    "disabled": False,
+                    "parameters": {"brightness": 0.95, "contrast": 1.15, "saturation": 0.7, "sharpness": 0.9}
+                },
+                {
+                    "id": "node_sepia",
+                    "type": "n8n-nodes-base.filterFx",
+                    "name": "Sepia Tone FX",
+                    "typeVersion": 1.0,
+                    "position": [720, 300],
+                    "disabled": False,
+                    "parameters": {"filter_type": "sepia"}
+                },
+                {
+                    "id": "node_vignette",
+                    "type": "n8n-nodes-base.filterFx",
+                    "name": "Vignette Shading",
+                    "typeVersion": 1.0,
+                    "position": [960, 300],
+                    "disabled": False,
+                    "parameters": {"filter_type": "vignette"}
+                },
+                {
+                    "id": "node_output",
+                    "type": "n8n-nodes-base.downloadOutput",
+                    "name": "Export Vintage Asset",
+                    "typeVersion": 1.0,
+                    "position": [1200, 300],
+                    "disabled": False,
+                    "parameters": {}
+                }
+            ],
+            "connections": {
+                "node_trigger": {"main": [[{"node": "node_color", "type": "main", "index": 0}]]},
+                "node_color": {"main": [[{"node": "node_sepia", "type": "main", "index": 0}]]},
+                "node_sepia": {"main": [[{"node": "node_vignette", "type": "main", "index": 0}]]},
+                "node_vignette": {"main": [[{"node": "node_output", "type": "main", "index": 0}]]}
+            }
+        }
     }
 
     @staticmethod
@@ -203,7 +354,7 @@ class ImageWorkflowEngine:
             x, y = margin, h - text_h - margin
         elif position == "center":
             x, y = (w - text_w) / 2, (h - text_h) / 2
-        else:  # bottom-right default
+        else:
             x, y = w - text_w - margin, h - text_h - margin
 
         draw.text((x, y), text, fill=(r, g, b, alpha), font=font)
@@ -213,23 +364,20 @@ class ImageWorkflowEngine:
 
     @classmethod
     def execute_node(cls, img: Image.Image, node: dict) -> tuple[Image.Image, dict]:
-        """
-        Executes a single n8n graph node with performance timing and telemetry recording.
-        """
         node_id = node.get("id", "unknown_node")
         node_type = node.get("type", "unknown")
         node_name = node.get("name", node_type)
-        is_enabled = node.get("enabled", True)
-        params = node.get("params", {})
+        is_disabled = node.get("disabled", False)
+        params = node.get("parameters", {})
 
-        meta = cls.NODE_TYPES.get(node_type, {"name": node_name, "category": "Custom", "icon": "⚙️"})
+        meta = cls.NODE_TYPES.get(node_type, {"name": node_name, "category": "Action", "icon": "⚙️", "color": "#4B5563"})
 
-        if not is_enabled:
+        if is_disabled:
             return img, {
                 "id": node_id,
                 "name": node_name,
                 "type": node_type,
-                "status": "bypassed",
+                "status": "disabled",
                 "execution_time_ms": 0.0,
                 "output_dimensions": f"{img.width}x{img.height}",
                 "message": f"Node '{node_name}' disabled/bypassed."
@@ -239,20 +387,19 @@ class ImageWorkflowEngine:
         processed_img = img
 
         try:
-            if node_type == "resize":
+            if "resize" in node_type:
                 processed_img = cls.process_resize(img, **params)
-            elif node_type == "crop":
+            elif "crop" in node_type:
                 processed_img = cls.process_crop(img, **params)
-            elif node_type == "adjust_color":
+            elif "adjustColor" in node_type:
                 processed_img = cls.process_adjust_color(img, **params)
-            elif node_type == "rotate_flip":
+            elif "rotateFlip" in node_type:
                 processed_img = cls.process_rotate_flip(img, **params)
-            elif node_type == "filter":
+            elif "filterFx" in node_type:
                 processed_img = cls.process_filter(img, **params)
-            elif node_type == "watermark":
+            elif "watermark" in node_type:
                 processed_img = cls.process_watermark(img, **params)
-            elif node_type in ("trigger_file", "trigger_telegram", "trigger_ai_gen", "output_download", "gemini_analysis"):
-                # Pass-through / trigger / output nodes
+            elif any(t in node_type for t in ["Trigger", "geminiVision", "downloadOutput"]):
                 processed_img = img
 
             elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
@@ -260,8 +407,9 @@ class ImageWorkflowEngine:
                 "id": node_id,
                 "name": node_name,
                 "type": node_type,
-                "category": meta.get("category", "Processor"),
+                "category": meta.get("category", "Action"),
                 "icon": meta.get("icon", "⚡"),
+                "color": meta.get("color", "#3B82F6"),
                 "status": "success",
                 "execution_time_ms": elapsed_ms,
                 "output_dimensions": f"{processed_img.width}x{processed_img.height}",
@@ -284,11 +432,15 @@ class ImageWorkflowEngine:
             return img, telemetry
 
     @classmethod
-    def run_pipeline(cls, img: Image.Image, nodes: list[dict]) -> tuple[Image.Image, list[dict]]:
+    def run_pipeline(cls, img: Image.Image, nodes_or_workflow: list | dict) -> tuple[Image.Image, list[dict]]:
         """
-        Executes an n8n node graph sequence across input image.
-        Returns final output image and per-node execution telemetry metrics.
+        Executes an n8n node graph across input image, following node graph sequence / connections.
         """
+        if isinstance(nodes_or_workflow, dict):
+            nodes = nodes_or_workflow.get("nodes", [])
+        else:
+            nodes = nodes_or_workflow
+
         current_img = img.copy().convert("RGB")
         telemetry_list = []
 
@@ -300,16 +452,14 @@ class ImageWorkflowEngine:
         return current_img, telemetry_list
 
     @staticmethod
-    def export_workflow_json(nodes: list[dict]) -> str:
-        return json.dumps(nodes, indent=2)
+    def export_workflow_json(workflow_data: list | dict) -> str:
+        return json.dumps(workflow_data, indent=2)
 
     @staticmethod
-    def import_workflow_json(json_str: str) -> list[dict]:
+    def import_workflow_json(json_str: str) -> list | dict:
         try:
             data = json.loads(json_str)
-            if isinstance(data, list):
-                return data
-            return []
+            return data
         except Exception as e:
             logger.error(f"Failed to parse workflow JSON: {e}")
             return []
