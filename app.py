@@ -45,7 +45,7 @@ else:
 
 # Global thread-safe Active Workflow Storage (for Telegram & API default)
 GLOBAL_WORKFLOW_CONFIG = {
-    "active_workflow_steps": list(ImageWorkflowEngine.PRESETS["Social Media Post"])
+    "active_workflow_steps": list(ImageWorkflowEngine.PRESETS["n8n Social Media Flow"])
 }
 
 # PDF Text Extraction
@@ -109,6 +109,93 @@ def generate_image_hf(prompt: str):
         except Exception as ex:
             logger.error(f"Fallback HF Image Generation Error: {ex}")
             return None
+
+# n8n Node Canvas Flowchart Renderer
+def render_n8n_flowchart_html(nodes: list[dict]):
+    """
+    Renders an interactive n8n-style visual graph canvas showing node flow connections, status pills, and category colors.
+    """
+    html_cards = []
+    for idx, node in enumerate(nodes):
+        ntype = node.get("type", "unknown")
+        meta = ImageWorkflowEngine.NODE_TYPES.get(ntype, {"name": ntype, "category": "Processor", "icon": "⚙️"})
+        enabled = node.get("enabled", True)
+        cat = meta.get("category", "Processor")
+
+        # Category colors mimicking n8n theme
+        bg_color = "#1F2937"
+        border_color = "#374151"
+        badge_bg = "#4B5563"
+
+        if cat == "Trigger":
+            border_color = "#10B981"  # Emerald
+            badge_bg = "#065F46"
+        elif cat == "Processor":
+            border_color = "#3B82F6"  # Blue
+            badge_bg = "#1E40AF"
+        elif cat == "Output":
+            border_color = "#8B5CF6"  # Purple
+            badge_bg = "#5B21B6"
+
+        opacity = "1.0" if enabled else "0.45"
+        status_dot = "🟢" if enabled else "⚪ Bypassed"
+
+        card_html = f"""
+        <div style="
+            display: inline-flex;
+            flex-direction: column;
+            align-items: center;
+            background: {bg_color};
+            border: 2px solid {border_color};
+            border-radius: 12px;
+            padding: 12px 16px;
+            min-width: 170px;
+            opacity: {opacity};
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            margin: 8px 4px;
+            font-family: system-ui, sans-serif;
+            color: #F9FAFB;
+        ">
+            <div style="font-size: 24px; margin-bottom: 4px;">{meta.get('icon', '⚡')}</div>
+            <div style="font-size: 13px; font-weight: 700; text-align: center; margin-bottom: 4px;">{node.get('name', meta['name'])}</div>
+            <div style="
+                background: {badge_bg};
+                font-size: 10px;
+                padding: 2px 8px;
+                border-radius: 10px;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                font-weight: 600;
+                margin-bottom: 6px;
+            ">{cat}</div>
+            <div style="font-size: 10px; color: #9CA3AF;">{status_dot}</div>
+        </div>
+        """
+        html_cards.append(card_html)
+        if idx < len(nodes) - 1:
+            arrow_html = """
+            <div style="display: inline-flex; align-items: center; margin: 0 6px; color: #FF6D5A; font-size: 20px; font-weight: bold;">
+                ➔
+            </div>
+            """
+            html_cards.append(arrow_html)
+
+    flow_container = f"""
+    <div style="
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        background-color: #0D1117;
+        padding: 20px;
+        border-radius: 16px;
+        border: 1px solid #30363D;
+        overflow-x: auto;
+        margin-bottom: 20px;
+    ">
+        {''.join(html_cards)}
+    </div>
+    """
+    return flow_container
 
 # Telegram Bot Handlers
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -177,15 +264,15 @@ async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         img_bytes = await photo_file.download_as_bytearray()
         input_img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
 
-        # Access global thread-safe config instead of st.session_state
-        steps = GLOBAL_WORKFLOW_CONFIG.get("active_workflow_steps", ImageWorkflowEngine.PRESETS["Social Media Post"])
-        processed_img, logs = ImageWorkflowEngine.run_pipeline(input_img, steps)
+        steps = GLOBAL_WORKFLOW_CONFIG.get("active_workflow_steps", ImageWorkflowEngine.PRESETS["n8n Social Media Flow"])
+        processed_img, telemetry = ImageWorkflowEngine.run_pipeline(input_img, steps)
 
         out_buffer = io.BytesIO()
         processed_img.save(out_buffer, format="JPEG", quality=92)
         out_buffer.seek(0)
 
-        caption = "✨ Processed via HF Workflow Server!\n\nExecution log:\n" + "\n".join(logs[:5])
+        logs_summary = [f"{t['icon']} {t['name']}: {t['status']} ({t['execution_time_ms']}ms)" for t in telemetry]
+        caption = "✨ Processed via n8n Workflow Server!\n\nNode Telemetry:\n" + "\n".join(logs_summary[:5])
         await update.message.reply_photo(photo=out_buffer, caption=caption[:1024])
         await context.bot.delete_message(chat_id=update.effective_chat.id, message_id=status_msg.message_id)
 
@@ -231,7 +318,6 @@ def run_bot():
 
 # Main Streamlit UI Entry Function
 def main():
-    # Background Bot Thread Initializer
     try:
         if "bot_thread" not in st.session_state:
             st.session_state.bot_thread = True
@@ -240,207 +326,192 @@ def main():
     except Exception:
         pass
 
-    # Streamlit Page Config
     st.set_page_config(
-        page_title="Hugging Face Image Editing Workflow Server",
-        page_icon="🖼️",
+        page_title="n8n Image Workflow Server Studio",
+        page_icon="⚡",
         layout="wide"
     )
 
-    st.title("⚡ Hugging Face Image Editing Workflow Server")
+    st.title("⚡ n8n Image Workflow Server Studio")
     st.markdown(
-        "Automate, build, test, and execute modular image editing workflows on Hugging Face Spaces with PIL, Gemini AI, and Llama 3."
+        "Build, visualize, and execute modular **n8n-style Node Graph Workflows** on Hugging Face Spaces with PIL, Gemini 1.5 Flash, and Llama 3."
     )
 
-    # Sidebar System Specs
     st.sidebar.header("⚙️ Server Status & Config")
     st.sidebar.markdown(f"- **Llama 3 Chat**: {'🟢 Active' if hf_client else '🔴 Inactive (Missing HF_TOKEN)'}")
     st.sidebar.markdown(f"- **Gemini 1.5 Flash**: {'🟢 Active' if GOOGLE_API_KEY and genai else '🔴 Inactive'}")
     st.sidebar.markdown(f"- **Telegram Bot**: {'🟢 Active' if TELEGRAM_TOKEN else '🔴 Inactive'}")
 
     st.sidebar.divider()
-    st.sidebar.header("🎯 Workflow Presets")
+    st.sidebar.header("🎯 n8n Workflow Templates")
     preset_choice = st.sidebar.selectbox("Load Preset Workflow:", ["Custom"] + list(ImageWorkflowEngine.PRESETS.keys()))
 
     if preset_choice != "Custom":
         if st.sidebar.button(f"Load '{preset_choice}'"):
             st.session_state.current_workflow = list(ImageWorkflowEngine.PRESETS[preset_choice])
             GLOBAL_WORKFLOW_CONFIG["active_workflow_steps"] = st.session_state.current_workflow
-            st.sidebar.success(f"Loaded preset: {preset_choice}")
+            st.sidebar.success(f"Loaded template: {preset_choice}")
 
     if "current_workflow" not in st.session_state:
-        st.session_state.current_workflow = list(ImageWorkflowEngine.PRESETS["Social Media Post"])
+        st.session_state.current_workflow = list(ImageWorkflowEngine.PRESETS["n8n Social Media Flow"])
         GLOBAL_WORKFLOW_CONFIG["active_workflow_steps"] = st.session_state.current_workflow
 
-    # Navigation Tabs
-    tab_builder, tab_batch, tab_ai, tab_json, tab_api = st.tabs([
-        "🎨 Workflow Builder",
+    tab_canvas, tab_inspector, tab_batch, tab_ai, tab_json, tab_api = st.tabs([
+        "🌐 n8n Flow Visualizer",
+        "🎛️ Node Inspector & Builder",
         "📦 Batch Processing",
         "🤖 AI Multi-Modal Suite",
         "📄 Workflow JSON",
         "💻 API & Server Docs"
     ])
 
-    # TAB 1: WORKFLOW BUILDER
-    with tab_builder:
-        st.header("Visual Workflow Engine Builder")
-        col_left, col_right = st.columns([1, 1])
+    # TAB 1: VISUAL FLOW CANVAS
+    with tab_canvas:
+        st.header("Interactive n8n Node Flowchart Canvas")
+        st.markdown(render_n8n_flowchart_html(st.session_state.current_workflow), unsafe_allow_html=True)
 
-        with col_left:
-            st.subheader("1. Source Image Input")
+        col_img, col_metrics = st.columns([1, 1])
+
+        with col_img:
+            st.subheader("Source & Render Preview")
+            input_image = None
             upload_source = st.radio("Image Source:", ["Upload Local File", "Generate via AI Text Prompt", "Sample Placeholder"], horizontal=True)
 
-            input_image = None
             if upload_source == "Upload Local File":
                 uploaded_file = st.file_uploader("Choose an image file:", type=["png", "jpg", "jpeg", "webp"])
                 if uploaded_file:
                     input_image = Image.open(uploaded_file).convert("RGB")
             elif upload_source == "Generate via AI Text Prompt":
-                gen_prompt = st.text_input("Enter AI Image Generation Prompt:", "A surreal futuristic cyberpunk city at twilight, 8k resolution, photorealistic")
+                gen_prompt = st.text_input("Enter AI Generation Prompt:", "A surreal futuristic cyberpunk city at twilight, 8k resolution, photorealistic")
                 if st.button("✨ Generate Base Image"):
-                    with st.spinner("Generating image via Hugging Face Inference..."):
+                    with st.spinner("Generating base image via HF Inference..."):
                         gen_img = generate_image_hf(gen_prompt)
                         if gen_img:
                             st.session_state.generated_base_image = gen_img
-                            st.success("Image generated successfully!")
-                        else:
-                            st.error("Failed to generate image. Please check HF_TOKEN.")
+                            st.success("Image generated!")
                 if "generated_base_image" in st.session_state:
                     input_image = st.session_state.generated_base_image
-            else:  # Sample placeholder
+            else:
                 sample_img = Image.new("RGB", (800, 600), color=(73, 109, 137))
                 d = ImageDraw.Draw(sample_img)
                 d.rectangle([(100, 100), (700, 500)], fill=(255, 192, 203), outline=(255, 255, 255), width=5)
                 d.ellipse([(250, 150), (550, 450)], fill=(135, 206, 250), outline=(0, 0, 0), width=3)
                 input_image = sample_img
 
-            if input_image:
-                st.image(input_image, caption=f"Original Image ({input_image.width}x{input_image.height})", use_container_width=True)
-
-        with col_right:
-            st.subheader("2. Configure Workflow Pipeline Steps")
-
-            with st.expander("➕ Add Step to Workflow", expanded=True):
-                step_type = st.selectbox("Select Action Type:", ["Resize", "Crop", "Color Adjustments", "Rotate & Flip", "Artistic Filter", "Watermark Text"])
-
-                new_step = None
-                if step_type == "Resize":
-                    w = st.number_input("Target Width (px):", min_value=10, max_value=4000, value=1080, step=10)
-                    h = st.number_input("Target Height (px):", min_value=10, max_value=4000, value=1080, step=10)
-                    aspect = st.checkbox("Maintain Aspect Ratio", value=True)
-                    new_step = {"type": "resize", "params": {"width": w, "height": h, "maintain_aspect_ratio": aspect}}
-
-                elif step_type == "Crop":
-                    left = st.slider("Crop Left %:", 0.0, 50.0, 0.0)
-                    top = st.slider("Crop Top %:", 0.0, 50.0, 0.0)
-                    right = st.slider("Crop Right %:", 50.0, 100.0, 100.0)
-                    bottom = st.slider("Crop Bottom %:", 50.0, 100.0, 100.0)
-                    new_step = {"type": "crop", "params": {"left_pct": left, "top_pct": top, "right_pct": right, "bottom_pct": bottom}}
-
-                elif step_type == "Color Adjustments":
-                    b = st.slider("Brightness:", 0.1, 2.0, 1.0, 0.05)
-                    c = st.slider("Contrast:", 0.1, 2.0, 1.0, 0.05)
-                    s = st.slider("Saturation:", 0.0, 2.0, 1.0, 0.05)
-                    sh = st.slider("Sharpness:", 0.0, 3.0, 1.0, 0.1)
-                    new_step = {"type": "adjust_color", "params": {"brightness": b, "contrast": c, "saturation": s, "sharpness": sh}}
-
-                elif step_type == "Rotate & Flip":
-                    angle = st.selectbox("Rotation Angle:", [0, 90, 180, 270])
-                    fh = st.checkbox("Flip Horizontal (Mirror)")
-                    fv = st.checkbox("Flip Vertical")
-                    new_step = {"type": "rotate_flip", "params": {"angle": angle, "flip_h": fh, "flip_v": fv}}
-
-                elif step_type == "Artistic Filter":
-                    ftype = st.selectbox("Filter Type:", ["grayscale", "sepia", "blur", "contour", "edge_enhance", "invert", "posterize", "vignette"])
-                    radius = 2.0
-                    if ftype == "blur":
-                        radius = st.slider("Blur Radius:", 0.5, 10.0, 2.0, 0.5)
-                    new_step = {"type": "filter", "params": {"filter_type": ftype, "radius": radius}}
-
-                elif step_type == "Watermark Text":
-                    wtext = st.text_input("Watermark Text:", "HF Workflow Engine")
-                    pos = st.selectbox("Position:", ["bottom-right", "bottom-left", "top-right", "top-left", "center"])
-                    color = st.color_picker("Text Color:", "#FFFFFF")
-                    opacity = st.slider("Opacity:", 0.1, 1.0, 0.8, 0.05)
-                    new_step = {"type": "watermark", "params": {"text": wtext, "position": pos, "color": color, "opacity": opacity}}
-
-                if st.button("Add Step to Pipeline"):
-                    st.session_state.current_workflow.append(new_step)
-                    GLOBAL_WORKFLOW_CONFIG["active_workflow_steps"] = st.session_state.current_workflow
-                    st.success(f"Added '{step_type}' to pipeline!")
-
-            st.subheader("Current Pipeline Sequence")
-            if not st.session_state.current_workflow:
-                st.info("No steps in pipeline. Add steps above or select a preset.")
-            else:
-                for idx, step in enumerate(st.session_state.current_workflow):
-                    c1, c2 = st.columns([4, 1])
-                    c1.write(f"**Step {idx+1}:** `{step['type']}` — `{step['params']}`")
-                    if c2.button("🗑️", key=f"del_step_{idx}"):
-                        st.session_state.current_workflow.pop(idx)
-                        GLOBAL_WORKFLOW_CONFIG["active_workflow_steps"] = st.session_state.current_workflow
-                        st.rerun()
-
-                if st.button("🧹 Clear All Steps"):
-                    st.session_state.current_workflow = []
-                    GLOBAL_WORKFLOW_CONFIG["active_workflow_steps"] = []
-                    st.rerun()
-
-        st.divider()
-        st.subheader("3. Rendered Output Preview & Pipeline Logs")
-        if input_image and st.session_state.current_workflow:
-            output_img, exec_logs = ImageWorkflowEngine.run_pipeline(input_image, st.session_state.current_workflow)
-
-            prev_col1, prev_col2 = st.columns(2)
-            with prev_col1:
-                st.image(input_image, caption="Before (Original)", use_container_width=True)
-            with prev_col2:
-                st.image(output_img, caption=f"After Processed ({output_img.width}x{output_img.height})", use_container_width=True)
+            if input_image and st.session_state.current_workflow:
+                out_img, telemetry = ImageWorkflowEngine.run_pipeline(input_image, st.session_state.current_workflow)
+                st.image(out_img, caption=f"Final Output Asset ({out_img.width}x{out_img.height})", use_container_width=True)
 
                 buf = io.BytesIO()
-                output_img.save(buf, format="PNG")
-                st.download_button("💾 Download Output Image (PNG)", data=buf.getvalue(), file_name="workflow_result.png", mime="image/png")
+                out_img.save(buf, format="PNG")
+                st.download_button("💾 Download Rendered Asset (PNG)", data=buf.getvalue(), file_name="n8n_processed.png", mime="image/png")
 
-            with st.expander("📋 Execution Logs", expanded=False):
-                for log in exec_logs:
-                    st.text(log)
-        elif not input_image:
-            st.warning("Please select or upload a source image.")
+        with col_metrics:
+            st.subheader("⚡ Per-Node Execution Telemetry Metrics")
+            if input_image and st.session_state.current_workflow:
+                for t in telemetry:
+                    status_badge = "🟢 SUCCESS" if t["status"] == "success" else ("⚪ BYPASSED" if t["status"] == "bypassed" else "🔴 ERROR")
+                    st.markdown(f"**Step {t['step_number']}: {t['icon']} {t['name']}** — `{status_badge}`")
+                    st.caption(f"Category: {t.get('category', 'Processor')} | Time: **{t['execution_time_ms']} ms** | Output Dim: **{t['output_dimensions']}**")
+                    st.divider()
 
-    # TAB 2: BATCH PROCESSING
+    # TAB 2: NODE INSPECTOR & BUILDER
+    with tab_inspector:
+        st.header("🎛️ Node Graph Inspector & Builder")
+
+        col_nodes, col_add = st.columns([3, 2])
+
+        with col_nodes:
+            st.subheader("Configured Nodes Sequence")
+            if not st.session_state.current_workflow:
+                st.info("Graph is empty. Add a node from the panel.")
+            else:
+                for idx, node in enumerate(st.session_state.current_workflow):
+                    ntype = node.get("type", "unknown")
+                    meta = ImageWorkflowEngine.NODE_TYPES.get(ntype, {"name": ntype, "icon": "⚙️"})
+
+                    with st.expander(f"#{idx+1} {meta['icon']} {node.get('name', meta['name'])} [{'Active' if node.get('enabled', True) else 'Bypassed'}]", expanded=False):
+                        c1, c2, c3 = st.columns([2, 2, 1])
+                        node["name"] = c1.text_input("Node Custom Label:", value=node.get("name", meta["name"]), key=f"lbl_{idx}")
+                        node["enabled"] = c2.checkbox("Enable Node", value=node.get("enabled", True), key=f"enb_{idx}")
+                        if c3.button("🗑️ Delete", key=f"del_{idx}"):
+                            st.session_state.current_workflow.pop(idx)
+                            GLOBAL_WORKFLOW_CONFIG["active_workflow_steps"] = st.session_state.current_workflow
+                            st.rerun()
+
+                        st.write("**Parameters:**", node.get("params", {}))
+
+        with col_add:
+            st.subheader("➕ Add New n8n Node")
+            node_type_key = st.selectbox("Select Node Type:", list(ImageWorkflowEngine.NODE_TYPES.keys()), format_func=lambda k: f"{ImageWorkflowEngine.NODE_TYPES[k]['icon']} {ImageWorkflowEngine.NODE_TYPES[k]['name']} ({ImageWorkflowEngine.NODE_TYPES[k]['category']})")
+
+            node_meta = ImageWorkflowEngine.NODE_TYPES[node_type_key]
+            node_name = st.text_input("Node Name:", node_meta["name"])
+
+            params = {}
+            if node_type_key == "resize":
+                w = st.number_input("Width (px):", min_value=10, max_value=4000, value=1080)
+                h = st.number_input("Height (px):", min_value=10, max_value=4000, value=1080)
+                aspect = st.checkbox("Keep Aspect Ratio", value=True)
+                params = {"width": w, "height": h, "maintain_aspect_ratio": aspect}
+            elif node_type_key == "crop":
+                left = st.slider("Left %:", 0.0, 50.0, 0.0)
+                top = st.slider("Top %:", 0.0, 50.0, 0.0)
+                right = st.slider("Right %:", 50.0, 100.0, 100.0)
+                bottom = st.slider("Bottom %:", 50.0, 100.0, 100.0)
+                params = {"left_pct": left, "top_pct": top, "right_pct": right, "bottom_pct": bottom}
+            elif node_type_key == "adjust_color":
+                b = st.slider("Brightness:", 0.1, 2.0, 1.0, 0.05)
+                c = st.slider("Contrast:", 0.1, 2.0, 1.0, 0.05)
+                s = st.slider("Saturation:", 0.0, 2.0, 1.0, 0.05)
+                sh = st.slider("Sharpness:", 0.0, 3.0, 1.0, 0.1)
+                params = {"brightness": b, "contrast": c, "saturation": s, "sharpness": sh}
+            elif node_type_key == "filter":
+                ftype = st.selectbox("Filter:", ["grayscale", "sepia", "blur", "contour", "edge_enhance", "invert", "posterize", "vignette"])
+                radius = st.slider("Radius (for blur):", 0.5, 10.0, 2.0) if ftype == "blur" else 2.0
+                params = {"filter_type": ftype, "radius": radius}
+            elif node_type_key == "watermark":
+                wtext = st.text_input("Watermark Text:", "n8n Workflow")
+                pos = st.selectbox("Position:", ["bottom-right", "bottom-left", "top-right", "top-left", "center"])
+                color = st.color_picker("Color:", "#FFFFFF")
+                opacity = st.slider("Opacity:", 0.1, 1.0, 0.8)
+                params = {"text": wtext, "position": pos, "color": color, "opacity": opacity}
+
+            if st.button("Add Node to Graph"):
+                new_node_obj = {
+                    "id": f"node_{len(st.session_state.current_workflow)+1}",
+                    "type": node_type_key,
+                    "name": node_name,
+                    "enabled": True,
+                    "params": params
+                }
+                st.session_state.current_workflow.append(new_node_obj)
+                GLOBAL_WORKFLOW_CONFIG["active_workflow_steps"] = st.session_state.current_workflow
+                st.success(f"Added node '{node_name}'!")
+                st.rerun()
+
+    # TAB 3: BATCH PROCESSING
     with tab_batch:
         st.header("📦 Batch Image Processing Server")
-        st.write("Apply your current active workflow to multiple images at once.")
-
         batch_files = st.file_uploader("Upload multiple images for batch processing:", type=["png", "jpg", "jpeg", "webp"], accept_multiple_files=True)
 
         if batch_files and st.session_state.current_workflow:
-            if st.button("🚀 Process Batch Images"):
-                st.info(f"Processing {len(batch_files)} images using active workflow...")
-                progress_bar = st.progress(0)
-
+            if st.button("🚀 Execute Batch Node Workflow"):
                 results = []
                 for i, file_item in enumerate(batch_files):
                     img = Image.open(file_item).convert("RGB")
-                    processed_img, _ = ImageWorkflowEngine.run_pipeline(img, st.session_state.current_workflow)
-                    results.append((file_item.name, processed_img))
-                    progress_bar.progress((i + 1) / len(batch_files))
+                    pimg, _ = ImageWorkflowEngine.run_pipeline(img, st.session_state.current_workflow)
+                    results.append((file_item.name, pimg))
 
-                st.success(f"Successfully processed {len(results)} images!")
-
+                st.success(f"Processed {len(results)} images successfully!")
                 cols = st.columns(min(3, len(results)))
                 for idx, (fname, pimg) in enumerate(results):
                     with cols[idx % 3]:
-                        st.image(pimg, caption=f"Processed: {fname}", use_container_width=True)
-                        buf = io.BytesIO()
-                        pimg.save(buf, format="JPEG", quality=90)
-                        st.download_button(f"Download {fname}", data=buf.getvalue(), file_name=f"processed_{fname}", mime="image/jpeg", key=f"dl_batch_{idx}")
+                        st.image(pimg, caption=fname, use_container_width=True)
 
-    # TAB 3: AI MULTI-MODAL SUITE
+    # TAB 4: AI MULTI-MODAL SUITE
     with tab_ai:
         st.header("🤖 AI Multi-Modal & Photo Assistant")
-
-        st.subheader("Gemini 1.5 Flash Photo Analyzer")
         ai_file = st.file_uploader("Upload image to analyze with Gemini 1.5 Flash:", type=["png", "jpg", "jpeg", "webp"], key="ai_photo_uploader")
         custom_prompt = st.text_input("Analysis Prompt:", "Analyze this image in detail and recommend optimal editing adjustments.")
 
@@ -450,74 +521,50 @@ def main():
                 st.markdown("### Gemini Analysis Result")
                 st.write(res_analysis)
 
-    # TAB 4: WORKFLOW JSON IMPORT/EXPORT
+    # TAB 5: WORKFLOW JSON IMPORT/EXPORT
     with tab_json:
-        st.header("📄 Workflow JSON Configuration")
-        st.write("Export your active workflow to JSON, or import an existing workflow JSON definition.")
-
+        st.header("📄 n8n Workflow JSON Definition")
         col_exp, col_imp = st.columns(2)
 
         with col_exp:
-            st.subheader("Export Workflow JSON")
+            st.subheader("Export Graph JSON")
             json_str = ImageWorkflowEngine.export_workflow_json(st.session_state.current_workflow)
             st.code(json_str, language="json")
-            st.download_button("💾 Download Workflow (.json)", data=json_str, file_name="image_workflow.json", mime="application/json")
+            st.download_button("💾 Download Workflow (.json)", data=json_str, file_name="n8n_image_workflow.json", mime="application/json")
 
         with col_imp:
-            st.subheader("Import Workflow JSON")
-            uploaded_json = st.file_uploader("Upload Workflow JSON File:", type=["json"], key="json_uploader")
-            raw_json_input = st.text_area("Or Paste JSON String here:", height=150)
+            st.subheader("Import Graph JSON")
+            uploaded_json = st.file_uploader("Upload Workflow JSON:", type=["json"], key="json_uploader")
+            if uploaded_json and st.button("📥 Import JSON"):
+                imported = ImageWorkflowEngine.import_workflow_json(uploaded_json.getvalue().decode("utf-8"))
+                if imported:
+                    st.session_state.current_workflow = imported
+                    GLOBAL_WORKFLOW_CONFIG["active_workflow_steps"] = imported
+                    st.success("Loaded workflow!")
+                    st.rerun()
 
-            if st.button("📥 Load Workflow JSON"):
-                content_to_parse = ""
-                if uploaded_json:
-                    content_to_parse = uploaded_json.getvalue().decode("utf-8")
-                elif raw_json_input:
-                    content_to_parse = raw_json_input
-
-                if content_to_parse:
-                    imported_steps = ImageWorkflowEngine.import_workflow_json(content_to_parse)
-                    if imported_steps:
-                        st.session_state.current_workflow = imported_steps
-                        GLOBAL_WORKFLOW_CONFIG["active_workflow_steps"] = imported_steps
-                        st.success(f"Successfully loaded {len(imported_steps)} workflow steps!")
-                        st.rerun()
-                    else:
-                        st.error("Failed to parse workflow JSON. Please check formatting.")
-
-    # TAB 5: API & SERVER DOCS
+    # TAB 6: API & SERVER DOCS
     with tab_api:
         st.header("💻 Server API & Integration Documentation")
         st.markdown("""
-        This Hugging Face Space operates as a **Image Editing Workflow Server**.
-        You can trigger image workflows via Python, cURL, or directly via Telegram photos.
+        This Hugging Face Space operates an **n8n-style Node Graph Image Workflow Server**.
 
-        ### Telegram Integration
-        - Send any photo directly to your connected Telegram Bot.
-        - The bot automatically applies the active workflow pipeline configured in this server and replies with the processed image.
-
-        ### Python Code Snippet to Run Engine Headlessly
+        ### Python Code Snippet to Run Node Graph Headlessly
         ```python
         from PIL import Image
         from workflow_engine import ImageWorkflowEngine
 
-        # Load input image
         img = Image.open("input.jpg")
-
-        # Define Workflow Steps
-        workflow = [
-            {"type": "resize", "params": {"width": 1080, "height": 1080, "maintain_aspect_ratio": True}},
-            {"type": "adjust_color", "params": {"brightness": 1.1, "contrast": 1.2, "saturation": 1.15}},
-            {"type": "filter", "params": {"filter_type": "vignette"}},
-            {"type": "watermark", "params": {"text": "HF Workflow Server", "position": "bottom-right"}}
+        nodes = [
+            {"id": "n1", "type": "trigger_file", "name": "Input Image", "enabled": True, "params": {}},
+            {"id": "n2", "type": "resize", "name": "Resize 1080p", "enabled": True, "params": {"width": 1080, "height": 1080, "maintain_aspect_ratio": True}},
+            {"id": "n3", "type": "filter", "name": "Sepia Tone", "enabled": True, "params": {"filter_type": "sepia"}},
+            {"id": "n4", "type": "watermark", "name": "Watermark", "enabled": True, "params": {"text": "n8n Server"}}
         ]
 
-        # Run Pipeline
-        processed_img, logs = ImageWorkflowEngine.run_pipeline(img, workflow)
-
-        # Save Output
-        processed_img.save("output_processed.jpg")
-        print(logs)
+        out_img, telemetry = ImageWorkflowEngine.run_pipeline(img, nodes)
+        out_img.save("processed_output.jpg")
+        print(telemetry)
         ```
         """)
 

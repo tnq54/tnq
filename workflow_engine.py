@@ -1,5 +1,6 @@
 import io
 import json
+import time
 import logging
 from PIL import Image, ImageEnhance, ImageFilter, ImageOps, ImageDraw, ImageFont
 
@@ -7,32 +8,53 @@ logger = logging.getLogger(__name__)
 
 class ImageWorkflowEngine:
     """
-    Core image processing workflow engine for applying sequential transformations,
-    filters, watermarks, and AI analysis steps to images.
+    n8n-style Node Graph image processing workflow engine.
+    Supports modular Nodes (Trigger, Processor, Output), node bypass toggles,
+    execution graph sequence, and per-node performance telemetry.
     """
 
+    NODE_TYPES = {
+        # Triggers
+        "trigger_file": {"name": "File Upload Trigger", "category": "Trigger", "icon": "📁"},
+        "trigger_telegram": {"name": "Telegram Photo Trigger", "category": "Trigger", "icon": "✈️"},
+        "trigger_ai_gen": {"name": "AI Generation Trigger", "category": "Trigger", "icon": "✨"},
+        # Processors
+        "resize": {"name": "Resize Node", "category": "Processor", "icon": "📐"},
+        "crop": {"name": "Crop Node", "category": "Processor", "icon": "✂️"},
+        "adjust_color": {"name": "Color Adjustment Node", "category": "Processor", "icon": "🎨"},
+        "rotate_flip": {"name": "Rotate & Flip Node", "category": "Processor", "icon": "🔄"},
+        "filter": {"name": "Artistic Filter Node", "category": "Processor", "icon": "🎭"},
+        "gemini_analysis": {"name": "Gemini AI Analyzer Node", "category": "Processor", "icon": "🧠"},
+        # Outputs
+        "watermark": {"name": "Watermark Node", "category": "Output", "icon": "🏷️"},
+        "output_download": {"name": "Download Output Node", "category": "Output", "icon": "💾"}
+    }
+
     PRESETS = {
-        "Social Media Post": [
-            {"type": "resize", "params": {"width": 1080, "height": 1080, "maintain_aspect_ratio": True}},
-            {"type": "adjust_color", "params": {"brightness": 1.05, "contrast": 1.1, "saturation": 1.2, "sharpness": 1.1}},
-            {"type": "watermark", "params": {"text": "Workflow Server", "position": "bottom-right", "color": "#FFFFFF", "opacity": 0.8}}
+        "n8n Social Media Flow": [
+            {"id": "node_1", "type": "trigger_file", "name": "Image Input", "enabled": True, "params": {}},
+            {"id": "node_2", "type": "resize", "name": "Format Square (1080x1080)", "enabled": True, "params": {"width": 1080, "height": 1080, "maintain_aspect_ratio": True}},
+            {"id": "node_3", "type": "adjust_color", "name": "Vibrant Color Enhancement", "enabled": True, "params": {"brightness": 1.05, "contrast": 1.1, "saturation": 1.2, "sharpness": 1.1}},
+            {"id": "node_4", "type": "watermark", "name": "Brand Watermark Overlay", "enabled": True, "params": {"text": "n8n Workflow Space", "position": "bottom-right", "color": "#FFFFFF", "opacity": 0.8}},
+            {"id": "node_5", "type": "output_download", "name": "Export Final Asset", "enabled": True, "params": {}}
         ],
-        "Aesthetic Vintage": [
-            {"type": "adjust_color", "params": {"brightness": 0.95, "contrast": 1.15, "saturation": 0.7, "sharpness": 0.9}},
-            {"type": "filter", "params": {"filter_type": "sepia"}},
-            {"type": "filter", "params": {"filter_type": "vignette"}}
+        "n8n Vintage Film Flow": [
+            {"id": "node_1", "type": "trigger_file", "name": "Image Input", "enabled": True, "params": {}},
+            {"id": "node_2", "type": "adjust_color", "name": "Warm Film Tone", "enabled": True, "params": {"brightness": 0.95, "contrast": 1.15, "saturation": 0.7, "sharpness": 0.9}},
+            {"id": "node_3", "type": "filter", "name": "Sepia Filter Node", "enabled": True, "params": {"filter_type": "sepia"}},
+            {"id": "node_4", "type": "filter", "name": "Vignette Shading Node", "enabled": True, "params": {"filter_type": "vignette"}},
+            {"id": "node_5", "type": "output_download", "name": "Export Vintage Asset", "enabled": True, "params": {}}
         ],
-        "High Contrast Monochrome": [
-            {"type": "filter", "params": {"filter_type": "grayscale"}},
-            {"type": "adjust_color", "params": {"brightness": 1.0, "contrast": 1.4, "saturation": 1.0, "sharpness": 1.3}}
+        "n8n Monochrome Art Flow": [
+            {"id": "node_1", "type": "trigger_file", "name": "Image Input", "enabled": True, "params": {}},
+            {"id": "node_2", "type": "filter", "name": "Grayscale Filter Node", "enabled": True, "params": {"filter_type": "grayscale"}},
+            {"id": "node_3", "type": "adjust_color", "name": "High Contrast Boost", "enabled": True, "params": {"brightness": 1.0, "contrast": 1.4, "saturation": 1.0, "sharpness": 1.3}},
+            {"id": "node_4", "type": "watermark", "name": "Signature Stamp", "enabled": True, "params": {"text": "Monochrome Studio", "position": "bottom-left", "color": "#000000", "opacity": 0.9}}
         ],
-        "Soft Portrait Blur": [
-            {"type": "adjust_color", "params": {"brightness": 1.05, "contrast": 1.0, "saturation": 1.05, "sharpness": 0.8}},
-            {"type": "filter", "params": {"filter_type": "blur", "radius": 2}}
-        ],
-        "Edge Art Sketch": [
-            {"type": "filter", "params": {"filter_type": "contour"}},
-            {"type": "adjust_color", "params": {"brightness": 1.1, "contrast": 1.3, "saturation": 1.0, "sharpness": 1.5}}
+        "n8n Edge Sketch Flow": [
+            {"id": "node_1", "type": "trigger_file", "name": "Image Input", "enabled": True, "params": {}},
+            {"id": "node_2", "type": "filter", "name": "Contour Edge Detect", "enabled": True, "params": {"filter_type": "contour"}},
+            {"id": "node_3", "type": "adjust_color", "name": "Edge Sharpening", "enabled": True, "params": {"brightness": 1.1, "contrast": 1.3, "saturation": 1.0, "sharpness": 1.5}}
         ]
     }
 
@@ -94,10 +116,8 @@ class ImageWorkflowEngine:
 
         elif filter_type == "sepia":
             gray = ImageOps.grayscale(res)
-            # Apply sepia tone transformation
             sepia_img = Image.new("RGB", gray.size)
 
-            # Use get_flattened_data if available in Pillow, or fallback to getdata
             if hasattr(gray, "get_flattened_data"):
                 flat_data = gray.get_flattened_data()
             else:
@@ -157,7 +177,6 @@ class ImageWorkflowEngine:
         except Exception:
             font = ImageFont.load_default()
 
-        # Parse hex color
         hex_color = color.lstrip("#")
         if len(hex_color) == 6:
             r, g, b = tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
@@ -193,43 +212,96 @@ class ImageWorkflowEngine:
         return out.convert("RGB")
 
     @classmethod
-    def execute_step(cls, img: Image.Image, step: dict) -> tuple[Image.Image, str]:
-        step_type = step.get("type")
-        params = step.get("params", {})
-        log_msg = f"Step '{step_type}' applied with params {params}"
+    def execute_node(cls, img: Image.Image, node: dict) -> tuple[Image.Image, dict]:
+        """
+        Executes a single n8n graph node with performance timing and telemetry recording.
+        """
+        node_id = node.get("id", "unknown_node")
+        node_type = node.get("type", "unknown")
+        node_name = node.get("name", node_type)
+        is_enabled = node.get("enabled", True)
+        params = node.get("params", {})
 
-        if step_type == "resize":
-            return cls.process_resize(img, **params), log_msg
-        elif step_type == "crop":
-            return cls.process_crop(img, **params), log_msg
-        elif step_type == "adjust_color":
-            return cls.process_adjust_color(img, **params), log_msg
-        elif step_type == "rotate_flip":
-            return cls.process_rotate_flip(img, **params), log_msg
-        elif step_type == "filter":
-            return cls.process_filter(img, **params), log_msg
-        elif step_type == "watermark":
-            return cls.process_watermark(img, **params), log_msg
-        else:
-            return img, f"Step '{step_type}' skipped (unknown type)"
+        meta = cls.NODE_TYPES.get(node_type, {"name": node_name, "category": "Custom", "icon": "⚙️"})
+
+        if not is_enabled:
+            return img, {
+                "id": node_id,
+                "name": node_name,
+                "type": node_type,
+                "status": "bypassed",
+                "execution_time_ms": 0.0,
+                "output_dimensions": f"{img.width}x{img.height}",
+                "message": f"Node '{node_name}' disabled/bypassed."
+            }
+
+        start_time = time.perf_counter()
+        processed_img = img
+
+        try:
+            if node_type == "resize":
+                processed_img = cls.process_resize(img, **params)
+            elif node_type == "crop":
+                processed_img = cls.process_crop(img, **params)
+            elif node_type == "adjust_color":
+                processed_img = cls.process_adjust_color(img, **params)
+            elif node_type == "rotate_flip":
+                processed_img = cls.process_rotate_flip(img, **params)
+            elif node_type == "filter":
+                processed_img = cls.process_filter(img, **params)
+            elif node_type == "watermark":
+                processed_img = cls.process_watermark(img, **params)
+            elif node_type in ("trigger_file", "trigger_telegram", "trigger_ai_gen", "output_download", "gemini_analysis"):
+                # Pass-through / trigger / output nodes
+                processed_img = img
+
+            elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
+            telemetry = {
+                "id": node_id,
+                "name": node_name,
+                "type": node_type,
+                "category": meta.get("category", "Processor"),
+                "icon": meta.get("icon", "⚡"),
+                "status": "success",
+                "execution_time_ms": elapsed_ms,
+                "output_dimensions": f"{processed_img.width}x{processed_img.height}",
+                "message": f"Executed node '{node_name}' successfully ({elapsed_ms}ms)."
+            }
+            return processed_img, telemetry
+
+        except Exception as e:
+            elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
+            logger.error(f"Error executing node '{node_name}' ({node_type}): {e}")
+            telemetry = {
+                "id": node_id,
+                "name": node_name,
+                "type": node_type,
+                "status": "error",
+                "execution_time_ms": elapsed_ms,
+                "output_dimensions": f"{img.width}x{img.height}",
+                "message": f"Error in node '{node_name}': {e}"
+            }
+            return img, telemetry
 
     @classmethod
-    def run_pipeline(cls, img: Image.Image, steps: list[dict]) -> tuple[Image.Image, list[str]]:
+    def run_pipeline(cls, img: Image.Image, nodes: list[dict]) -> tuple[Image.Image, list[dict]]:
+        """
+        Executes an n8n node graph sequence across input image.
+        Returns final output image and per-node execution telemetry metrics.
+        """
         current_img = img.copy().convert("RGB")
-        logs = []
-        for idx, step in enumerate(steps, start=1):
-            try:
-                current_img, step_log = cls.execute_step(current_img, step)
-                logs.append(f"[{idx}] {step_log}")
-            except Exception as e:
-                logger.error(f"Error executing step {idx} ({step}): {e}")
-                logs.append(f"[{idx}] Error in step '{step.get('type')}': {e}")
+        telemetry_list = []
 
-        return current_img, logs
+        for idx, node in enumerate(nodes, start=1):
+            current_img, node_telemetry = cls.execute_node(current_img, node)
+            node_telemetry["step_number"] = idx
+            telemetry_list.append(node_telemetry)
+
+        return current_img, telemetry_list
 
     @staticmethod
-    def export_workflow_json(steps: list[dict]) -> str:
-        return json.dumps(steps, indent=2)
+    def export_workflow_json(nodes: list[dict]) -> str:
+        return json.dumps(nodes, indent=2)
 
     @staticmethod
     def import_workflow_json(json_str: str) -> list[dict]:

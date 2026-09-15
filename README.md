@@ -1,6 +1,6 @@
 ---
-title: Image Editing Workflow Server
-emoji: 🖼️
+title: n8n Image Workflow Server Studio
+emoji: ⚡
 colorFrom: blue
 colorTo: indigo
 sdk: streamlit
@@ -9,37 +9,35 @@ app_file: app.py
 pinned: false
 ---
 
-# Image Editing Workflow Server (Hugging Face Space)
+# ⚡ n8n Image Workflow Server Studio (Hugging Face Space)
 
-A full-featured server and workflow builder interface for image editing, transformation, batch processing, and AI multi-modal analysis deployed on Hugging Face Spaces.
+A full-featured **n8n-style Node Graph image editing workflow server** hosted on Hugging Face Spaces. Design, visualize, inspect, and execute node-based image pipelines with live canvas rendering, node bypass toggles, per-node telemetry, batch processing, and AI multi-modal integrations.
 
 ## 🚀 Key Features
 
-1. **Modular Image Pipeline Engine (`workflow_engine.py`)**:
-   - **Resize**: Custom width/height and aspect ratio constraints.
-   - **Crop**: Precision percentage-based cropping.
-   - **Color Adjustments**: Real-time Brightness, Contrast, Saturation, and Sharpness controls.
-   - **Rotate & Flip**: 90/180/270 degree rotation, horizontal mirror, and vertical flipping.
-   - **Artistic Filters**: Grayscale, Sepia, Gaussian Blur, Contour, Edge Enhancement, Invert, Posterize, and Vignette.
-   - **Watermarking**: Dynamic overlay text with custom positioning, font sizing, color picker, and alpha opacity.
+1. **n8n-Style Node Graph Engine (`workflow_engine.py`)**:
+   - **Trigger Nodes**: File Upload Trigger (`trigger_file`), Telegram Photo Trigger (`trigger_telegram`), AI Generation Trigger (`trigger_ai_gen`).
+   - **Processor Nodes**: Resize Node (`resize`), Crop Node (`crop`), Color Adjustment Node (`adjust_color`), Rotate & Flip Node (`rotate_flip`), Artistic Filter Node (`filter`), Gemini AI Analyzer Node (`gemini_analysis`).
+   - **Output Nodes**: Watermark Overlay Node (`watermark`), Download Output Asset (`output_download`).
+   - **Node Bypass & Telemetry**: Enable/Disable toggles per node, execution timing (`ms`), output image dimensions, and node status indicators (`🟢 SUCCESS`, `⚪ BYPASSED`, `🔴 ERROR`).
 
-2. **Preset Workflow Library**:
-   - Social Media Post (1080x1080 square format, vibrant color grade, watermark)
-   - Aesthetic Vintage (Sepia tones, vignette shading, warm contrast)
-   - High Contrast Monochrome
-   - Soft Portrait Blur
-   - Edge Art Sketch
+2. **n8n Preset Workflow Templates**:
+   - `n8n Social Media Flow` (Square formatting, vibrant color grade, brand watermark overlay).
+   - `n8n Vintage Film Flow` (Warm film tone, sepia filter node, vignette shading node).
+   - `n8n Monochrome Art Flow` (Grayscale filter node, high contrast boost, signature stamp).
+   - `n8n Edge Sketch Flow` (Contour edge detect, edge sharpening).
 
 3. **Streamlit Interactive UI (`app.py`)**:
-   - **🎨 Workflow Builder**: Visual pipeline assembly, node addition/removal, and live before/after image previews.
-   - **📦 Batch Processing**: Apply active workflow pipelines across multiple uploaded images simultaneously.
-   - **🤖 AI Multi-Modal Suite**: Gemini 1.5 Flash image inspection and Hugging Face FLUX/SDXL image generation.
-   - **📄 Workflow JSON Import/Export**: Export workflows to JSON or import workflow configurations.
-   - **💻 API & Server Docs**: Code examples for headless Python integration and server usage.
+   - **🌐 n8n Flow Visualizer**: Interactive visual node flowchart canvas (`[Trigger Node] ➔ [Processor Nodes] ➔ [Output Node]`).
+   - **🎛️ Node Inspector & Builder**: Inspect node parameters, toggle enable/disable, customize node labels, and add new n8n nodes.
+   - **📦 Batch Processing**: Run configured n8n node graphs across multiple images simultaneously.
+   - **🤖 AI Multi-Modal Suite**: Gemini 1.5 Flash image inspection and Hugging Face FLUX/SDXL base image generation.
+   - **📄 Workflow JSON Import/Export**: Save, export, and load n8n graph JSON definitions.
+   - **💻 API & Server Docs**: Code examples for headless Python integration.
 
 4. **Telegram Bot Integration**:
-   - Send photos directly to your Telegram bot.
-   - Automatically executes the active server workflow on incoming photos and responds with the edited image and execution logs.
+   - Send photos to your Telegram bot.
+   - Automatically executes the active server n8n node graph on incoming photos and responds with the processed asset and per-node telemetry log.
 
 ## 🛠️ Installation & Setup
 
@@ -48,7 +46,7 @@ A full-featured server and workflow builder interface for image editing, transfo
    pip install -r requirements.txt
    ```
 
-2. **Run Streamlit Server Locally**:
+2. **Run Streamlit App Locally**:
    ```bash
    streamlit run app.py
    ```

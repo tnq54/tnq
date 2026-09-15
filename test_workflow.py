@@ -8,7 +8,6 @@ import app
 class TestImageWorkflowEngine(unittest.TestCase):
 
     def setUp(self):
-        # Create a basic 200x200 red image for testing
         self.test_img = Image.new("RGB", (200, 200), color=(255, 0, 0))
 
     def test_resize(self):
@@ -37,33 +36,49 @@ class TestImageWorkflowEngine(unittest.TestCase):
         watermarked = ImageWorkflowEngine.process_watermark(self.test_img, text="Test Watermark", position="bottom-right")
         self.assertEqual(watermarked.size, self.test_img.size)
 
-    def test_pipeline_execution(self):
-        steps = [
-            {"type": "resize", "params": {"width": 100, "height": 100, "maintain_aspect_ratio": False}},
-            {"type": "filter", "params": {"filter_type": "grayscale"}},
-            {"type": "watermark", "params": {"text": "Test"}}
+    def test_node_graph_execution_and_telemetry(self):
+        nodes = [
+            {"id": "n1", "type": "trigger_file", "name": "Input Trigger", "enabled": True, "params": {}},
+            {"id": "n2", "type": "resize", "name": "Resize 100", "enabled": True, "params": {"width": 100, "height": 100, "maintain_aspect_ratio": False}},
+            {"id": "n3", "type": "filter", "name": "Grayscale Node", "enabled": True, "params": {"filter_type": "grayscale"}},
+            {"id": "n4", "type": "watermark", "name": "Watermark Node", "enabled": True, "params": {"text": "n8n Test"}},
+            {"id": "n5", "type": "output_download", "name": "Output Node", "enabled": True, "params": {}}
         ]
-        out_img, logs = ImageWorkflowEngine.run_pipeline(self.test_img, steps)
+        out_img, telemetry = ImageWorkflowEngine.run_pipeline(self.test_img, nodes)
         self.assertEqual(out_img.size, (100, 100))
-        self.assertEqual(len(logs), 3)
+        self.assertEqual(len(telemetry), 5)
+        for item in telemetry:
+            self.assertEqual(item["status"], "success")
+            self.assertIn("execution_time_ms", item)
+            self.assertIn("output_dimensions", item)
 
-    def test_presets(self):
-        for preset_name, steps in ImageWorkflowEngine.PRESETS.items():
-            out_img, logs = ImageWorkflowEngine.run_pipeline(self.test_img, steps)
+    def test_node_bypass_state(self):
+        nodes = [
+            {"id": "n1", "type": "resize", "name": "Disabled Resize", "enabled": False, "params": {"width": 50, "height": 50, "maintain_aspect_ratio": False}},
+            {"id": "n2", "type": "filter", "name": "Active Filter", "enabled": True, "params": {"filter_type": "sepia"}}
+        ]
+        out_img, telemetry = ImageWorkflowEngine.run_pipeline(self.test_img, nodes)
+        # Bypassed resize should leave image at original size 200x200
+        self.assertEqual(out_img.size, (200, 200))
+        self.assertEqual(telemetry[0]["status"], "bypassed")
+        self.assertEqual(telemetry[1]["status"], "success")
+
+    def test_n8n_presets(self):
+        for preset_name, nodes in ImageWorkflowEngine.PRESETS.items():
+            out_img, telemetry = ImageWorkflowEngine.run_pipeline(self.test_img, nodes)
             self.assertIsNotNone(out_img)
-            self.assertGreater(len(logs), 0)
+            self.assertGreater(len(telemetry), 0)
 
     def test_json_export_import(self):
-        steps = [
-            {"type": "filter", "params": {"filter_type": "sepia"}},
-            {"type": "adjust_color", "params": {"brightness": 1.1}}
+        nodes = [
+            {"id": "n1", "type": "filter", "name": "Sepia", "enabled": True, "params": {"filter_type": "sepia"}},
+            {"id": "n2", "type": "adjust_color", "name": "Brightness", "enabled": True, "params": {"brightness": 1.1}}
         ]
-        json_str = ImageWorkflowEngine.export_workflow_json(steps)
-        imported_steps = ImageWorkflowEngine.import_workflow_json(json_str)
-        self.assertEqual(steps, imported_steps)
+        json_str = ImageWorkflowEngine.export_workflow_json(nodes)
+        imported_nodes = ImageWorkflowEngine.import_workflow_json(json_str)
+        self.assertEqual(nodes, imported_nodes)
 
     def test_pdf_text_extraction(self):
-        # Blank PDF bytes mock test
         text = app.extract_pdf_text(b"invalid pdf data")
         self.assertIsNone(text)
 
