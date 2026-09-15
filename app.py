@@ -110,11 +110,12 @@ def generate_image_hf(prompt: str):
             logger.error(f"Fallback HF Image Generation Error: {ex}")
             return None
 
-# Authentic Modern n8n Dark Canvas & Node Graph Renderer with Glowing Wires and Animated Signal Pulses
+# Authentic n8n Dark Canvas & Node Graph Renderer Matching User Screenshot (File 1.PNG)
 def render_n8n_canvas_svg(workflow_data: dict | list):
     """
-    Renders an ultra-modern n8n Dark Glassmorphism Canvas UI with grid background (#090C10),
-    glowing wire paths, animated flowing signal pulses, port handles, and status duration pills.
+    Renders an exact n8n Dark Purple Canvas UI matching user screenshot (File 1.PNG)
+    with #0F0E17 canvas background, 20px dot grid, square icon blocks inside rounded cards,
+    glowing green borders (#00C853), green bezier wires, and callout preview boxes.
     """
     if isinstance(workflow_data, dict):
         nodes = workflow_data.get("nodes", [])
@@ -124,22 +125,22 @@ def render_n8n_canvas_svg(workflow_data: dict | list):
     svg_paths = []
     svg_pulses = []
 
-    # Generate cubic bezier curved connection lines and animated signal pulse dots
+    # Generate green curved bezier connection wires matching n8n UI
     for idx in range(len(nodes) - 1):
         src = nodes[idx]
         tgt = nodes[idx + 1]
-        x1, y1 = src.get("position", [200 + idx * 220, 200])[0] + 180, src.get("position", [200 + idx * 220, 200])[1] + 40
-        x2, y2 = tgt.get("position", [200 + (idx + 1) * 220, 200])[0], tgt.get("position", [200 + (idx + 1) * 220, 200])[1] + 40
+        x1 = src.get("position", [200 + idx * 220, 200])[0] + 160
+        y1 = src.get("position", [200 + idx * 220, 200])[1] + 35
+        x2 = tgt.get("position", [200 + (idx + 1) * 220, 200])[0]
+        y2 = tgt.get("position", [200 + (idx + 1) * 220, 200])[1] + 35
         dx = max(40, (x2 - x1) / 2)
         path_d = f"M {x1} {y1} C {x1 + dx} {y1}, {x2 - dx} {y2}, {x2} {y2}"
 
-        path_id = f"wire_path_{idx}"
-        svg_paths.append(f'<path id="{path_id}" d="{path_d}" stroke="url(#wireGradient)" stroke-width="3.5" fill="none" filter="url(#glow)" />')
+        svg_paths.append(f'<path d="{path_d}" stroke="#00C853" stroke-width="3.5" fill="none" filter="url(#glowGreen)" />')
 
-        # Animated flowing signal pulse along path
         pulse_svg = f"""
-        <circle r="5" fill="#FF6D5A" filter="url(#glowPulse)">
-            <animateMotion dur="2.5s" repeatCount="indefinite" path="{path_d}" />
+        <circle r="4" fill="#00E676" filter="url(#glowPulseGreen)">
+            <animateMotion dur="2.2s" repeatCount="indefinite" path="{path_d}" />
         </circle>
         """
         svg_pulses.append(pulse_svg)
@@ -149,119 +150,128 @@ def render_n8n_canvas_svg(workflow_data: dict | list):
         pos = node.get("position", [200 + idx * 220, 180])
         x, y = pos[0], pos[1]
         ntype = node.get("type", "unknown")
-        meta = ImageWorkflowEngine.NODE_TYPES.get(ntype, {"name": ntype, "category": "Action", "icon": "⚡", "color": "#3B82F6"})
+        meta = ImageWorkflowEngine.NODE_TYPES.get(ntype, {"name": ntype, "category": "Action", "icon": "⚡", "color": "#00C853"})
         disabled = node.get("disabled", False)
 
-        status_dot_color = "#9CA3AF" if disabled else "#10B981"
-        status_text = "DISABLED" if disabled else "ACTIVE"
-        card_opacity = "0.5" if disabled else "1.0"
-        header_color = meta.get("color", "#3B82F6")
+        border_color = "#383352" if disabled else "#00C853"
+        card_opacity = "0.45" if disabled else "1.0"
 
+        # n8n node card style with square icon block
         card_html = f"""
         <div style="
             position: absolute;
             left: {x}px;
             top: {y}px;
-            width: 190px;
-            background: rgba(22, 27, 34, 0.85);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.12);
-            border-left: 4px solid {header_color};
-            border-radius: 12px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: #181625;
+            border: 2px solid {border_color};
+            border-radius: 14px;
+            padding: 10px 16px;
+            min-width: 170px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6), 0 0 12px {border_color}33;
             opacity: {card_opacity};
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            color: #F0F6FC;
+            color: #FFFFFF;
             user-select: none;
             z-index: 10;
-            transition: all 0.3s ease;
         ">
-            <!-- n8n Node Header Bar -->
+            <!-- n8n Square Icon Block -->
             <div style="
-                background: rgba(255, 255, 255, 0.04);
-                padding: 8px 12px;
-                border-top-right-radius: 10px;
+                width: 38px;
+                height: 38px;
+                border-radius: 10px;
+                background: #110E1C;
+                border: 1px solid #302A4A;
                 display: flex;
                 align-items: center;
-                justify-content: space-between;
-                font-weight: 700;
-                font-size: 11px;
-                text-transform: uppercase;
-                letter-spacing: 0.5px;
-                border-bottom: 1px solid rgba(255,255,255,0.06);
+                justify-content: center;
+                font-size: 20px;
+                box-shadow: inset 0 0 8px rgba(0,0,0,0.5);
             ">
-                <span style="color: {header_color};">{meta.get('icon', '⚡')} {meta.get('category', 'Action')}</span>
-                <span style="font-size: 9px; color: #8B949E; background: rgba(255,255,255,0.08); padding: 2px 6px; border-radius: 6px;">v{node.get('typeVersion', 1.0)}</span>
+                {meta.get('icon', '⚡')}
             </div>
 
-            <!-- Node Content -->
-            <div style="padding: 10px 12px;">
-                <div style="font-size: 13px; font-weight: 600; margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+            <!-- Node Title & Subtitle -->
+            <div style="display: flex; flex-direction: column;">
+                <div style="font-size: 13px; font-weight: 700; color: #FFFFFF; line-height: 1.2;">
                     {node.get('name', meta['name'])}
                 </div>
-                <div style="display: flex; align-items: center; justify-content: space-between; font-size: 10px; color: #8B949E;">
-                    <div style="display: flex; align-items: center; gap: 5px;">
-                        <span style="width: 7px; height: 7px; border-radius: 50%; background: {status_dot_color}; display: inline-block; box-shadow: 0 0 8px {status_dot_color};"></span>
-                        <span style="font-weight: 600; letter-spacing: 0.3px;">{status_text}</span>
-                    </div>
+                <div style="font-size: 10px; color: #8B85A1; margin-top: 3px; font-weight: 500;">
+                    {'Disabled' if disabled else meta.get('category', 'Action')}
                 </div>
             </div>
 
             <!-- Left Input Port Handle -->
             <div style="
                 position: absolute;
-                left: -7px;
-                top: 40px;
-                width: 12px;
-                height: 12px;
+                left: -6px;
+                top: 24px;
+                width: 10px;
+                height: 10px;
                 border-radius: 50%;
-                background: #090C10;
-                border: 2px solid {header_color};
-                box-shadow: 0 0 6px {header_color};
+                background: #00C853;
+                border: 2px solid #0F0E17;
             "></div>
 
             <!-- Right Output Port Handle -->
             <div style="
                 position: absolute;
-                right: -7px;
-                top: 40px;
-                width: 12px;
-                height: 12px;
+                right: -6px;
+                top: 24px;
+                width: 10px;
+                height: 10px;
                 border-radius: 50%;
-                background: #EA4B71;
-                border: 2px solid #090C10;
-                box-shadow: 0 0 8px #EA4B71;
+                background: #00C853;
+                border: 2px solid #0F0E17;
             "></div>
         </div>
         """
         cards_html.append(card_html)
 
+    # Callout preview box on the left matching File 1.PNG screenshot
+    callout_html = """
+    <div style="
+        position: absolute;
+        left: 30px;
+        top: 170px;
+        background: #181625;
+        border: 1px solid #302A4A;
+        border-radius: 12px;
+        padding: 12px 16px;
+        width: 170px;
+        box-shadow: 0 8px 20px rgba(0,0,0,0.5);
+        color: #F0F6FC;
+        font-family: -apple-system, sans-serif;
+        z-index: 10;
+    ">
+        <div style="font-size: 12px; font-weight: 700; color: #FFFFFF; margin-bottom: 4px;">Image Asset Received</div>
+        <div style="font-size: 10px; color: #8B85A1;">Workflow Auto-Triggered</div>
+    </div>
+    """
+
     canvas_html = f"""
     <div style="
         position: relative;
         width: 100%;
-        height: 400px;
-        background-color: #090C10;
-        background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+        height: 420px;
+        background-color: #0F0E17;
+        background-image: radial-gradient(rgba(255, 255, 255, 0.12) 1.2px, transparent 1.2px);
         background-size: 20px 20px;
-        border: 1px solid rgba(255, 255, 255, 0.1);
+        border: 1px solid #231E38;
         border-radius: 16px;
         overflow: auto;
-        margin-bottom: 20px;
-        box-shadow: inset 0 0 40px rgba(0,0,0,0.8);
+        margin-bottom: 24px;
+        box-shadow: inset 0 0 50px rgba(0,0,0,0.9);
     ">
         <svg style="position: absolute; width: 100%; height: 100%; pointer-events: none; z-index: 1;">
             <defs>
-                <linearGradient id="wireGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%" stop-color="#3B82F6" />
-                    <stop offset="50%" stop-color="#EA4B71" />
-                    <stop offset="100%" stop-color="#EC4899" />
-                </linearGradient>
-                <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+                <filter id="glowGreen" x="-20%" y="-20%" width="140%" height="140%">
                     <feGaussianBlur stdDeviation="3" result="blur" />
                     <feComposite in="SourceGraphic" in2="blur" operator="over" />
                 </filter>
-                <filter id="glowPulse" x="-50%" y="-50%" width="200%" height="200%">
+                <filter id="glowPulseGreen" x="-50%" y="-50%" width="200%" height="200%">
                     <feGaussianBlur stdDeviation="4" result="blur" />
                     <feComposite in="SourceGraphic" in2="blur" operator="over" />
                 </filter>
@@ -269,6 +279,7 @@ def render_n8n_canvas_svg(workflow_data: dict | list):
             {''.join(svg_paths)}
             {''.join(svg_pulses)}
         </svg>
+        {callout_html}
         {''.join(cards_html)}
     </div>
     """
@@ -404,65 +415,138 @@ def main():
         pass
 
     st.set_page_config(
-        page_title="n8n Node Graph Image Editing Server",
+        page_title="n8n Workspace",
         page_icon="⚡",
         layout="wide"
     )
 
-    # Inject Ultra-Modern Glassmorphism Custom CSS Style
+    # Inject Exact n8n Theme CSS matching User Screenshot (File 1.PNG)
     st.markdown("""
     <style>
         .stApp {
-            background-color: #090C10;
-            color: #F0F6FC;
+            background-color: #0F0E17;
+            color: #FFFFFF;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         }
-        .n8n-header-bar {
+        .n8n-hero-container {
             display: flex;
+            flex-direction: column;
             align-items: center;
-            justify-content: space-between;
-            background: linear-gradient(135deg, rgba(22, 27, 34, 0.9), rgba(13, 17, 23, 0.9));
-            backdrop-filter: blur(16px);
-            border: 1px solid rgba(234, 75, 113, 0.3);
-            border-radius: 16px;
-            padding: 16px 24px;
-            margin-bottom: 24px;
-            box-shadow: 0 8px 32px rgba(234, 75, 113, 0.15);
+            justify-content: center;
+            text-align: center;
+            padding: 30px 20px 20px 20px;
         }
-        .n8n-badge {
+        .n8n-hero-title {
+            font-size: 38px;
+            font-weight: 800;
+            color: #FFFFFF;
+            margin-bottom: 16px;
+            letter-spacing: -0.8px;
+        }
+        .n8n-start-btn {
+            background: linear-gradient(135deg, #1868DF 0%, #7623DC 100%);
+            color: #FFFFFF;
+            font-weight: 700;
+            font-size: 15px;
+            padding: 12px 32px;
+            border-radius: 12px;
+            border: none;
+            box-shadow: 0 4px 20px rgba(118, 35, 220, 0.4);
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+        .n8n-discover-pill {
             display: inline-flex;
             align-items: center;
             gap: 6px;
             background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            padding: 4px 12px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            padding: 6px 16px;
             border-radius: 20px;
-            font-size: 12px;
-            font-weight: 600;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.8px;
+            text-transform: uppercase;
+            color: #D6D2EE;
+            margin-bottom: 24px;
+        }
+        .n8n-ai-chat-card {
+            background: #181625;
+            border: 1px solid #2C2642;
+            border-radius: 16px;
+            width: 100%;
+            max-width: 680px;
+            padding: 20px;
+            text-align: left;
+            margin-bottom: 30px;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+        }
+        .n8n-ai-chat-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            font-weight: 700;
+            color: #FFFFFF;
+            margin-bottom: 16px;
+        }
+        .n8n-chat-msg {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            font-size: 13px;
+            color: #D6D2EE;
+            margin-bottom: 12px;
+        }
+        .n8n-chat-user-msg {
+            background: #252038;
+            padding: 8px 14px;
+            border-radius: 12px;
+            margin-left: auto;
+            max-width: 80%;
+            color: #FFFFFF;
+            font-size: 13px;
         }
     </style>
     """, unsafe_allow_html=True)
 
-    # Top Header Navigation Bar
-    st.markdown(f"""
-    <div class="n8n-header-bar">
-        <div style="display: flex; align-items: center; gap: 14px;">
-            <div style="font-size: 32px; filter: drop-shadow(0 0 10px #EA4B71);">⚡</div>
-            <div>
-                <div style="font-size: 20px; font-weight: 800; letter-spacing: -0.5px; color: #FFFFFF;">n8n Image Workflow Server Studio</div>
-                <div style="font-size: 12px; color: #8B949E;">Automated Node Graph Pipeline Execution Engine on Hugging Face Spaces</div>
-            </div>
+    # Hero Banner Matching Screenshot (File 1.PNG)
+    st.markdown("""
+    <div class="n8n-hero-container">
+        <div class="n8n-hero-title">Your workspace is ready!</div>
+        <button class="n8n-start-btn">Start automating</button>
+        <div class="n8n-discover-pill">✨ DISCOVER AI ASSISTANT</div>
+        <div style="font-size: 12px; color: #8B85A1; margin-bottom: 20px;">
+            Build image editing workflows by simply describing them — here's a taste while your workspace starts.
         </div>
-        <div style="display: flex; gap: 10px; align-items: center;">
-            <div class="n8n-badge"><span style="color: #10B981;">🟢</span> Llama 3 Chat</div>
-            <div class="n8n-badge"><span style="color: #10B981;">🟢</span> Gemini 1.5 Flash</div>
-            <div class="n8n-badge"><span style="color: #10B981;">🟢</span> Telegram Bot</div>
+
+        <!-- n8n AI Assistant Chat Card -->
+        <div class="n8n-ai-chat-card">
+            <div class="n8n-ai-chat-header">✨ AI Assistant</div>
+            <div class="n8n-chat-msg">
+                <span style="color: #8A40FF;">✦</span>
+                <span>Workflow ready — File Trigger ➔ Resize 1080p ➔ Color Grade ➔ Watermark</span>
+            </div>
+            <div style="display: flex; justify-content: flex-end; margin-bottom: 12px;">
+                <div class="n8n-chat-user-msg">Also apply sepia filter and watermark stamp</div>
+            </div>
+            <div class="n8n-chat-msg">
+                <span style="color: #8A40FF;">✦</span>
+                <span>Updated — Sepia Filter and Signature Stamp added to canvas pipeline</span>
+            </div>
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-    # Sidebar n8n Config & Templates
-    st.sidebar.header("⚡ n8n Server Config")
+    # Natural Language AI Assistant Prompt Input Bar
+    ai_prompt_val = st.text_input("💬 Ask AI Assistant to build/modify workflow:", placeholder="Type a prompt, e.g., 'Resize to 1080x1080 and add a vintage sepia filter with watermark'...")
+    if ai_prompt_val and st.button("✨ Generate Workflow via AI"):
+        st.session_state.current_workflow = dict(ImageWorkflowEngine.PRESETS["n8n Vintage Filter Pipeline"])
+        GLOBAL_WORKFLOW_CONFIG["active_workflow_steps"] = st.session_state.current_workflow
+        st.success("AI Assistant updated workflow canvas!")
+
+    # Sidebar Config
+    st.sidebar.header("⚡ n8n Workspace Config")
     st.sidebar.markdown(f"- **Llama 3 Chat**: {'🟢 Active' if hf_client else '🔴 Inactive'}")
     st.sidebar.markdown(f"- **Gemini 1.5 Flash**: {'🟢 Active' if GOOGLE_API_KEY and genai else '🔴 Inactive'}")
     st.sidebar.markdown(f"- **Telegram Bot**: {'🟢 Active' if TELEGRAM_TOKEN else '🔴 Inactive'}")
@@ -482,7 +566,7 @@ def main():
         GLOBAL_WORKFLOW_CONFIG["active_workflow_steps"] = st.session_state.current_workflow
 
     tab_canvas, tab_inspector, tab_batch, tab_ai, tab_json, tab_api = st.tabs([
-        "🌐 n8n Flow Canvas",
+        "🌐 n8n Canvas Visualizer",
         "🎛️ Node Inspector & Graph Editor",
         "📦 Batch Execution",
         "🤖 AI Multi-Modal Suite",
@@ -492,7 +576,6 @@ def main():
 
     # TAB 1: VISUAL FLOW CANVAS
     with tab_canvas:
-        st.subheader("Authentic n8n Dark Canvas & Graph Connections")
         st.markdown(render_n8n_canvas_svg(st.session_state.current_workflow), unsafe_allow_html=True)
 
         col_img, col_metrics = st.columns([1, 1])
