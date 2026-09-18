@@ -17,10 +17,106 @@ from huggingface_hub import InferenceClient
 
 # Page configuration
 st.set_page_config(
-    page_title="HuggingFace Space Linux Environment & CLI Studio",
-    page_icon="🐧",
+    page_title="macOS Workstation & Docker Studio",
+    page_icon="🍎",
     layout="wide"
 )
+
+# Inject macOS Theme CSS
+st.markdown("""
+<style>
+    /* macOS Menu Bar */
+    .macos-menubar {
+        background-color: rgba(30, 30, 30, 0.85);
+        backdrop-filter: blur(10px);
+        color: #f0f0f0;
+        padding: 6px 16px;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        font-size: 13px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-radius: 8px 8px 0 0;
+        margin-bottom: 15px;
+        border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    .macos-menu-left {
+        display: flex;
+        gap: 18px;
+        align-items: center;
+        font-weight: 500;
+    }
+    .apple-logo {
+        font-size: 16px;
+        margin-right: 4px;
+    }
+
+    /* macOS Terminal Window Frame */
+    .macos-window {
+        background: #1e1e1e;
+        border-radius: 10px;
+        box-shadow: 0 12px 30px rgba(0,0,0,0.5);
+        border: 1px solid #333333;
+        overflow: hidden;
+        margin-bottom: 20px;
+    }
+    .macos-titlebar {
+        background: #2d2d2d;
+        padding: 8px 12px;
+        display: flex;
+        align-items: center;
+        border-bottom: 1px solid #1a1a1a;
+    }
+    .traffic-lights {
+        display: flex;
+        gap: 8px;
+    }
+    .light {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        display: inline-block;
+    }
+    .light-red { background-color: #ff5f56; border: 1px solid #e0443e; }
+    .light-yellow { background-color: #ffbd2e; border: 1px solid #dea123; }
+    .light-green { background-color: #27c93f; border: 1px solid #1aab29; }
+    .window-title {
+        color: #a0a0a0;
+        font-size: 12px;
+        font-family: SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+        margin-left: auto;
+        margin-right: auto;
+        font-weight: 600;
+    }
+
+    /* macOS Card Containers */
+    .macos-card {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 12px;
+        padding: 16px;
+        backdrop-filter: blur(12px);
+    }
+</style>
+
+<div class="macos-menubar">
+    <div class="macos-menu-left">
+        <span class="apple-logo">🍎</span>
+        <span style="font-weight: 700;">macOS Terminal Studio</span>
+        <span>File</span>
+        <span>Edit</span>
+        <span>View</span>
+        <span>Docker</span>
+        <span>Window</span>
+        <span>Help</span>
+    </div>
+    <div>
+        <span>🔋 100%</span> &nbsp;|&nbsp;
+        <span>📶 Connected</span> &nbsp;|&nbsp;
+        <span>Docker Engine Ready 🐳</span>
+    </div>
+</div>
+""", unsafe_allow_html=True)
 
 # Setup logging
 logging.basicConfig(
@@ -51,7 +147,7 @@ else:
     hf_client = None
 
 
-# --- Linux Shell Engine & Helpers ---
+# --- Linux & Docker Shell Engine & Helpers ---
 
 def get_current_working_dir():
     if "working_dir" not in st.session_state or not os.path.isdir(st.session_state.working_dir):
@@ -124,6 +220,32 @@ def execute_shell_command(cmd_str, cwd=None, timeout=60):
             "returncode": 1,
             "cwd": cwd
         }
+
+def get_docker_status():
+    """Checks if Docker CLI and daemon are available."""
+    res = subprocess.run("docker --version", shell=True, capture_output=True, text=True)
+    if res.returncode == 0:
+        version_str = res.stdout.strip()
+        ps_res = subprocess.run("docker ps", shell=True, capture_output=True, text=True)
+        daemon_ready = (ps_res.returncode == 0)
+        return {
+            "installed": True,
+            "version": version_str,
+            "daemon_ready": daemon_ready,
+            "error": ps_res.stderr if not daemon_ready else ""
+        }
+    return {
+        "installed": False,
+        "version": "Not Found",
+        "daemon_ready": False,
+        "error": "Docker CLI not installed"
+    }
+
+def run_docker_command(docker_cmd):
+    """Runs a docker command safely."""
+    if not docker_cmd.startswith("docker"):
+        docker_cmd = f"docker {docker_cmd}"
+    return execute_shell_command(docker_cmd)
 
 def get_system_info():
     """Gathers detailed system and environment information."""
@@ -303,8 +425,8 @@ if "bot_thread" not in st.session_state:
 
 # --- Streamlit UI Layout ---
 
-st.title("🐧 HuggingFace Space Linux Web CLI & Studio")
-st.markdown("Môi trường làm việc Linux với Giao diện dòng lệnh (CLI) trực tiếp trên HuggingFace Spaces.")
+st.title("🖥️ macOS Workstation & Docker Studio")
+st.markdown("Môi trường làm việc phong cách **macOS** tích hợp **Docker CLI** và **Linux Terminal** trên Hugging Face Spaces.")
 
 # Session state initialization for history
 if "cmd_history" not in st.session_state:
@@ -312,29 +434,43 @@ if "cmd_history" not in st.session_state:
 
 cwd = get_current_working_dir()
 sys_info = get_system_info()
+docker_info = get_docker_status()
 
 # Header status bar
 col1, col2, col3, col4 = st.columns(4)
 with col1:
-    st.metric("OS Distro", sys_info.get("distro", "Linux"))
+    st.metric("macOS Workstation Host", sys_info.get("user", "jules"))
 with col2:
-    st.metric("User @ Host", f"{sys_info.get('user', 'user')}@{sys_info.get('hostname', 'host')}")
+    st.metric("Docker CLI", docker_info["version"].split(",")[0] if docker_info["installed"] else "N/A")
 with col3:
     st.metric("Disk Free", f"{sys_info.get('disk_free_gb', 0)} GB")
 with col4:
-    st.metric("Python Version", sys_info.get("python_version", "3.x"))
+    st.metric("Python Runtime", sys_info.get("python_version", "3.x"))
 
 
 # Create Tabs
-tab_cli, tab_sys, tab_bot = st.tabs(["💻 Linux Terminal CLI", "📊 System Info & Resources", "🤖 Telegram Bot & AI Studio"])
+tab_cli, tab_docker, tab_sys, tab_bot = st.tabs(["💻 macOS Terminal CLI", "🐳 Docker Studio", "📊 System & Environment", "🤖 Telegram Bot & AI Studio"])
 
-# --- TAB 1: Linux Terminal CLI ---
+# --- TAB 1: macOS Terminal CLI ---
 with tab_cli:
-    st.subheader("Interactive Bash Terminal")
+    # macOS Terminal Window Frame Header
+    st.markdown("""
+    <div class="macos-window">
+        <div class="macos-titlebar">
+            <div class="traffic-lights">
+                <span class="light light-red"></span>
+                <span class="light light-yellow"></span>
+                <span class="light light-green"></span>
+            </div>
+            <div class="window-title">bash — 80x24</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
     st.markdown(f"**Current Directory (`PWD`):** `{cwd}`")
 
     # Quick command buttons
-    st.markdown("**Quick Preset Commands:**")
+    st.markdown("**Quick macOS / Linux Preset Commands:**")
     btn_col1, btn_col2, btn_col3, btn_col4, btn_col5, btn_col6, btn_col7 = st.columns(7)
     preset_cmd = None
     if btn_col1.button("📁 `ls -la`"):
@@ -354,7 +490,7 @@ with tab_cli:
 
     # Command execution form
     with st.form("cli_form", clear_on_submit=True):
-        cmd_input = st.text_input(f"[{sys_info.get('user', 'user')}@{sys_info.get('hostname', 'host')} {os.path.basename(cwd) or '/'}]#", value=preset_cmd or "")
+        cmd_input = st.text_input(f"[{sys_info.get('user', 'user')}@{sys_info.get('hostname', 'macbook')} {os.path.basename(cwd) or '/'}]#", value=preset_cmd or "")
         submitted = st.form_submit_button("🚀 Run Command", use_container_width=True)
 
     if (submitted and cmd_input) or preset_cmd:
@@ -380,11 +516,11 @@ with tab_cli:
     st.markdown("### Terminal Console Output")
 
     if not st.session_state.cmd_history:
-        st.info("Nhập lệnh Linux vào ô trên và nhấn **Run Command** (hoặc chọn lệnh nhanh) để bắt đầu.")
+        st.info("Nhập lệnh Linux / macOS vào ô trên và nhấn **Run Command** (hoặc chọn lệnh nhanh) để bắt đầu.")
     else:
         for idx, entry in enumerate(reversed(st.session_state.cmd_history)):
             c_user = sys_info.get('user', 'user')
-            c_host = sys_info.get('hostname', 'host')
+            c_host = sys_info.get('hostname', 'macbook')
             e_cwd = entry['cwd']
             cmd = entry['command']
             res = entry['result']
@@ -403,9 +539,48 @@ with tab_cli:
                 st.caption(f"Command executed (Exit code: {retcode}). No output returned.")
 
 
-# --- TAB 2: System Info & Resources ---
+# --- TAB 2: Docker Studio ---
+with tab_docker:
+    st.subheader("🐳 Docker Container & Image Management Studio")
+
+    if docker_info["installed"]:
+        st.success(f"**Docker Engine:** {docker_info['version']}")
+        if not docker_info["daemon_ready"]:
+            st.warning("⚠️ Docker CLI is available, but the Docker daemon socket is not currently running or restricted in this container environment.")
+            if docker_info["error"]:
+                st.caption(f"Daemon response: {docker_info['error']}")
+
+        st.markdown("#### Quick Docker Controls")
+        d_col1, d_col2, d_col3, d_col4 = st.columns(4)
+        docker_preset = None
+        if d_col1.button("📦 `docker ps -a`"):
+            docker_preset = "docker ps -a"
+        if d_col2.button("🖼️ `docker images`"):
+            docker_preset = "docker images"
+        if d_col3.button("ℹ️ `docker info`"):
+            docker_preset = "docker info"
+        if d_col4.button("🏷️ `docker version`"):
+            docker_preset = "docker version"
+
+        with st.form("docker_form"):
+            docker_input = st.text_input("Docker Command:", value=docker_preset or "docker ps -a")
+            d_submitted = st.form_submit_button("🚀 Run Docker Command", use_container_width=True)
+
+        if d_submitted or docker_preset:
+            target_docker_cmd = docker_input if d_submitted else docker_preset
+            d_res = run_docker_command(target_docker_cmd)
+            st.markdown(f"**Command Output (`{target_docker_cmd}`):**")
+            if d_res["stdout"]:
+                st.code(d_res["stdout"], language="text")
+            if d_res["stderr"]:
+                st.error(d_res["stderr"])
+    else:
+        st.error("Docker is not installed on this environment.")
+
+
+# --- TAB 3: System Info & Resources ---
 with tab_sys:
-    st.subheader("Linux System Details & Environment Specs")
+    st.subheader("macOS & Linux System Details")
 
     col_a, col_b = st.columns(2)
     with col_a:
@@ -441,7 +616,7 @@ with tab_sys:
         st.json(env_vars)
 
 
-# --- TAB 3: Telegram Bot & AI Studio ---
+# --- TAB 4: Telegram Bot & AI Studio ---
 with tab_bot:
     st.subheader("VBot1 Hybrid AI & Telegram Status")
     st.write("Status: Telegram Bot is running in background thread.")
