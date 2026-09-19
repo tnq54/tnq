@@ -48,13 +48,13 @@ else:
 CUSTOM_CSS = """
 <style>
     /* Dark Theme Core */
-    html, body, [data-testid="stAppViewContainer"] {
+    html, body, [data-testid="stAppViewContainer"], [data-testid="stHeader"] {
         background-color: #121319 !important;
         color: #e0e1e6 !important;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
     }
 
-    /* Hide Streamlit Header & Toolbar */
+    /* Hide Streamlit Header */
     [data-testid="stHeader"] {
         display: none !important;
     }
@@ -73,18 +73,7 @@ CUSTOM_CSS = """
         font-family: 'Consolas', 'Fira Code', 'Monaco', 'Courier New', monospace !important;
     }
 
-    /* Top Navigation Bar */
-    .pi-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        background-color: #1a1b23;
-        border-bottom: 1px solid #2a2b36;
-        padding: 8px 16px;
-        border-radius: 8px;
-        margin-bottom: 12px;
-    }
-
+    /* Header & Badges */
     .pi-logo {
         font-weight: 800;
         font-size: 1.3rem;
@@ -103,7 +92,7 @@ CUSTOM_CSS = """
 
     .webgpu-badge {
         background-color: #232430;
-        color: #8c8d9e;
+        color: #a0a1b8;
         border: 1px solid #323344;
         padding: 4px 10px;
         border-radius: 20px;
@@ -121,18 +110,7 @@ CUSTOM_CSS = """
         display: inline-block;
     }
 
-    /* Left Panel: TUI Workspace */
-    .tui-container {
-        background-color: #171821;
-        border: 1px solid #282936;
-        border-radius: 8px;
-        padding: 16px;
-        height: 82vh;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-    }
-
+    /* TUI Left Panel */
     .tui-header {
         font-size: 1rem;
         color: #e0e1e6;
@@ -199,7 +177,7 @@ CUSTOM_CSS = """
         background-color: #12131a;
         border-top: 1px solid #282936;
         padding: 6px 12px;
-        color: #6c6d80;
+        color: #8c8d9e;
         font-size: 0.8rem;
         border-radius: 4px;
         margin-top: 8px;
@@ -214,62 +192,40 @@ CUSTOM_CSS = """
         margin-bottom: 12px;
     }
 
-    .workspace-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        border-bottom: 1px solid #262736;
-        padding-bottom: 8px;
-        margin-bottom: 10px;
-    }
-
     .file-path {
         color: #a0a1b5;
         font-size: 0.85rem;
     }
 
-    /* Text Input Overrides */
-    .stTextInput>div>div>input {
-        background-color: #121319 !important;
-        color: #e0e1e6 !important;
-        border: 1px solid #2d2e3d !important;
-        border-radius: 6px !important;
-    }
-
-    .stTextArea>div>div>textarea {
-        background-color: #121319 !important;
-        color: #a5f3fc !important;
-        border: 1px solid #2d2e3d !important;
-        font-family: 'Consolas', 'Fira Code', 'Monaco', monospace !important;
-        border-radius: 6px !important;
-    }
-
-    /* Buttons Override */
-    .stButton>button {
+    /* High Contrast Controls & Buttons Fix */
+    button, .stButton button, [data-testid="baseButton-secondary"], [data-testid="baseButton-primary"] {
         background-color: #232430 !important;
-        color: #d0d1e0 !important;
-        border: 1px solid #343547 !important;
-        border-radius: 6px !important;
-        font-size: 0.85rem !important;
-        transition: all 0.2s ease;
-    }
-
-    .stButton>button:hover {
-        background-color: #2e2f40 !important;
         color: #ffffff !important;
-        border-color: #4f516b !important;
+        border: 1px solid #3e4054 !important;
+        border-radius: 6px !important;
     }
 
-    .save-btn>button {
-        background-color: #1e3a8a !important;
-        color: #60a5fa !important;
-        border-color: #2563eb !important;
+    button p, .stButton button p, .stDownloadButton button p {
+        color: #ffffff !important;
+        font-size: 0.85rem !important;
+        font-weight: 600 !important;
     }
 
-    .run-btn>button {
-        background-color: #064e3b !important;
-        color: #34d399 !important;
-        border-color: #059669 !important;
+    /* Text Inputs & Selectboxes */
+    input, textarea, [data-baseweb="input"] input, [data-baseweb="textarea"] textarea {
+        background-color: #121319 !important;
+        color: #ffffff !important;
+        border: 1px solid #323344 !important;
+    }
+
+    div[data-baseweb="select"] > div {
+        background-color: #232430 !important;
+        color: #ffffff !important;
+        border-color: #3e4054 !important;
+    }
+
+    div[data-baseweb="select"] span {
+        color: #ffffff !important;
     }
 
     /* Hide Streamlit Element Extra Padding */
@@ -281,7 +237,7 @@ CUSTOM_CSS = """
 
 
 # ---------------------------------------------------------
-# Helper Functions: PDF, Gemini & Shell
+# Helper Functions: PDF, Gemini & Safe Shell Execution
 # ---------------------------------------------------------
 def extract_pdf_text(file_bytes):
     try:
@@ -311,6 +267,8 @@ def summarize_with_gemini(text):
         logger.error(f"Gemini Error: {e}")
         return f"Error summarizing: {e}"
 
+ALLOWED_COMMAND_PREFIXES = ["ls", "cat", "pwd", "echo", "python", "python3", "head", "tail", "wc", "grep", "date", "whoami", "cd", "clear"]
+
 def execute_shell_command(cmd, workspace_dir="./workspace"):
     if not os.path.exists(workspace_dir):
         os.makedirs(workspace_dir, exist_ok=True)
@@ -321,6 +279,11 @@ def execute_shell_command(cmd, workspace_dir="./workspace"):
 
     if cmd == "clear":
         return "CLEAR_SIGNAL"
+
+    # Restrict to safe workspace utilities
+    cmd_base = cmd.split()[0].lower() if cmd.split() else ""
+    if cmd_base not in ALLOWED_COMMAND_PREFIXES:
+        return f"Command '{cmd_base}' restricted in virtual workspace shell."
 
     # Navigation helper
     if cmd.startswith("cd "):
@@ -627,40 +590,40 @@ def render_app():
     # RIGHT COLUMN: Workspace File Editor & Shell
     with col_right:
         st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
-        top_w_col1, top_w_col2 = st.columns([1, 1])
-        with top_w_col1:
+
+        # Single-level column bar for workspace header actions
+        w_col_title, file_btn_col1, file_btn_col2, file_btn_col3 = st.columns([3, 2, 2, 2])
+        with w_col_title:
             st.markdown('<span style="font-weight: bold; color: #ffffff;">Workspace</span>', unsafe_allow_html=True)
-        with top_w_col2:
-            file_btn_col1, file_btn_col2, file_btn_col3 = st.columns(3)
-            with file_btn_col1:
-                if st.button("+ File", key="add_file_btn", use_container_width=True):
-                    new_fn = f"file_{len(os.listdir(WORKSPACE_DIR))+1}.txt"
-                    with open(os.path.join(WORKSPACE_DIR, new_fn), "w") as f:
-                        f.write("New workspace file created.")
-                    st.session_state.selected_file = new_fn
-                    st.rerun()
-            with file_btn_col2:
-                uploaded = st.file_uploader("Import", label_visibility="collapsed", key="file_import_uploader")
-                if uploaded is not None:
-                    save_p = os.path.join(WORKSPACE_DIR, uploaded.name)
-                    with open(save_p, "wb") as f:
-                        f.write(uploaded.getbuffer())
-                    st.session_state.selected_file = uploaded.name
-                    st.toast(f"Imported {uploaded.name}")
-            with file_btn_col3:
-                curr_fp = os.path.join(WORKSPACE_DIR, st.session_state.selected_file)
-                curr_content = ""
-                if os.path.exists(curr_fp):
-                    with open(curr_fp, "r", encoding="utf-8", errors="ignore") as f:
-                        curr_content = f.read()
-                st.download_button(
-                    "Export",
-                    data=curr_content,
-                    file_name=st.session_state.selected_file,
-                    mime="text/plain",
-                    key="export_file_btn",
-                    use_container_width=True
-                )
+        with file_btn_col1:
+            if st.button("+ File", key="add_file_btn", use_container_width=True):
+                new_fn = f"file_{len(os.listdir(WORKSPACE_DIR))+1}.txt"
+                with open(os.path.join(WORKSPACE_DIR, new_fn), "w") as f:
+                    f.write("New workspace file created.")
+                st.session_state.selected_file = new_fn
+                st.rerun()
+        with file_btn_col2:
+            uploaded = st.file_uploader("Import", label_visibility="collapsed", key="file_import_uploader")
+            if uploaded is not None:
+                save_p = os.path.join(WORKSPACE_DIR, uploaded.name)
+                with open(save_p, "wb") as f:
+                    f.write(uploaded.getbuffer())
+                st.session_state.selected_file = uploaded.name
+                st.toast(f"Imported {uploaded.name}")
+        with file_btn_col3:
+            curr_fp = os.path.join(WORKSPACE_DIR, st.session_state.selected_file)
+            curr_content = ""
+            if os.path.exists(curr_fp):
+                with open(curr_fp, "r", encoding="utf-8", errors="ignore") as f:
+                    curr_content = f.read()
+            st.download_button(
+                "Export",
+                data=curr_content,
+                file_name=st.session_state.selected_file,
+                mime="text/plain",
+                key="export_file_btn",
+                use_container_width=True
+            )
 
         all_files = sorted(os.listdir(WORKSPACE_DIR))
         if not all_files:
@@ -706,18 +669,16 @@ def render_app():
                 key=f"editor_{st.session_state.selected_file}"
             )
 
-            save_c1, save_c2 = st.columns([3, 1])
-            with save_c2:
-                if st.button("Save", key="save_file_content_btn", use_container_width=True):
-                    with open(active_fpath, "w", encoding="utf-8") as f:
-                        f.write(edited_code)
-                    st.toast(f"Saved {st.session_state.selected_file}")
+            if st.button("Save", key="save_file_content_btn"):
+                with open(active_fpath, "w", encoding="utf-8") as f:
+                    f.write(edited_code)
+                st.toast(f"Saved {st.session_state.selected_file}")
 
         st.markdown('</div>', unsafe_allow_html=True)
 
         # Shell Terminal Component
         st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
-        sh_head1, sh_head2 = st.columns([2, 1])
+        sh_head1, sh_head2, sh_head3 = st.columns([3, 2, 2])
         with sh_head1:
             st.markdown("""
                 <div style="display: flex; gap: 10px; align-items: center;">
@@ -726,13 +687,11 @@ def render_app():
                 </div>
             """, unsafe_allow_html=True)
         with sh_head2:
-            sh_sub1, sh_sub2 = st.columns([1, 1])
-            with sh_sub1:
-                st.markdown('<span style="color: #6c6d80; font-size: 0.78rem;" class="mono-font">just-bash</span>', unsafe_allow_html=True)
-            with sh_sub2:
-                if st.button("Clear", key="clear_shell_btn", use_container_width=True):
-                    st.session_state.shell_history = ["Ready in your workspace"]
-                    st.rerun()
+            st.markdown('<span style="color: #6c6d80; font-size: 0.78rem;" class="mono-font">just-bash</span>', unsafe_allow_html=True)
+        with sh_head3:
+            if st.button("Clear", key="clear_shell_btn", use_container_width=True):
+                st.session_state.shell_history = ["Ready in your workspace"]
+                st.rerun()
 
         term_box = st.container(height=160)
         with term_box:
