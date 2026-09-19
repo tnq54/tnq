@@ -5,6 +5,7 @@ import threading
 import asyncio
 import io
 import json
+import shlex
 import subprocess
 import logging
 from pypdf import PdfReader
@@ -267,7 +268,7 @@ def summarize_with_gemini(text):
         logger.error(f"Gemini Error: {e}")
         return f"Error summarizing: {e}"
 
-ALLOWED_COMMAND_PREFIXES = ["ls", "cat", "pwd", "echo", "python", "python3", "head", "tail", "wc", "grep", "date", "whoami", "cd", "clear"]
+ALLOWED_COMMAND_PREFIXES = ["ls", "cat", "pwd", "echo", "python", "python3", "head", "tail", "wc", "date", "whoami", "cd", "clear"]
 
 def execute_shell_command(cmd, workspace_dir="./workspace"):
     if not os.path.exists(workspace_dir):
@@ -280,14 +281,26 @@ def execute_shell_command(cmd, workspace_dir="./workspace"):
     if cmd == "clear":
         return "CLEAR_SIGNAL"
 
-    # Restrict to safe workspace utilities
-    cmd_base = cmd.split()[0].lower() if cmd.split() else ""
+    # Reject dangerous shell operators to prevent injection/subshells
+    forbidden_chars = [";", "&&", "||", "|", "`", "$", "(", ")", ">", "<", "&"]
+    if any(char in cmd for char in forbidden_chars):
+        return "Error: Special shell operators/subshells are restricted in virtual shell."
+
+    try:
+        args = shlex.split(cmd)
+    except Exception as e:
+        return f"Command parse error: {e}"
+
+    if not args:
+        return ""
+
+    cmd_base = args[0].lower()
     if cmd_base not in ALLOWED_COMMAND_PREFIXES:
         return f"Command '{cmd_base}' restricted in virtual workspace shell."
 
     # Navigation helper
-    if cmd.startswith("cd "):
-        new_path = cmd[3:].strip()
+    if cmd_base == "cd":
+        new_path = args[1] if len(args) > 1 else "."
         target = os.path.abspath(os.path.join(workspace_dir, new_path))
         if os.path.exists(target) and os.path.isdir(target):
             return f"Changed directory to {new_path}"
@@ -295,9 +308,10 @@ def execute_shell_command(cmd, workspace_dir="./workspace"):
             return f"cd: no such file or directory: {new_path}"
 
     try:
+        # Execute securely without shell=True
         result = subprocess.run(
-            cmd,
-            shell=True,
+            args,
+            shell=False,
             cwd=workspace_dir,
             capture_output=True,
             text=True,
