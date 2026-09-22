@@ -8,46 +8,58 @@ import pandas as pd
 
 # Set page config at the very top
 st.set_page_config(
-    page_title="Linux Web Workspace - Hugging Face",
-    page_icon="🐧",
+    page_title="Termux Web CLI - Hugging Face Space",
+    page_icon="📱",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Dark theme custom CSS
+# Termux Dark Theme CSS
 st.markdown("""
 <style>
     .stApp {
-        background-color: #0d1117;
-        color: #c9d1d9;
-    }
-    .terminal-container {
-        background-color: #161b22;
-        border: 1px solid #30363d;
-        border-radius: 6px;
-        padding: 12px;
+        background-color: #000000;
+        color: #00ff66;
         font-family: 'Courier New', Courier, monospace;
     }
-    .terminal-output {
-        background-color: #0d1117;
-        color: #39d353;
+    .termux-banner {
+        background-color: #050505;
+        color: #00ff66;
+        border: 1px solid #004411;
+        border-radius: 4px;
+        padding: 15px;
+        font-family: monospace;
+        white-space: pre-wrap;
+        margin-bottom: 15px;
+    }
+    .termux-output {
+        background-color: #000000;
+        color: #00ff66;
         padding: 10px;
         border-radius: 4px;
         font-family: monospace;
         white-space: pre-wrap;
         word-break: break-all;
-        max-height: 400px;
-        overflow-y: auto;
-    }
-    .metric-card {
-        background-color: #161b22;
-        border: 1px solid #30363d;
-        border-radius: 6px;
-        padding: 15px;
-        text-align: center;
     }
 </style>
 """, unsafe_allow_html=True)
+
+TERMUX_BANNER = """Welcome to Termux (Linux Web CLI)!
+
+Community forum: https://termux.com/community
+Gitter chat:     https://gitter.im/termux/termux
+
+Working with packages:
+ * Search packages:   pkg search <query>
+ * Install a package: pkg install <package>
+ * Upgrade packages:  pkg upgrade
+
+Subscribed repositories:
+ * main (Debian/Ubuntu Linux environment)
+ * python / pip ecosystem
+
+System: Linux / Hugging Face Spaces Cloud Runtime
+"""
 
 # Initialize Session State
 if "cwd" not in st.session_state:
@@ -63,6 +75,29 @@ def execute_shell_command(cmd, cwd=None):
     cmd_str = cmd.strip()
     if not cmd_str:
         return "", "", 0
+
+    # Handle 'pkg' command emulation for Termux
+    if cmd_str.startswith("pkg ") or cmd_str == "pkg":
+        parts = cmd_str.split(maxsplit=2)
+        sub = parts[1] if len(parts) > 1 else "help"
+
+        if sub in ["update", "upgrade"]:
+            cmd_str = "apt-get update"
+        elif sub == "install" and len(parts) > 2:
+            pkg_name = parts[2]
+            # Try pip first or apt-get
+            cmd_str = f"pip install {pkg_name} || apt-get install -y {pkg_name}"
+        elif sub in ["search", "list-all", "list"]:
+            query = parts[2] if len(parts) > 2 else ""
+            cmd_str = f"pip search {query}" if query else "pip list"
+        elif sub in ["help", "-h", "--help"]:
+            help_msg = (
+                "Termux package manager (pkg emulation):\n"
+                "  pkg install <pkg>  Install a Python/Linux package\n"
+                "  pkg update         Update package lists\n"
+                "  pkg list           List installed packages\n"
+            )
+            return help_msg, "", 0
 
     # Handle 'cd' command in python session state
     if cmd_str.startswith("cd ") or cmd_str == "cd":
@@ -115,38 +150,40 @@ def get_process_list():
             pass
     return pd.DataFrame(processes).sort_values(by='cpu_percent', ascending=False) if processes else pd.DataFrame()
 
-# Layout Tabs
-st.title("🐧 Linux Web Workspace - Hugging Face Space")
-st.caption(f"Current Working Directory: `{st.session_state.cwd}`")
+# Header
+st.title("📱 Termux Real CLI - Linux Web Workspace")
+st.caption(f"Termux Terminal Sandbox | Working Dir: `{st.session_state.cwd}`")
 
-tab_terminal, tab_filemanager, tab_sysinfo = st.tabs(["💻 Terminal / CLI", "📁 File Manager & Editor", "📊 System & Resources"])
+tab_terminal, tab_filemanager, tab_sysinfo = st.tabs(["💻 Termux Terminal CLI", "📁 File Manager & Editor", "📊 System & Resources"])
 
 # TAB 1: TERMINAL / CLI
 with tab_terminal:
-    st.subheader("Interactive Linux Terminal")
+    # Display Termux Banner
+    st.markdown(f'<div class="termux-banner">{TERMUX_BANNER}</div>', unsafe_allow_html=True)
 
     # Quick Shortcuts
     st.write("Quick Shortcuts:")
     q_col1, q_col2, q_col3, q_col4, q_col5, q_col6 = st.columns(6)
 
     run_quick_cmd = None
-    if q_col1.button("`ls -la`"):
+    if q_col1.button("`pkg list`"):
+        run_quick_cmd = "pkg list"
+    if q_col2.button("`ls -la`"):
         run_quick_cmd = "ls -la"
-    if q_col2.button("`pwd`"):
+    if q_col3.button("`pwd`"):
         run_quick_cmd = "pwd"
-    if q_col3.button("`top (summary)`"):
+    if q_col4.button("`top`"):
         run_quick_cmd = "top -bn1 | head -n 20"
-    if q_col4.button("`df -h`"):
+    if q_col5.button("`df -h`"):
         run_quick_cmd = "df -h"
-    if q_col5.button("`free -m`"):
-        run_quick_cmd = "free -m"
     if q_col6.button("`python --version`"):
         run_quick_cmd = "python3 --version"
 
     # Command Input
+    termux_prompt = f"u0_a241@localhost:{st.session_state.cwd} $"
     with st.form(key="terminal_form", clear_on_submit=True):
-        user_input = st.text_input("Enter bash command:", placeholder="e.g. ls -la, pip list, git status, python3 -c 'print(1+1)'")
-        submit_btn = st.form_submit_button("Execute 🚀")
+        user_input = st.text_input(f"{termux_prompt}", placeholder="e.g. pkg install htop, ls -la, python3 -c 'print(\"Hello Termux\")'")
+        submit_btn = st.form_submit_button("Run Command 🚀")
 
     cmd_to_run = run_quick_cmd or (user_input if submit_btn else None)
 
@@ -155,6 +192,7 @@ with tab_terminal:
         st.session_state.cmd_history.append({
             "cmd": cmd_to_run,
             "cwd": st.session_state.cwd,
+            "prompt": f"u0_a241@localhost:{st.session_state.cwd} $",
             "stdout": stdout,
             "stderr": stderr,
             "code": code
@@ -170,18 +208,16 @@ with tab_terminal:
     # Display Terminal Log
     if st.session_state.cmd_history:
         for idx, item in enumerate(reversed(st.session_state.cmd_history)):
-            st.markdown(f"**`[{item['cwd']}]$ {item['cmd']}`** (Exit code: `{item['code']}`)")
+            st.markdown(f"**`{item.get('prompt', '$')} {item['cmd']}`** (Exit: `{item['code']}`)")
             if item["stdout"]:
                 st.text_area(f"stdout-{idx}", value=item["stdout"], height=150, key=f"stdout_{idx}")
             if item["stderr"]:
                 st.error(f"Error:\n{item['stderr']}")
             st.divider()
-    else:
-        st.info("No commands run yet. Enter a command above or click a shortcut.")
 
 # TAB 2: FILE MANAGER & EDITOR
 with tab_filemanager:
-    st.subheader("Workspace File Browser & Code Editor")
+    st.subheader("Termux Workspace File Browser & Code Editor")
 
     current_dir = st.session_state.cwd
 
@@ -237,7 +273,7 @@ with tab_filemanager:
         c1, c2 = st.columns(2)
         with c1:
             new_file_name = st.text_input("New file name:", placeholder="example.txt")
-            new_file_content = st.text_area("Initial Content:", placeholder="Hello Linux World")
+            new_file_content = st.text_area("Initial Content:", placeholder="Hello Termux World")
             if st.button("Create File"):
                 if new_file_name:
                     file_path = os.path.join(current_dir, new_file_name)

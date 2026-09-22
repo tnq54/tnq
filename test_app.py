@@ -4,10 +4,15 @@ import pandas as pd
 from app import execute_shell_command, get_system_metrics, get_process_list
 
 def test_execute_shell_command_basic():
-    stdout, stderr, code = execute_shell_command("echo 'Hello Linux'", cwd=os.getcwd())
+    stdout, stderr, code = execute_shell_command("echo 'Hello Termux'", cwd=os.getcwd())
     assert code == 0
-    assert "Hello Linux" in stdout
+    assert "Hello Termux" in stdout
     assert stderr == ""
+
+def test_execute_shell_command_pkg_help():
+    stdout, stderr, code = execute_shell_command("pkg help", cwd=os.getcwd())
+    assert code == 0
+    assert "Termux package manager" in stdout
 
 def test_execute_shell_command_invalid():
     stdout, stderr, code = execute_shell_command("invalid_command_xyz_123", cwd=os.getcwd())
