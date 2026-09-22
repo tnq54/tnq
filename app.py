@@ -1,184 +1,308 @@
 import streamlit as st
-import time
 import os
-import threading
-import asyncio
-import io
-import logging
-from pypdf import PdfReader
-from telegram import Update
-from telegram.error import NetworkError
-from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters
-from huggingface_hub import InferenceClient
+import subprocess
+import sys
+import platform
+import psutil
+import pandas as pd
 
-# Setup logging
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
+# Set page config at the very top
+st.set_page_config(
+    page_title="Linux Web Workspace - Hugging Face",
+    page_icon="🐧",
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
-logger = logging.getLogger(__name__)
 
-# Try importing Google GenAI
-try:
-    from google import genai
-except ImportError:
-    genai = None
+# Dark theme custom CSS
+st.markdown("""
+<style>
+    .stApp {
+        background-color: #0d1117;
+        color: #c9d1d9;
+    }
+    .terminal-container {
+        background-color: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 6px;
+        padding: 12px;
+        font-family: 'Courier New', Courier, monospace;
+    }
+    .terminal-output {
+        background-color: #0d1117;
+        color: #39d353;
+        padding: 10px;
+        border-radius: 4px;
+        font-family: monospace;
+        white-space: pre-wrap;
+        word-break: break-all;
+        max-height: 400px;
+        overflow-y: auto;
+    }
+    .metric-card {
+        background-color: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 6px;
+        padding: 15px;
+        text-align: center;
+    }
+</style>
+""", unsafe_allow_html=True)
 
-# Load Environment Variables
-HF_TOKEN = os.environ.get("HF_TOKEN")
-TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
-GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
+# Initialize Session State
+if "cwd" not in st.session_state:
+    st.session_state.cwd = os.getcwd()
 
-# Initialize HF Client
-if HF_TOKEN:
-    try:
-        hf_client = InferenceClient(token=HF_TOKEN)
-    except Exception as e:
-        logger.error(f"Failed to init HF Client: {e}")
-        hf_client = None
-else:
-    hf_client = None
+if "cmd_history" not in st.session_state:
+    st.session_state.cmd_history = []
 
-# PDF Text Extraction
-def extract_pdf_text(file_bytes):
-    try:
-        reader = PdfReader(io.BytesIO(file_bytes))
-        text = ""
-        for page in reader.pages:
-            text += page.extract_text() or ""
-        return text
-    except Exception as e:
-        logger.error(f"PDF Extraction Error: {e}")
-        return None
+def execute_shell_command(cmd, cwd=None):
+    if cwd is None:
+        cwd = st.session_state.cwd
 
-# Gemini Summarization
-def summarize_with_gemini(text):
-    if not GOOGLE_API_KEY:
-        return "Error: GOOGLE_API_KEY not found."
-    if not genai:
-        return "Error: google-genai library not installed."
+    cmd_str = cmd.strip()
+    if not cmd_str:
+        return "", "", 0
 
-    try:
-        client = genai.Client(api_key=GOOGLE_API_KEY)
-        # Using gemini-1.5-flash as requested (closest valid model to 2.5)
-        response = client.models.generate_content(
-            model='gemini-1.5-flash',
-            contents=f"Summarize this document:\n\n{text[:30000]}"
-        )
-        return response.text
-    except Exception as e:
-        logger.error(f"Gemini Error: {e}")
-        return f"Error summarizing: {e}"
-
-# Telegram Bot Handlers
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "Welcome to VBot1!\n"
-        "- Chat with me (Llama 3).\n"
-        "- Send a PDF to summarize (Gemini 1.5 Flash)."
-    )
-
-async def chat_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_text = update.message.text
-    if not hf_client:
-        await update.message.reply_text("Llama 3 is not available (HF_TOKEN missing).")
-        return
-
-    status_msg = await update.message.reply_text("Thinking...")
-    try:
-        messages = [{"role": "user", "content": user_text}]
-        # Llama 3 via HF Inference API
-        completion = hf_client.chat_completion(
-            model="meta-llama/Meta-Llama-3-8B-Instruct",
-            messages=messages,
-            max_tokens=500
-        )
-        reply = completion.choices[0].message.content
-        await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=status_msg.message_id, text=reply)
-    except Exception as e:
-        logger.error(f"Llama 3 Error: {e}")
-        await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=status_msg.message_id, text=f"Error: {e}")
-
-async def document_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    doc = update.message.document
-    if doc.mime_type != 'application/pdf':
-        await update.message.reply_text("Please send a PDF file.")
-        return
-
-    status_msg = await update.message.reply_text("Downloading PDF...")
-    try:
-        file = await context.bot.get_file(doc.file_id)
-        file_bytes = await file.download_as_bytearray()
-
-        await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=status_msg.message_id, text="Extracting text...")
-        text = extract_pdf_text(file_bytes)
-
-        if not text:
-            await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=status_msg.message_id, text="No text found in PDF.")
-            return
-
-        await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=status_msg.message_id, text="Summarizing (Gemini 1.5 Flash)...")
-        summary = summarize_with_gemini(text)
-
-        # Split long messages
-        if len(summary) > 4000:
-            for i in range(0, len(summary), 4000):
-                await update.message.reply_text(summary[i:i+4000])
+    # Handle 'cd' command in python session state
+    if cmd_str.startswith("cd ") or cmd_str == "cd":
+        target = cmd_str[3:].strip() if len(cmd_str) > 2 else os.path.expanduser("~")
+        if not target:
+            target = os.path.expanduser("~")
+        new_path = os.path.abspath(os.path.join(cwd, target))
+        if os.path.exists(new_path) and os.path.isdir(new_path):
+            st.session_state.cwd = new_path
+            return f"Changed directory to {new_path}\n", "", 0
         else:
-            await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=status_msg.message_id, text=summary)
+            return "", f"cd: {target}: No such file or directory\n", 1
 
+    try:
+        res = subprocess.run(
+            cmd_str,
+            shell=True,
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+        return res.stdout, res.stderr, res.returncode
+    except subprocess.TimeoutExpired:
+        return "", "Error: Command timed out after 30 seconds.\n", 124
     except Exception as e:
-        logger.error(f"Document Error: {e}")
-        await update.message.reply_text(f"Error processing document: {e}")
+        return "", f"Execution error: {str(e)}\n", 1
 
-# Bot Runner
-def run_bot():
-    # FIX: Network Error - Wait for network to be ready
-    logger.info("Waiting 20s for network initialization...")
-    time.sleep(20)
+# System Information Helpers
+def get_system_metrics():
+    cpu_percent = psutil.cpu_percent(interval=0.1)
+    mem = psutil.virtual_memory()
+    disk = psutil.disk_usage(st.session_state.cwd if "cwd" in st.session_state else os.getcwd())
+    return {
+        "cpu_percent": cpu_percent,
+        "mem_percent": mem.percent,
+        "mem_used_gb": round(mem.used / (1024**3), 2),
+        "mem_total_gb": round(mem.total / (1024**3), 2),
+        "disk_percent": disk.percent,
+        "disk_used_gb": round(disk.used / (1024**3), 2),
+        "disk_total_gb": round(disk.total / (1024**3), 2)
+    }
 
-    if not TELEGRAM_TOKEN:
-        logger.error("TELEGRAM_TOKEN is missing")
-        return
-
-    # Setup Loop for Thread
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-
-    logger.info("Starting polling loop...")
-
-    while True:
+def get_process_list():
+    processes = []
+    for proc in psutil.process_iter(['pid', 'name', 'username', 'cpu_percent', 'memory_percent']):
         try:
-            # Rebuild application on every iteration to ensure fresh httpx client
-            application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
-
-            application.add_handler(CommandHandler("start", start))
-            application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat_handler))
-            application.add_handler(MessageHandler(filters.Document.PDF, document_handler))
-
-            # FIX: System Error - Invalid file descriptor
-            application.run_polling(stop_signals=None, close_loop=False)
-
-        except NetworkError as e:
-            logger.error(f"Network error during polling: {e}. Retrying in 10s...")
-            time.sleep(10)
-        except Exception as e:
-            logger.error(f"Critical error during polling: {e}")
-            # Wait a bit before retrying to avoid rapid crash loops
-            time.sleep(10)
-        finally:
-            # Clean up if necessary, though ApplicationBuilder makes a new one
+            processes.append(proc.info)
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
             pass
+    return pd.DataFrame(processes).sort_values(by='cpu_percent', ascending=False) if processes else pd.DataFrame()
 
-# Background Thread
-if "bot_thread" not in st.session_state:
-    st.session_state.bot_thread = True
-    thread = threading.Thread(target=run_bot, daemon=True)
-    thread.start()
+# Layout Tabs
+st.title("🐧 Linux Web Workspace - Hugging Face Space")
+st.caption(f"Current Working Directory: `{st.session_state.cwd}`")
 
-# Streamlit UI
-st.title("VBot1 System Rebuilt")
-st.write("Status: Bot is running in background.")
-st.write("Config:")
-st.write(f"- Llama 3: {'Active' if hf_client else 'Inactive'}")
-st.write(f"- Gemini 1.5 Flash: {'Active' if GOOGLE_API_KEY else 'Inactive'}")
+tab_terminal, tab_filemanager, tab_sysinfo = st.tabs(["💻 Terminal / CLI", "📁 File Manager & Editor", "📊 System & Resources"])
+
+# TAB 1: TERMINAL / CLI
+with tab_terminal:
+    st.subheader("Interactive Linux Terminal")
+
+    # Quick Shortcuts
+    st.write("Quick Shortcuts:")
+    q_col1, q_col2, q_col3, q_col4, q_col5, q_col6 = st.columns(6)
+
+    run_quick_cmd = None
+    if q_col1.button("`ls -la`"):
+        run_quick_cmd = "ls -la"
+    if q_col2.button("`pwd`"):
+        run_quick_cmd = "pwd"
+    if q_col3.button("`top (summary)`"):
+        run_quick_cmd = "top -bn1 | head -n 20"
+    if q_col4.button("`df -h`"):
+        run_quick_cmd = "df -h"
+    if q_col5.button("`free -m`"):
+        run_quick_cmd = "free -m"
+    if q_col6.button("`python --version`"):
+        run_quick_cmd = "python3 --version"
+
+    # Command Input
+    with st.form(key="terminal_form", clear_on_submit=True):
+        user_input = st.text_input("Enter bash command:", placeholder="e.g. ls -la, pip list, git status, python3 -c 'print(1+1)'")
+        submit_btn = st.form_submit_button("Execute 🚀")
+
+    cmd_to_run = run_quick_cmd or (user_input if submit_btn else None)
+
+    if cmd_to_run:
+        stdout, stderr, code = execute_shell_command(cmd_to_run)
+        st.session_state.cmd_history.append({
+            "cmd": cmd_to_run,
+            "cwd": st.session_state.cwd,
+            "stdout": stdout,
+            "stderr": stderr,
+            "code": code
+        })
+
+    # Terminal History Controls
+    col_hist_title, col_hist_clear = st.columns([4, 1])
+    with col_hist_clear:
+        if st.button("Clear Terminal Log"):
+            st.session_state.cmd_history = []
+            st.rerun()
+
+    # Display Terminal Log
+    if st.session_state.cmd_history:
+        for idx, item in enumerate(reversed(st.session_state.cmd_history)):
+            st.markdown(f"**`[{item['cwd']}]$ {item['cmd']}`** (Exit code: `{item['code']}`)")
+            if item["stdout"]:
+                st.text_area(f"stdout-{idx}", value=item["stdout"], height=150, key=f"stdout_{idx}")
+            if item["stderr"]:
+                st.error(f"Error:\n{item['stderr']}")
+            st.divider()
+    else:
+        st.info("No commands run yet. Enter a command above or click a shortcut.")
+
+# TAB 2: FILE MANAGER & EDITOR
+with tab_filemanager:
+    st.subheader("Workspace File Browser & Code Editor")
+
+    current_dir = st.session_state.cwd
+
+    col_dir_nav, col_actions = st.columns([3, 1])
+    with col_dir_nav:
+        st.write(f"📁 Directory: **`{current_dir}`**")
+    with col_actions:
+        if st.button("Up One Directory (`..`)"):
+            st.session_state.cwd = os.path.dirname(current_dir)
+            st.rerun()
+
+    try:
+        dir_contents = os.listdir(current_dir)
+        files_dirs = []
+        for name in dir_contents:
+            full_path = os.path.join(current_dir, name)
+            is_dir = os.path.isdir(full_path)
+            size_str = "-" if is_dir else f"{os.path.getsize(full_path):,} bytes"
+            files_dirs.append({
+                "Type": "📁 Folder" if is_dir else "📄 File",
+                "Name": name,
+                "Size": size_str
+            })
+
+        df_files = pd.DataFrame(files_dirs)
+        st.dataframe(df_files, use_container_width=True)
+    except Exception as e:
+        st.error(f"Cannot list directory: {e}")
+
+    st.divider()
+
+    # File Operations
+    fm_tab1, fm_tab2, fm_tab3 = st.tabs(["✏️ Edit / View File", "➕ Create File/Folder", "📤 Upload File"])
+
+    with fm_tab1:
+        file_to_edit = st.text_input("File path to edit / view:", value=os.path.join(current_dir, "README.md"))
+        if os.path.exists(file_to_edit) and os.path.isfile(file_to_edit):
+            try:
+                with open(file_to_edit, "r", encoding="utf-8", errors="ignore") as f:
+                    file_content = f.read()
+
+                new_content = st.text_area("File Content:", value=file_content, height=300)
+                if st.button("Save Changes"):
+                    with open(file_to_edit, "w", encoding="utf-8") as f:
+                        f.write(new_content)
+                    st.success(f"Saved changes to `{file_to_edit}` successfully!")
+            except Exception as e:
+                st.error(f"Error reading file: {e}")
+        else:
+            st.warning("File does not exist or is a directory.")
+
+    with fm_tab2:
+        c1, c2 = st.columns(2)
+        with c1:
+            new_file_name = st.text_input("New file name:", placeholder="example.txt")
+            new_file_content = st.text_area("Initial Content:", placeholder="Hello Linux World")
+            if st.button("Create File"):
+                if new_file_name:
+                    file_path = os.path.join(current_dir, new_file_name)
+                    with open(file_path, "w", encoding="utf-8") as f:
+                        f.write(new_file_content)
+                    st.success(f"Created file `{new_file_name}`!")
+                    st.rerun()
+        with c2:
+            new_folder_name = st.text_input("New directory name:", placeholder="my_folder")
+            if st.button("Create Directory"):
+                if new_folder_name:
+                    dir_path = os.path.join(current_dir, new_folder_name)
+                    os.makedirs(dir_path, exist_ok=True)
+                    st.success(f"Created directory `{new_folder_name}`!")
+                    st.rerun()
+
+    with fm_tab3:
+        uploaded_file = st.file_uploader("Upload file to current directory:")
+        if uploaded_file is not None:
+            save_path = os.path.join(current_dir, uploaded_file.name)
+            with open(save_path, "wb") as f:
+                f.write(uploaded_file.getbuffer())
+            st.success(f"Uploaded `{uploaded_file.name}` to `{current_dir}`!")
+            st.rerun()
+
+# TAB 3: SYSTEM & RESOURCES
+with tab_sysinfo:
+    st.subheader("System Resources & Environment")
+
+    metrics = get_system_metrics()
+
+    m_col1, m_col2, m_col3 = st.columns(3)
+    m_col1.metric("CPU Usage", f"{metrics['cpu_percent']}%")
+    m_col2.metric("Memory Usage", f"{metrics['mem_percent']}%", f"{metrics['mem_used_gb']} GB / {metrics['mem_total_gb']} GB")
+    m_col3.metric("Disk Usage", f"{metrics['disk_percent']}%", f"{metrics['disk_used_gb']} GB / {metrics['disk_total_gb']} GB")
+
+    st.divider()
+
+    st.write("### OS Kernel & Python Runtime")
+    st.json({
+        "System OS": platform.system(),
+        "OS Release": platform.release(),
+        "Architecture": platform.machine(),
+        "Python Version": sys.version,
+        "Executable": sys.executable
+    })
+
+    st.divider()
+
+    st.write("### Active System Processes")
+    if st.button("Refresh Processes"):
+        st.rerun()
+    proc_df = get_process_list()
+    if not proc_df.empty:
+        st.dataframe(proc_df.head(20), use_container_width=True)
+
+    st.divider()
+
+    st.write("### Environment Variables")
+    masked_env = []
+    sensitive_keywords = ["TOKEN", "KEY", "SECRET", "PASSWORD", "AUTH"]
+    for k, v in os.environ.items():
+        if any(keyword in k.upper() for keyword in sensitive_keywords):
+            masked_env.append((k, "********"))
+        else:
+            masked_env.append((k, v))
+    env_df = pd.DataFrame(masked_env, columns=["Variable", "Value"])
+    st.dataframe(env_df, use_container_width=True)

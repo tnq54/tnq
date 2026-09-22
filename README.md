@@ -1,20 +1,18 @@
 ---
-title: VBot1
-emoji: 🤖
+title: Linux Web Workspace
+emoji: 🐧
 colorFrom: blue
 colorTo: indigo
 sdk: streamlit
 sdk_version: 1.35.0
 app_file: app.py
+app_port: 7860
 pinned: false
 ---
 
-# VBot1 System
+# Linux Web Workspace
 
-This is the VBot1 system, a hybrid AI Telegram bot powered by:
-- **Llama 3** (via Hugging Face Inference API) for chat.
-- **Gemini 1.5 Flash** (via Google GenAI) for PDF summarization.
-- **Streamlit** for the web interface and runtime environment.
-
-## Deployment
-This space is synced automatically from GitHub.
+An interactive Linux environment and web workspace hosted on Hugging Face Spaces:
+- **Interactive Shell / Terminal**: Execute bash commands, view command history, use quick shortcuts.
+- **Workspace File Manager & Code Editor**: Browse directories, view & edit files, create files/folders, and upload files.
+- **System Resource & Environment Dashboard**: Monitor CPU/RAM/Disk metrics, running processes, kernel info, and environment variables.
