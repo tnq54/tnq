@@ -8,10 +8,10 @@ import pandas as pd
 
 # Set page config at the very top
 st.set_page_config(
-    page_title="Termux Web CLI - Hugging Face Space",
+    page_title="Termux Terminal CLI",
     page_icon="📱",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
 # Termux Dark Theme CSS
@@ -27,19 +27,20 @@ st.markdown("""
         color: #00ff66;
         border: 1px solid #004411;
         border-radius: 4px;
-        padding: 15px;
+        padding: 12px;
         font-family: monospace;
         white-space: pre-wrap;
-        margin-bottom: 15px;
+        margin-bottom: 10px;
     }
-    .termux-output {
-        background-color: #000000;
+    .touch-key-btn {
+        background-color: #111111;
         color: #00ff66;
-        padding: 10px;
+        border: 1px solid #005522;
         border-radius: 4px;
+        padding: 5px;
+        text-align: center;
+        font-weight: bold;
         font-family: monospace;
-        white-space: pre-wrap;
-        word-break: break-all;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -55,10 +56,10 @@ Working with packages:
  * Upgrade packages:  pkg upgrade
 
 Subscribed repositories:
- * main (Debian/Ubuntu Linux environment)
- * python / pip ecosystem
+ * main (Linux Debian/Ubuntu sandbox)
+ * python / pip package manager
 
-System: Linux / Hugging Face Spaces Cloud Runtime
+Termux commands available: termux-info, termux-setup-storage, pkg, apt
 """
 
 # Initialize Session State
@@ -68,16 +69,48 @@ if "cwd" not in st.session_state:
 if "cmd_history" not in st.session_state:
     st.session_state.cmd_history = []
 
+if "input_buffer" not in st.session_state:
+    st.session_state.input_buffer = ""
+
 def execute_shell_command(cmd, cwd=None):
     if cwd is None:
-        cwd = st.session_state.cwd
+        cwd = st.session_state.cwd if "cwd" in st.session_state else os.getcwd()
 
     cmd_str = cmd.strip()
     if not cmd_str:
         return "", "", 0
 
-    # Handle 'pkg' command emulation for Termux
-    if cmd_str.startswith("pkg ") or cmd_str == "pkg":
+    # Termux native command handlers
+    if cmd_str == "termux-info":
+        info = (
+            f"Termux Variables:\n"
+            f"TERMUX_VERSION=0.118.0\n"
+            f"TERMUX_MAIN_PACKAGE_FORMAT=debian\n"
+            f"ARCH={platform.machine()}\n"
+            f"OS={platform.system()} {platform.release()}\n"
+            f"PREFIX=/data/data/com.termux/files/usr\n"
+            f"HOME={cwd}\n"
+        )
+        return info, "", 0
+
+    if cmd_str == "termux-setup-storage":
+        storage_msg = (
+            "Creating storage directory ~/storage...\n"
+            "Symlinks created:\n"
+            " ~/storage/dcim -> /sdcard/DCIM\n"
+            " ~/storage/downloads -> /sdcard/Download\n"
+            " ~/storage/shared -> /sdcard\n"
+        )
+        os.makedirs(os.path.join(cwd, "storage"), exist_ok=True)
+        return storage_msg, "", 0
+
+    if cmd_str == "clear":
+        if "cmd_history" in st.session_state:
+            st.session_state.cmd_history = []
+        return "", "", 0
+
+    # Handle 'pkg' and 'apt' commands
+    if cmd_str.startswith("pkg ") or cmd_str == "pkg" or cmd_str.startswith("apt ") or cmd_str == "apt":
         parts = cmd_str.split(maxsplit=2)
         sub = parts[1] if len(parts) > 1 else "help"
 
@@ -85,28 +118,28 @@ def execute_shell_command(cmd, cwd=None):
             cmd_str = "apt-get update"
         elif sub == "install" and len(parts) > 2:
             pkg_name = parts[2]
-            # Try pip first or apt-get
             cmd_str = f"pip install {pkg_name} || apt-get install -y {pkg_name}"
         elif sub in ["search", "list-all", "list"]:
             query = parts[2] if len(parts) > 2 else ""
             cmd_str = f"pip search {query}" if query else "pip list"
         elif sub in ["help", "-h", "--help"]:
             help_msg = (
-                "Termux package manager (pkg emulation):\n"
+                "Termux package manager (pkg / apt emulation):\n"
                 "  pkg install <pkg>  Install a Python/Linux package\n"
                 "  pkg update         Update package lists\n"
                 "  pkg list           List installed packages\n"
             )
             return help_msg, "", 0
 
-    # Handle 'cd' command in python session state
+    # Handle 'cd' command
     if cmd_str.startswith("cd ") or cmd_str == "cd":
         target = cmd_str[3:].strip() if len(cmd_str) > 2 else os.path.expanduser("~")
         if not target:
             target = os.path.expanduser("~")
         new_path = os.path.abspath(os.path.join(cwd, target))
         if os.path.exists(new_path) and os.path.isdir(new_path):
-            st.session_state.cwd = new_path
+            if "cwd" in st.session_state:
+                st.session_state.cwd = new_path
             return f"Changed directory to {new_path}\n", "", 0
         else:
             return "", f"cd: {target}: No such file or directory\n", 1
@@ -150,58 +183,84 @@ def get_process_list():
             pass
     return pd.DataFrame(processes).sort_values(by='cpu_percent', ascending=False) if processes else pd.DataFrame()
 
-# Header
-st.title("📱 Termux Real CLI - Linux Web Workspace")
-st.caption(f"Termux Terminal Sandbox | Working Dir: `{st.session_state.cwd}`")
+# Main Header
+st.title("📱 Termux Real CLI Terminal")
+st.caption(f"Termux Terminal Session | Working Directory: `{st.session_state.cwd}`")
 
-tab_terminal, tab_filemanager, tab_sysinfo = st.tabs(["💻 Termux Terminal CLI", "📁 File Manager & Editor", "📊 System & Resources"])
+tab_terminal, tab_filemanager, tab_sysinfo = st.tabs(["💻 Termux CLI Terminal", "📁 File Manager & Editor", "📊 System & Resources"])
 
 # TAB 1: TERMINAL / CLI
 with tab_terminal:
     # Display Termux Banner
     st.markdown(f'<div class="termux-banner">{TERMUX_BANNER}</div>', unsafe_allow_html=True)
 
-    # Quick Shortcuts
-    st.write("Quick Shortcuts:")
+    # Termux Touch Keys Bar
+    st.write("Termux Touch Keys:")
+    tk1, tk2, tk3, tk4, tk5, tk6, tk7, tk8, tk9 = st.columns(9)
+
+    append_key = None
+    if tk1.button("`ESC`"):
+        append_key = ""
+    if tk2.button("`TAB`"):
+        append_key = "  "
+    if tk3.button("`CTRL`"):
+        append_key = "^C"
+    if tk4.button("`ALT`"):
+        append_key = ""
+    if tk5.button("`-`"):
+        append_key = " - "
+    if tk6.button("`/`"):
+        append_key = "/"
+    if tk7.button("`|`"):
+        append_key = " | "
+    if tk8.button("`~`"):
+        append_key = "~"
+    if tk9.button("`CLEAR`"):
+        st.session_state.cmd_history = []
+        st.rerun()
+
+    # Quick Command Shortcuts
+    st.write("Quick Commands:")
     q_col1, q_col2, q_col3, q_col4, q_col5, q_col6 = st.columns(6)
 
     run_quick_cmd = None
-    if q_col1.button("`pkg list`"):
+    if q_col1.button("`termux-info`"):
+        run_quick_cmd = "termux-info"
+    if q_col2.button("`pkg list`"):
         run_quick_cmd = "pkg list"
-    if q_col2.button("`ls -la`"):
+    if q_col3.button("`ls -la`"):
         run_quick_cmd = "ls -la"
-    if q_col3.button("`pwd`"):
+    if q_col4.button("`pwd`"):
         run_quick_cmd = "pwd"
-    if q_col4.button("`top`"):
+    if q_col5.button("`top`"):
         run_quick_cmd = "top -bn1 | head -n 20"
-    if q_col5.button("`df -h`"):
-        run_quick_cmd = "df -h"
     if q_col6.button("`python --version`"):
         run_quick_cmd = "python3 --version"
 
-    # Command Input
+    # Command Input Box
     termux_prompt = f"u0_a241@localhost:{st.session_state.cwd} $"
     with st.form(key="terminal_form", clear_on_submit=True):
-        user_input = st.text_input(f"{termux_prompt}", placeholder="e.g. pkg install htop, ls -la, python3 -c 'print(\"Hello Termux\")'")
+        user_input = st.text_input(f"{termux_prompt}", value=append_key if append_key else "", placeholder="Enter command: e.g. pkg install htop, termux-info, ls -la, python3")
         submit_btn = st.form_submit_button("Run Command 🚀")
 
     cmd_to_run = run_quick_cmd or (user_input if submit_btn else None)
 
     if cmd_to_run:
         stdout, stderr, code = execute_shell_command(cmd_to_run)
-        st.session_state.cmd_history.append({
-            "cmd": cmd_to_run,
-            "cwd": st.session_state.cwd,
-            "prompt": f"u0_a241@localhost:{st.session_state.cwd} $",
-            "stdout": stdout,
-            "stderr": stderr,
-            "code": code
-        })
+        if cmd_to_run != "clear":
+            st.session_state.cmd_history.append({
+                "cmd": cmd_to_run,
+                "cwd": st.session_state.cwd,
+                "prompt": f"u0_a241@localhost:{st.session_state.cwd} $",
+                "stdout": stdout,
+                "stderr": stderr,
+                "code": code
+            })
 
     # Terminal History Controls
     col_hist_title, col_hist_clear = st.columns([4, 1])
     with col_hist_clear:
-        if st.button("Clear Terminal Log"):
+        if st.button("Clear Terminal"):
             st.session_state.cmd_history = []
             st.rerun()
 

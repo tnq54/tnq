@@ -9,6 +9,17 @@ def test_execute_shell_command_basic():
     assert "Hello Termux" in stdout
     assert stderr == ""
 
+def test_execute_shell_command_termux_info():
+    stdout, stderr, code = execute_shell_command("termux-info", cwd=os.getcwd())
+    assert code == 0
+    assert "TERMUX_VERSION" in stdout
+
+def test_execute_shell_command_termux_storage(tmp_path):
+    stdout, stderr, code = execute_shell_command("termux-setup-storage", cwd=str(tmp_path))
+    assert code == 0
+    assert "Creating storage directory" in stdout
+    assert (tmp_path / "storage").exists()
+
 def test_execute_shell_command_pkg_help():
     stdout, stderr, code = execute_shell_command("pkg help", cwd=os.getcwd())
     assert code == 0
