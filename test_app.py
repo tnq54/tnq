@@ -14,6 +14,22 @@ def test_execute_shell_command_termux_info():
     assert code == 0
     assert "TERMUX_VERSION" in stdout
 
+def test_execute_shell_command_termux_battery():
+    stdout, stderr, code = execute_shell_command("termux-battery-status", cwd=os.getcwd())
+    assert code == 0
+    assert "percentage" in stdout
+
+def test_execute_shell_command_termux_toast():
+    stdout, stderr, code = execute_shell_command("termux-toast Test Notification", cwd=os.getcwd())
+    assert code == 0
+    assert "Toast Notification" in stdout
+
+def test_execute_shell_command_termux_clipboard():
+    execute_shell_command("termux-clipboard-set my_secret_key", cwd=os.getcwd())
+    stdout, stderr, code = execute_shell_command("termux-clipboard-get", cwd=os.getcwd())
+    assert code == 0
+    assert "my_secret_key" in stdout
+
 def test_execute_shell_command_termux_storage(tmp_path):
     stdout, stderr, code = execute_shell_command("termux-setup-storage", cwd=str(tmp_path))
     assert code == 0

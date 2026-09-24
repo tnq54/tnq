@@ -5,47 +5,81 @@ import sys
 import platform
 import psutil
 import pandas as pd
+import json
 
 # Set page config at the very top
 st.set_page_config(
-    page_title="Termux Terminal CLI",
+    page_title="Termux Desktop Workstation",
     page_icon="📱",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="expanded"
 )
 
-# Termux Dark Theme CSS
-st.markdown("""
+# Initialize Session State
+if "cwd" not in st.session_state:
+    st.session_state.cwd = os.getcwd()
+
+if "cmd_history" not in st.session_state:
+    st.session_state.cmd_history = []
+
+if "termux_theme" not in st.session_state:
+    st.session_state.termux_theme = "Classic Green"
+
+if "termux_clipboard" not in st.session_state:
+    st.session_state.termux_clipboard = "Termux Clipboard Empty"
+
+# Color Themes Definition
+THEMES = {
+    "Classic Green": {"bg": "#000000", "fg": "#00ff66", "accent": "#004411"},
+    "Monokai": {"bg": "#272822", "fg": "#a6e22e", "accent": "#49483e"},
+    "Dracula": {"bg": "#282a36", "fg": "#50fa7b", "accent": "#44475a"},
+    "Solarized Dark": {"bg": "#002b36", "fg": "#2aa198", "accent": "#073642"},
+    "Cyan Cyberpunk": {"bg": "#080e18", "fg": "#00f0ff", "accent": "#0d233a"}
+}
+
+current_theme = THEMES.get(st.session_state.termux_theme, THEMES["Classic Green"])
+
+# Termux Desktop Emulator CSS
+st.markdown(f"""
 <style>
-    .stApp {
-        background-color: #000000;
-        color: #00ff66;
+    .stApp {{
+        background-color: {current_theme['bg']};
+        color: {current_theme['fg']};
         font-family: 'Courier New', Courier, monospace;
-    }
-    .termux-banner {
-        background-color: #050505;
-        color: #00ff66;
-        border: 1px solid #004411;
+    }}
+    .termux-window {{
+        background-color: {current_theme['bg']};
+        border: 2px solid {current_theme['accent']};
+        border-radius: 8px;
+        padding: 0px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+        margin-bottom: 15px;
+    }}
+    .termux-window-header {{
+        background-color: {current_theme['accent']};
+        color: {current_theme['fg']};
+        padding: 6px 12px;
+        border-top-left-radius: 6px;
+        border-top-right-radius: 6px;
+        font-weight: bold;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }}
+    .termux-banner {{
+        background-color: {current_theme['bg']};
+        color: {current_theme['fg']};
+        border: 1px solid {current_theme['accent']};
         border-radius: 4px;
         padding: 12px;
         font-family: monospace;
         white-space: pre-wrap;
-        margin-bottom: 10px;
-    }
-    .touch-key-btn {
-        background-color: #111111;
-        color: #00ff66;
-        border: 1px solid #005522;
-        border-radius: 4px;
-        padding: 5px;
-        text-align: center;
-        font-weight: bold;
-        font-family: monospace;
-    }
+        margin: 10px;
+    }}
 </style>
 """, unsafe_allow_html=True)
 
-TERMUX_BANNER = """Welcome to Termux (Linux Web CLI)!
+TERMUX_BANNER = """Welcome to Termux Desktop Workstation!
 
 Community forum: https://termux.com/community
 Gitter chat:     https://gitter.im/termux/termux
@@ -55,22 +89,9 @@ Working with packages:
  * Install a package: pkg install <package>
  * Upgrade packages:  pkg upgrade
 
-Subscribed repositories:
- * main (Linux Debian/Ubuntu sandbox)
- * python / pip package manager
-
-Termux commands available: termux-info, termux-setup-storage, pkg, apt
+Termux API tools loaded:
+ * termux-info, termux-battery-status, termux-toast, termux-clipboard-get/set, termux-setup-storage
 """
-
-# Initialize Session State
-if "cwd" not in st.session_state:
-    st.session_state.cwd = os.getcwd()
-
-if "cmd_history" not in st.session_state:
-    st.session_state.cmd_history = []
-
-if "input_buffer" not in st.session_state:
-    st.session_state.input_buffer = ""
 
 def execute_shell_command(cmd, cwd=None):
     if cwd is None:
@@ -80,7 +101,7 @@ def execute_shell_command(cmd, cwd=None):
     if not cmd_str:
         return "", "", 0
 
-    # Termux native command handlers
+    # Termux Native API Commands
     if cmd_str == "termux-info":
         info = (
             f"Termux Variables:\n"
@@ -90,8 +111,32 @@ def execute_shell_command(cmd, cwd=None):
             f"OS={platform.system()} {platform.release()}\n"
             f"PREFIX=/data/data/com.termux/files/usr\n"
             f"HOME={cwd}\n"
+            f"THEME={st.session_state.get('termux_theme', 'Classic Green')}\n"
         )
         return info, "", 0
+
+    if cmd_str == "termux-battery-status":
+        battery = {
+            "health": "GOOD",
+            "percentage": 98,
+            "plugged": "PLUGGED_AC",
+            "status": "CHARGING",
+            "temperature": 29.5
+        }
+        return json.dumps(battery, indent=2) + "\n", "", 0
+
+    if cmd_str.startswith("termux-toast"):
+        msg = cmd_str[12:].strip() or "Termux Toast Notification Sent!"
+        return f"[Toast Notification]: {msg}\n", "", 0
+
+    if cmd_str == "termux-clipboard-get":
+        clip = st.session_state.get("termux_clipboard", "Termux Clipboard Empty")
+        return f"{clip}\n", "", 0
+
+    if cmd_str.startswith("termux-clipboard-set"):
+        text = cmd_str[20:].strip()
+        st.session_state.termux_clipboard = text
+        return f"Clipboard set to: '{text}'\n", "", 0
 
     if cmd_str == "termux-setup-storage":
         storage_msg = (
@@ -119,15 +164,19 @@ def execute_shell_command(cmd, cwd=None):
         elif sub == "install" and len(parts) > 2:
             pkg_name = parts[2]
             cmd_str = f"pip install {pkg_name} || apt-get install -y {pkg_name}"
+        elif sub == "uninstall" and len(parts) > 2:
+            pkg_name = parts[2]
+            cmd_str = f"pip uninstall -y {pkg_name}"
         elif sub in ["search", "list-all", "list"]:
             query = parts[2] if len(parts) > 2 else ""
             cmd_str = f"pip search {query}" if query else "pip list"
         elif sub in ["help", "-h", "--help"]:
             help_msg = (
                 "Termux package manager (pkg / apt emulation):\n"
-                "  pkg install <pkg>  Install a Python/Linux package\n"
-                "  pkg update         Update package lists\n"
-                "  pkg list           List installed packages\n"
+                "  pkg install <pkg>    Install a Python/Linux package\n"
+                "  pkg uninstall <pkg>  Uninstall a package\n"
+                "  pkg update           Update package lists\n"
+                "  pkg list             List installed packages\n"
             )
             return help_msg, "", 0
 
@@ -183,9 +232,21 @@ def get_process_list():
             pass
     return pd.DataFrame(processes).sort_values(by='cpu_percent', ascending=False) if processes else pd.DataFrame()
 
-# Main Header
-st.title("📱 Termux Real CLI Terminal")
-st.caption(f"Termux Terminal Session | Working Directory: `{st.session_state.cwd}`")
+# Sidebar Theme & Settings
+with st.sidebar:
+    st.title("⚙️ Termux Settings")
+    st.session_state.termux_theme = st.selectbox("Termux Color Theme:", list(THEMES.keys()), index=list(THEMES.keys()).index(st.session_state.termux_theme))
+    st.divider()
+    st.write("### Quick Termux Info")
+    st.info(f"OS: {platform.system()} {platform.release()}\nArch: {platform.machine()}")
+
+# Main Header Window Frame
+st.markdown(f"""
+<div class="termux-window-header">
+    <span>📱 Termux Desktop Workstation (Session #1)</span>
+    <span>🟢 Active | Theme: {st.session_state.termux_theme}</span>
+</div>
+""", unsafe_allow_html=True)
 
 tab_terminal, tab_filemanager, tab_sysinfo = st.tabs(["💻 Termux CLI Terminal", "📁 File Manager & Editor", "📊 System & Resources"])
 
@@ -194,44 +255,61 @@ with tab_terminal:
     # Display Termux Banner
     st.markdown(f'<div class="termux-banner">{TERMUX_BANNER}</div>', unsafe_allow_html=True)
 
-    # Termux Touch Keys Bar
-    st.write("Termux Touch Keys:")
-    tk1, tk2, tk3, tk4, tk5, tk6, tk7, tk8, tk9 = st.columns(9)
+    # 2-Row Extended Touch Keys
+    st.write("Termux Extra Keys (Row 1):")
+    k1_1, k1_2, k1_3, k1_4, k1_5, k1_6, k1_7, k1_8 = st.columns(8)
 
     append_key = None
-    if tk1.button("`ESC`"):
+    if k1_1.button("`ESC`"):
         append_key = ""
-    if tk2.button("`TAB`"):
+    if k1_2.button("`TAB`"):
         append_key = "  "
-    if tk3.button("`CTRL`"):
+    if k1_3.button("`CTRL`"):
         append_key = "^C"
-    if tk4.button("`ALT`"):
+    if k1_4.button("`ALT`"):
         append_key = ""
-    if tk5.button("`-`"):
+    if k1_5.button("`-`"):
         append_key = " - "
-    if tk6.button("`/`"):
+    if k1_6.button("`/`"):
         append_key = "/"
-    if tk7.button("`|`"):
+    if k1_7.button("`|`"):
         append_key = " | "
-    if tk8.button("`~`"):
+    if k1_8.button("`~`"):
         append_key = "~"
-    if tk9.button("`CLEAR`"):
+
+    st.write("Termux Extra Keys (Row 2):")
+    k2_1, k2_2, k2_3, k2_4, k2_5, k2_6, k2_7, k2_8 = st.columns(8)
+    if k2_1.button("`UP`"):
+        run_quick_cmd = "pwd"
+    if k2_2.button("`DOWN`"):
+        run_quick_cmd = "ls -la"
+    if k2_3.button("`HOME`"):
+        run_quick_cmd = "cd ~"
+    if k2_4.button("`END`"):
+        append_key = " "
+    if k2_5.button("`PGUP`"):
+        run_quick_cmd = "top -bn1 | head -n 15"
+    if k2_6.button("`PGDN`"):
+        run_quick_cmd = "df -h"
+    if k2_7.button("`TOAST`"):
+        run_quick_cmd = "termux-toast Welcome to Termux Desktop"
+    if k2_8.button("`CLEAR`"):
         st.session_state.cmd_history = []
         st.rerun()
 
-    # Quick Command Shortcuts
-    st.write("Quick Commands:")
+    # Quick Commands Bar
+    st.write("Termux API Shortcuts:")
     q_col1, q_col2, q_col3, q_col4, q_col5, q_col6 = st.columns(6)
 
     run_quick_cmd = None
     if q_col1.button("`termux-info`"):
         run_quick_cmd = "termux-info"
-    if q_col2.button("`pkg list`"):
+    if q_col2.button("`termux-battery`"):
+        run_quick_cmd = "termux-battery-status"
+    if q_col3.button("`pkg list`"):
         run_quick_cmd = "pkg list"
-    if q_col3.button("`ls -la`"):
+    if q_col4.button("`ls -la`"):
         run_quick_cmd = "ls -la"
-    if q_col4.button("`pwd`"):
-        run_quick_cmd = "pwd"
     if q_col5.button("`top`"):
         run_quick_cmd = "top -bn1 | head -n 20"
     if q_col6.button("`python --version`"):
@@ -240,7 +318,7 @@ with tab_terminal:
     # Command Input Box
     termux_prompt = f"u0_a241@localhost:{st.session_state.cwd} $"
     with st.form(key="terminal_form", clear_on_submit=True):
-        user_input = st.text_input(f"{termux_prompt}", value=append_key if append_key else "", placeholder="Enter command: e.g. pkg install htop, termux-info, ls -la, python3")
+        user_input = st.text_input(f"{termux_prompt}", value=append_key if append_key else "", placeholder="Enter command: e.g. termux-info, pkg install htop, ls -la, python3")
         submit_btn = st.form_submit_button("Run Command 🚀")
 
     cmd_to_run = run_quick_cmd or (user_input if submit_btn else None)
@@ -260,7 +338,7 @@ with tab_terminal:
     # Terminal History Controls
     col_hist_title, col_hist_clear = st.columns([4, 1])
     with col_hist_clear:
-        if st.button("Clear Terminal"):
+        if st.button("Clear Terminal Log"):
             st.session_state.cmd_history = []
             st.rerun()
 
