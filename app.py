@@ -49,6 +49,12 @@ THEMES = {
 }
 
 
+# Helper to clean pkg flags like -y, --yes, -q
+def clean_pkg_args(args):
+    flags = {"-y", "--yes", "-q", "--quiet", "-f", "--fix-missing"}
+    return [a for a in args if a.lower() not in flags]
+
+
 # Function to execute commands
 def execute_shell_command(command: str, cwd: str = None) -> str:
     if cwd is None:
@@ -79,7 +85,8 @@ def execute_shell_command(command: str, cwd: str = None) -> str:
 
     # Handle Termux 'pkg' emulation
     if command == "pkg" or command.startswith("pkg "):
-        args = command.split()[1:]
+        raw_args = command.split()[1:]
+        args = clean_pkg_args(raw_args)
         if not args or args[0] in ["help", "-h", "--help"]:
             return (
                 "Termux Package Manager (pkg Emulator)\n\n"
@@ -165,6 +172,15 @@ def execute_shell_command(command: str, cwd: str = None) -> str:
         else:
             return f"{command}: termux API simulated."
 
+    # Handle background process execution (ending with &)
+    if command.endswith("&"):
+        bg_cmd = command[:-1].strip()
+        try:
+            proc = subprocess.Popen(bg_cmd, shell=True, cwd=cwd)
+            return f"[Started background process PID {proc.pid}]: {bg_cmd}"
+        except Exception as e:
+            return f"Error starting background process: {e}"
+
     # Handle general shell commands
     try:
         res = subprocess.run(command, shell=True, cwd=cwd, capture_output=True, text=True, timeout=30)
@@ -175,7 +191,7 @@ def execute_shell_command(command: str, cwd: str = None) -> str:
             output = "(Command executed successfully with no output)"
         return output
     except subprocess.TimeoutExpired:
-        return "Error: Command timed out after 30 seconds."
+        return "Error: Command timed out after 30 seconds. (Tip: append '&' to run long commands in background)"
     except Exception as e:
         return f"Error executing command: {e}"
 

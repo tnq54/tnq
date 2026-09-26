@@ -42,6 +42,16 @@ def test_execute_shell_command_pkg_search():
     assert "pytest" in output.lower()
 
 
+def test_execute_shell_command_pkg_install_with_flags():
+    output = execute_shell_command("pkg install pytest -y")
+    assert "Requirement already satisfied" in output or "Successfully installed" in output or "pytest" in output
+
+
+def test_execute_shell_command_background():
+    output = execute_shell_command("sleep 5 &")
+    assert "Started background process PID" in output
+
+
 def test_execute_shell_command_termux_info():
     output = execute_shell_command("termux-info")
     info = json.loads(output)
