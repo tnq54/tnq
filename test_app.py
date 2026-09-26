@@ -11,6 +11,7 @@ if "clipboard" not in st.session_state:
     st.session_state["clipboard"] = ""
 
 from app import execute_shell_command, get_system_metrics, get_process_list
+from main import is_port_in_use
 
 
 def test_execute_shell_command_basic():
@@ -88,3 +89,8 @@ def test_get_process_list():
     if len(procs) > 0:
         assert "PID" in procs[0]
         assert "Name" in procs[0]
+
+
+def test_is_port_in_use():
+    # Test with an unused high port number
+    assert is_port_in_use(59123) == False
