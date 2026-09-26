@@ -1,4 +1,7 @@
-streamlit
+streamlit==1.35.0
+pandas
+psutil
+pytest
 python-telegram-bot
 google-genai
 pypdf
