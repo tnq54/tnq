@@ -1,4 +1,6 @@
 streamlit
+pandas
+psutil
 python-telegram-bot
 google-genai
 pypdf
