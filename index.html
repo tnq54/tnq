@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Termux Web Terminal - Hugging Face Space</title>
+    <style>
+        :root {
+            --bg-color: #000000;
+            --text-color: #00ff66;
+            --prompt-color: #33ff00;
+            --user-color: #00ffff;
+            --path-color: #3388ff;
+            --accent-color: #ffb700;
+            --font-family: 'Courier New', Courier, monospace;
+        }
+
+        body.theme-monokai {
+            --bg-color: #272822;
+            --text-color: #f8f8f2;
+            --prompt-color: #a6e22e;
+            --user-color: #66d9ef;
+            --path-color: #fd971f;
+            --accent-color: #f92672;
+        }
+
+        body.theme-dracula {
+            --bg-color: #282a36;
+            --text-color: #f8f8f2;
+            --prompt-color: #50fa7b;
+            --user-color: #8be9fd;
+            --path-color: #bd93f9;
+            --accent-color: #ff79c6;
+        }
+
+        body.theme-solarized {
+            --bg-color: #002b36;
+            --text-color: #839496;
+            --prompt-color: #859900;
+            --user-color: #2aa198;
+            --path-color: #268bd2;
+            --accent-color: #b58900;
+        }
+
+        body.theme-cyan {
+            --bg-color: #050b14;
+            --text-color: #00f3ff;
+            --prompt-color: #00ffaa;
+            --user-color: #ff00ea;
+            --path-color: #00a2ff;
+            --accent-color: #ffff00;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: var(--font-family);
+            font-size: 14px;
+            overflow: hidden;
+        }
+
+        #terminal-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            width: 100vw;
+            padding: 10px;
+        }
+
+        #output-area {
+            flex: 1;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+            padding-bottom: 10px;
+        }
+
+        .banner {
+            color: var(--prompt-color);
+            font-weight: bold;
+            margin-bottom: 15px;
+            line-height: 1.2;
+        }
+
+        .command-line {
+            display: flex;
+            align-items: center;
+            margin-top: 5px;
+        }
+
+        .prompt {
+            color: var(--prompt-color);
+            white-space: nowrap;
+            margin-right: 8px;
+            font-weight: bold;
+        }
+
+        .prompt .user { color: var(--user-color); }
+        .prompt .path { color: var(--path-color); }
+
+        #input-line {
+            display: flex;
+            align-items: center;
+            width: 100%;
+        }
+
+        #cmd-input {
+            background: transparent;
+            border: none;
+            outline: none;
+            color: var(--text-color);
+            font-family: var(--font-family);
+            font-size: 14px;
+            width: 100%;
+            caret-color: var(--text-color);
+        }
+
+        /* Virtual Extra Keys Bar */
+        #extra-keys {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            padding: 8px 0;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            background-color: rgba(0, 0, 0, 0.3);
+        }
+
+        .key-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: var(--text-color);
+            padding: 6px 12px;
+            font-family: var(--font-family);
+            font-size: 12px;
+            font-weight: bold;
+            border-radius: 3px;
+            cursor: pointer;
+            user-select: none;
+            flex: 1;
+            min-width: 45px;
+            text-align: center;
+            transition: background 0.15s ease;
+        }
+
+        .key-btn:active {
+            background: var(--prompt-color);
+            color: var(--bg-color);
+        }
+
+        /* Special outputs */
+        .system-msg { color: var(--accent-color); }
+        .error-msg { color: #ff5555; }
+        .success-msg { color: #50fa7b; }
+        .dir { color: var(--path-color); font-weight: bold; }
+        .exec { color: var(--prompt-color); }
+
+        /* Canvas for Matrix Effect */
+        #matrix-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 999;
+            display: none;
+            background: black;
+        }
+    </style>
+</head>
+<body class="theme-classic">
+
+    <canvas id="matrix-canvas"></canvas>
+
+    <div id="terminal-container">
+        <div id="output-area">
+            <pre class="banner">
+ _____
+|_   _|__  _ __ _ __ ___  _   ___  __
+  | |/ _ \| '__| '_ ` _ \| | | \ \/ /
+  | |  __/| |  | | | | | | |_| |>  <
+  |_|\___||_|  |_| |_| |_|\__,_/_/\_\ Static Web Shell
+
+Welcome to Termux Static Web Terminal!
+Type <span class="system-msg">'help'</span> for available commands or <span class="system-msg">'pkg help'</span> for package management.
+Host: Hugging Face Space (Static HTML Environment)
+            </pre>
+        </div>
+
+        <div id="input-line">
+            <span class="prompt" id="prompt-span"><span class="user">u0_a124</span>@<span class="path">~</span> $</span>
+            <input type="text" id="cmd-input" autofocus autocomplete="off" spellcheck="false">
+        </div>
+
+        <div id="extra-keys">
+            <button class="key-btn" onclick="sendKey('ESC')">ESC</button>
+            <button class="key-btn" onclick="sendKey('TAB')">TAB</button>
+            <button class="key-btn" onclick="sendKey('CTRL')">CTRL</button>
+            <button class="key-btn" onclick="sendKey('ALT')">ALT</button>
+            <button class="key-btn" onclick="insertChar('-')">-</button>
+            <button class="key-btn" onclick="insertChar('/')">/</button>
+            <button class="key-btn" onclick="insertChar('|')">|</button>
+            <button class="key-btn" onclick="insertChar('~')">~</button>
+            <button class="key-btn" onclick="sendKey('UP')">▲</button>
+            <button class="key-btn" onclick="sendKey('DOWN')">▼</button>
+            <button class="key-btn" onclick="sendKey('CLEAR')">CLEAR</button>
+        </div>
+    </div>
+
+    <script>
+        // Terminal State
+        const state = {
+            cwd: '~',
+            user: 'u0_a124',
+            history: [],
+            historyIdx: -1,
+            installedPackages: ['coreutils', 'bash', 'termux-exec', 'git', 'python'],
+            fs: {
+                '~': {
+                    type: 'dir',
+                    content: {
+                        'welcome.txt': { type: 'file', content: 'Welcome to Termux Static Web Workspace on Hugging Face Spaces!' },
+                        'system.info': { type: 'file', content: 'OS: Termux Emulated (Linux/Web)\nArch: x86_64 / arm64\nKernel: Static Web Engine' },
+                        'projects': {
+                            type: 'dir',
+                            content: {
+                                'index.html': { type: 'file', content: '<!-- Termux Static Landing Page -->' },
+                                'readme.md': { type: 'file', content: '# Termux Static Web Workspace\nDeployed on Hugging Face Spaces.' }
+                            }
+                        },
+                        'scripts': {
+                            type: 'dir',
+                            content: {
+                                'hello.sh': { type: 'file', content: '#!/data/data/com.termux/files/usr/bin/bash\necho "Hello from Termux Static!"' }
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        const outputArea = document.getElementById('output-area');
+        const cmdInput = document.getElementById('cmd-input');
+        const promptSpan = document.getElementById('prompt-span');
+        const matrixCanvas = document.getElementById('matrix-canvas');
+
+        // Update Prompt Display
+        function updatePrompt() {
+            promptSpan.innerHTML = `<span class="user">${state.user}</span>@<span class="path">${state.cwd}</span> $`;
+        }
+
+        // Get directory object from path
+        function getDirNode(path) {
+            if (path === '~' || path === '') return state.fs['~'];
+            const parts = path.replace(/^~\/?/, '').split('/').filter(Boolean);
+            let current = state.fs['~'];
+            for (const part of parts) {
+                if (current.content && current.content[part] && current.content[part].type === 'dir') {
+                    current = current.content[part];
+                } else {
+                    return null;
+                }
+            }
+            return current;
+        }
+
+        // Append line to output
+        function printOutput(htmlContent) {
+            const div = document.createElement('div');
+            div.innerHTML = htmlContent;
+            outputArea.appendChild(div);
+            outputArea.scrollTop = outputArea.scrollHeight;
+        }
+
+        // Virtual Keys actions
+        function insertChar(char) {
+            cmdInput.value += char;
+            cmdInput.focus();
+        }
+
+        function sendKey(key) {
+            if (key === 'CLEAR') {
+                outputArea.innerHTML = '';
+            } else if (key === 'UP') {
+                if (state.history.length > 0) {
+                    if (state.historyIdx < state.history.length - 1) {
+                        state.historyIdx++;
+                        cmdInput.value = state.history[state.history.length - 1 - state.historyIdx];
+                    }
+                }
+            } else if (key === 'DOWN') {
+                if (state.historyIdx > 0) {
+                    state.historyIdx--;
+                    cmdInput.value = state.history[state.history.length - 1 - state.historyIdx];
+                } else if (state.historyIdx === 0) {
+                    state.historyIdx = -1;
+                    cmdInput.value = '';
+                }
+            } else if (key === 'TAB') {
+                handleTabCompletion();
+            } else if (key === 'ESC') {
+                cmdInput.value = '';
+            } else {
+                printOutput(`<span class="system-msg">[Key ${key} pressed]</span>`);
+            }
+            cmdInput.focus();
+        }
+
+        // Tab completion
+        function handleTabCompletion() {
+            const val = cmdInput.value.trim();
+            const parts = val.split(' ');
+            const currentDirNode = getDirNode(state.cwd);
+            if (!currentDirNode || !currentDirNode.content) return;
+
+            const items = Object.keys(currentDirNode.content);
+            const lastPart = parts[parts.length - 1];
+            const matches = items.filter(item => item.startsWith(lastPart));
+
+            if (matches.length === 1) {
+                parts[parts.length - 1] = matches[0];
+                cmdInput.value = parts.join(' ');
+            } else if (matches.length > 1) {
+                printOutput(`<span class="prompt">${promptSpan.innerText} ${cmdInput.value}</span>`);
+                printOutput(matches.join('  '));
+            }
+        }
+
+        // Command Parser
+        function handleCommand(rawCmd) {
+            const cmd = rawCmd.trim();
+            if (!cmd) return;
+
+            // Log history
+            state.history.push(cmd);
+            state.historyIdx = -1;
+
+            // Display executed command
+            printOutput(`<div class="command-line"><span class="prompt">${promptSpan.innerHTML}</span> <span>${escapeHtml(cmd)}</span></div>`);
+
+            const args = cmd.split(' ').filter(Boolean);
+            const mainCmd = args[0].toLowerCase();
+
+            switch (mainCmd) {
+                case 'help':
+                    printOutput(`
+<span class="system-msg">Available Commands:</span>
+  <span class="exec">pkg</span> [install|update|list|uninstall|search] - Package management
+  <span class="exec">ls</span> [-l]                     - List directory contents
+  <span class="exec">cd</span> [dir]                    - Change directory
+  <span class="exec">pwd</span>                         - Print working directory
+  <span class="exec">cat</span> [file]                  - Display file content
+  <span class="exec">echo</span> [text]                 - Output text
+  <span class="exec">mkdir</span> [dir]                 - Create directory
+  <span class="exec">touch</span> [file]                - Create empty file
+  <span class="exec">clear</span>                       - Clear terminal screen
+  <span class="exec">neofetch</span>                    - Show system information
+  <span class="exec">matrix</span>                      - Launch digital rain effect
+  <span class="exec">top</span> / <span class="exec">htop</span>                - Process monitor simulation
+  <span class="exec">theme</span> [classic|monokai|dracula|solarized|cyan] - Change theme
+  <span class="exec">whoami</span> / <span class="exec">uname</span> / <span class="exec">date</span>       - System utilities
+  <span class="exec">termux-info</span>                 - Show Termux system specs
+  <span class="exec">termux-battery-status</span>       - Battery status simulation
+  <span class="exec">history</span>                     - Command history
+`);
+                    break;
+
+                case 'pkg':
+                    handlePkg(args.slice(1));
+                    break;
+
+                case 'ls':
+                    handleLs(args.slice(1));
+                    break;
+
+                case 'cd':
+                    handleCd(args[1]);
+                    break;
+
+                case 'pwd':
+                    printOutput(`/data/data/com.termux/files/home${state.cwd === '~' ? '' : '/' + state.cwd.replace(/^~\/?/, '')}`);
+                    break;
+
+                case 'cat':
+                    handleCat(args[1]);
+                    break;
+
+                case 'echo':
+                    printOutput(escapeHtml(args.slice(1).join(' ')));
+                    break;
+
+                case 'mkdir':
+                    handleMkdir(args[1]);
+                    break;
+
+                case 'touch':
+                    handleTouch(args[1]);
+                    break;
+
+                case 'clear':
+                    outputArea.innerHTML = '';
+                    break;
+
+                case 'neofetch':
+                    handleNeofetch();
+                    break;
+
+                case 'matrix':
+                    runMatrix();
+                    break;
+
+                case 'top':
+                case 'htop':
+                    handleTop();
+                    break;
+
+                case 'theme':
+                    handleTheme(args[1]);
+                    break;
+
+                case 'whoami':
+                    printOutput(state.user);
+                    break;
+
+                case 'uname':
+                    printOutput('Linux termux-static 5.15.0-hf #1 SMP PREEMPT x86_64 GNU/Linux');
+                    break;
+
+                case 'date':
+                    printOutput(new Date().toString());
+                    break;
+
+                case 'history':
+                    printOutput(state.history.map((c, i) => `  ${i + 1}  ${escapeHtml(c)}`).join('\n'));
+                    break;
+
+                case 'termux-info':
+                    printOutput(`
+Packages CPU architecture:
+x86_64
+Subpackages:
+enabled
+Upstream locale:
+en_US.UTF-8
+Termux-tools version:
+1.38.2
+Termux Static HF Edition
+`);
+                    break;
+
+                case 'termux-battery-status':
+                    printOutput(`{\n  "health": "GOOD",\n  "percentage": 100,\n  "plugged": "PLUGGED_AC",\n  "status": "CHARGING",\n  "temperature": 28.5\n}`);
+                    break;
+
+                default:
+                    printOutput(`<span class="error-msg">No command '${escapeHtml(mainCmd)}' found, try 'help' or 'pkg search ${escapeHtml(mainCmd)}'</span>`);
+                    break;
+            }
+        }
+
+        // Package Management Simulation
+        function handlePkg(args) {
+            const action = args[0];
+            const pkgName = args[1];
+
+            if (!action || action === 'help') {
+                printOutput(`
+pkg command usage:
+  pkg install <package>
+  pkg uninstall <package>
+  pkg update / upgrade
+  pkg list-installed
+  pkg search <query>
+`);
+                return;
+            }
+
+            if (action === 'install') {
+                if (!pkgName) {
+                    printOutput('<span class="error-msg">Specify package name to install</span>');
+                    return;
+                }
+                if (state.installedPackages.includes(pkgName)) {
+                    printOutput(`<span class="system-msg">${pkgName} is already installed and up to date.</span>`);
+                } else {
+                    printOutput(`Checking availability of '${pkgName}'...\nDownloading ${pkgName}_1.0.0_x86_64.deb...\nUnpacking ${pkgName}...\nSetting up ${pkgName}...`);
+                    state.installedPackages.push(pkgName);
+                    printOutput(`<span class="success-msg">Successfully installed ${pkgName}!</span>`);
+                }
+            } else if (action === 'uninstall' || action === 'remove') {
+                if (!pkgName) {
+                    printOutput('<span class="error-msg">Specify package name to uninstall</span>');
+                    return;
+                }
+                const idx = state.installedPackages.indexOf(pkgName);
+                if (idx !== -1) {
+                    state.installedPackages.splice(idx, 1);
+                    printOutput(`<span class="success-msg">Package ${pkgName} removed.</span>`);
+                } else {
+                    printOutput(`<span class="error-msg">Package ${pkgName} is not installed.</span>`);
+                }
+            } else if (action === 'update' || action === 'upgrade') {
+                printOutput('Updating Termux repositories...\nGet:1 https://dl.bintray.com/termux/termux-packages-24 stable InRelease\nAll packages up to date.');
+            } else if (action === 'list-installed') {
+                printOutput(state.installedPackages.map(p => `${p}/stable,now 1.0.0 x86_64 [installed]`).join('\n'));
+            } else if (action === 'search') {
+                printOutput(`Found packages for '${pkgName || ''}':\n- ${pkgName || 'demo'}-tool/stable 1.0.0\n- ${pkgName || 'demo'}-utils/stable 2.1.0`);
+            } else {
+                printOutput(`<span class="error-msg">Unknown pkg action '${action}'</span>`);
+            }
+        }
+
+        // Directory listing
+        function handleLs(args) {
+            const node = getDirNode(state.cwd);
+            if (!node || !node.content) {
+                printOutput('<span class="error-msg">Cannot access directory</span>');
+                return;
+            }
+
+            const items = Object.keys(node.content);
+            if (items.length === 0) return;
+
+            const isLong = args.includes('-l');
+            if (isLong) {
+                const list = items.map(name => {
+                    const item = node.content[name];
+                    const isDir = item.type === 'dir';
+                    const perm = isDir ? 'drwxr-xr-x' : '-rw-r--r--';
+                    const size = isDir ? 4096 : (item.content ? item.content.length : 0);
+                    const nameFormatted = isDir ? `<span class="dir">${name}/</span>` : name;
+                    return `${perm} 1 u0_a124 u0_a124 ${size.toString().padStart(6, ' ')} Jan 24 12:00 ${nameFormatted}`;
+                });
+                printOutput(list.join('\n'));
+            } else {
+                const list = items.map(name => {
+                    const item = node.content[name];
+                    return item.type === 'dir' ? `<span class="dir">${name}/</span>` : name;
+                });
+                printOutput(list.join('  '));
+            }
+        }
+
+        // Change directory
+        function handleCd(target) {
+            if (!target || target === '~') {
+                state.cwd = '~';
+                updatePrompt();
+                return;
+            }
+
+            if (target === '..') {
+                if (state.cwd !== '~') {
+                    const parts = state.cwd.split('/');
+                    parts.pop();
+                    state.cwd = parts.length === 0 ? '~' : parts.join('/');
+                    updatePrompt();
+                }
+                return;
+            }
+
+            let newPath = state.cwd === '~' ? `~/${target}` : `${state.cwd}/${target}`;
+            newPath = newPath.replace(/\/+/g, '/');
+
+            const targetNode = getDirNode(newPath);
+            if (targetNode && targetNode.type === 'dir') {
+                state.cwd = newPath;
+                updatePrompt();
+            } else {
+                printOutput(`<span class="error-msg">cd: no such file or directory: ${escapeHtml(target)}</span>`);
+            }
+        }
+
+        // Cat file
+        function handleCat(filename) {
+            if (!filename) {
+                printOutput('<span class="error-msg">Usage: cat <filename></span>');
+                return;
+            }
+
+            const node = getDirNode(state.cwd);
+            if (node && node.content && node.content[filename]) {
+                if (node.content[filename].type === 'file') {
+                    printOutput(escapeHtml(node.content[filename].content));
+                } else {
+                    printOutput(`<span class="error-msg">cat: ${escapeHtml(filename)}: Is a directory</span>`);
+                }
+            } else {
+                printOutput(`<span class="error-msg">cat: ${escapeHtml(filename)}: No such file or directory</span>`);
+            }
+        }
+
+        // Mkdir
+        function handleMkdir(dirname) {
+            if (!dirname) {
+                printOutput('<span class="error-msg">Usage: mkdir <dirname></span>');
+                return;
+            }
+            const node = getDirNode(state.cwd);
+            if (node && node.content) {
+                if (node.content[dirname]) {
+                    printOutput(`<span class="error-msg">mkdir: cannot create directory '${escapeHtml(dirname)}': File exists</span>`);
+                } else {
+                    node.content[dirname] = { type: 'dir', content: {} };
+                    printOutput(`<span class="success-msg">Directory '${escapeHtml(dirname)}' created.</span>`);
+                }
+            }
+        }
+
+        // Touch
+        function handleTouch(filename) {
+            if (!filename) {
+                printOutput('<span class="error-msg">Usage: touch <filename></span>');
+                return;
+            }
+            const node = getDirNode(state.cwd);
+            if (node && node.content) {
+                if (!node.content[filename]) {
+                    node.content[filename] = { type: 'file', content: '' };
+                }
+            }
+        }
+
+        // Neofetch
+        function handleNeofetch() {
+            printOutput(`
+<span class="prompt">        .-.        </span>   <span class="system-msg">${state.user}@termux-static</span>
+<span class="prompt">       (   )       </span>   -------------------
+<span class="prompt">        \`-\`        </span>   <span class="exec">OS</span>: Termux Static HTML Environment
+<span class="prompt">     /|     |\\     </span>   <span class="exec">Host</span>: Hugging Face Spaces
+<span class="prompt">    / |     | \\    </span>   <span class="exec">Kernel</span>: Web-JS 1.0.0
+<span class="prompt">   |  |  _  |  |   </span>   <span class="exec">Uptime</span>: 10 mins
+<span class="prompt">   |  | (_) |  |   </span>   <span class="exec">Packages</span>: ${state.installedPackages.length} (dpkg)
+<span class="prompt">   |  |     |  |   </span>   <span class="exec">Shell</span>: termux-bash 5.2
+<span class="prompt">   \\  |     |  /   </span>   <span class="exec">Terminal</span>: Web-HTML Canvas
+<span class="prompt">    \\ |     | /    </span>   <span class="exec">CPU</span>: Virtual Web Engine (8) @ 3.20GHz
+<span class="prompt">     \\|_____|/     </span>   <span class="exec">Memory</span>: 2048MiB / 8192MiB
+`);
+        }
+
+        // Top / Htop process monitor
+        function handleTop() {
+            printOutput(`
+<span class="system-msg">Tasks: 4 total, 1 running, 3 sleeping, 0 stopped</span>
+<span class="prompt">%Cpu(s):  2.3 us,  1.1 sy,  0.0 ni, 96.6 id,  0.0 wa</span>
+<span class="path">MiB Mem :   8192.0 total,   4096.0 free,   2048.0 used</span>
+
+  PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND
+ 1024 u0_a124   20   0  128.4m  32.1m  12.4m R   2.5   0.4   0:01.20 bash
+    1 root      20   0   12.1m   2.1m   1.8m S   0.0   0.0   0:00.05 init
+  452 u0_a124   20   0   45.2m   8.2m   4.1m S   0.0   0.1   0:00.12 termux-exec
+ 2048 u0_a124   20   0   89.0m  18.0m   9.0m S   0.0   0.2   0:00.30 python
+`);
+        }
+
+        // Themes switch
+        function handleTheme(themeName) {
+            const validThemes = ['classic', 'monokai', 'dracula', 'solarized', 'cyan'];
+            if (!themeName || !validThemes.includes(themeName.toLowerCase())) {
+                printOutput(`<span class="system-msg">Available themes: ${validThemes.join(', ')}</span>`);
+                return;
+            }
+            document.body.className = '';
+            document.body.classList.add(`theme-${themeName.toLowerCase()}`);
+            printOutput(`<span class="success-msg">Theme switched to '${themeName.toLowerCase()}'.</span>`);
+        }
+
+        // Matrix Effect
+        function runMatrix() {
+            matrixCanvas.style.display = 'block';
+            const ctx = matrixCanvas.getContext('2d');
+            matrixCanvas.width = window.innerWidth;
+            matrixCanvas.height = window.innerHeight;
+
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%^&*()*&^%';
+            const fontSize = 14;
+            const columns = matrixCanvas.width / fontSize;
+            const drops = Array.from({ length: columns }, () => 1);
+
+            let frame = 0;
+            const interval = setInterval(() => {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+                ctx.fillRect(0, 0, matrixCanvas.width, matrixCanvas.height);
+
+                ctx.fillStyle = '#0F0';
+                ctx.font = `${fontSize}px monospace`;
+
+                for (let i = 0; i < drops.length; i++) {
+                    const text = chars.charAt(Math.floor(Math.random() * chars.length));
+                    ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+
+                    if (drops[i] * fontSize > matrixCanvas.height && Math.random() > 0.975) {
+                        drops[i] = 0;
+                    }
+                    drops[i]++;
+                }
+
+                frame++;
+                if (frame > 200) {
+                    clearInterval(interval);
+                    matrixCanvas.style.display = 'none';
+                    printOutput('<span class="system-msg">Matrix simulation ended.</span>');
+                }
+            }, 33);
+        }
+
+        // HTML Escape helper
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.innerText = text;
+            return div.innerHTML;
+        }
+
+        // Input Listener
+        cmdInput.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') {
+                handleCommand(cmdInput.value);
+                cmdInput.value = '';
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                sendKey('UP');
+            } else if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                sendKey('DOWN');
+            } else if (e.key === 'Tab') {
+                e.preventDefault();
+                sendKey('TAB');
+            }
+        });
+
+        // Click outside to focus input
+        document.addEventListener('click', (e) => {
+            if (e.target.tagName !== 'BUTTON') {
+                cmdInput.focus();
+            }
+        });
+
+        // Initial setup
+        updatePrompt();
+    </script>
+</body>
+</html>
